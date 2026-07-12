@@ -38,6 +38,9 @@ importers:
       '@qrew/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@qrew/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@qrew/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -85,6 +88,31 @@ importers:
       typescript:
         specifier: ^7.0.0
         version: 7.0.2
+
+  packages/core:
+    dependencies:
+      '@qrew/db':
+        specifier: workspace:*
+        version: link:../db
+      '@qrew/wallet-core':
+        specifier: workspace:*
+        version: link:../wallet-core
+      drizzle-orm:
+        specifier: ^0.44.0
+        version: 0.44.7(postgres@3.4.9)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.20.1
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
+      typescript:
+        specifier: ^7.0.0
+        version: 7.0.2
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(terser@5.49.0)(tsx@4.23.0)
 
   packages/db:
     dependencies:

@@ -12,9 +12,11 @@ export const StampRequest = z.object({
 export type StampRequest = z.infer<typeof StampRequest>;
 
 export const EnrollRequest = z.object({
+  merchantId: z.string().uuid(), // from the merchant's counter QR (public routing, not auth)
   programId: z.string().uuid(),
   phone: z.string().min(5).optional(),
   name: z.string().min(1).optional(),
+  consent: z.object({ sms: z.boolean().optional(), whatsapp: z.boolean().optional() }).optional(),
 });
 export type EnrollRequest = z.infer<typeof EnrollRequest>;
 

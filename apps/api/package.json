@@ -20,7 +20,8 @@
     "drizzle-orm": "^0.44.0",
     "zod": "^4.0.0",
     "@qrew/db": "workspace:*",
-    "@qrew/contracts": "workspace:*"
+    "@qrew/contracts": "workspace:*",
+    "@qrew/core": "workspace:*"
   },
   "devDependencies": {
     "@swc/core": "^1.7.0",
