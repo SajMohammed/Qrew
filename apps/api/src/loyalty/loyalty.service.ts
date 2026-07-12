@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { withTenant, loyaltyPrograms, enrollments, stampEvents } from "@qrew/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 @Injectable()
 export class LoyaltyService {
@@ -13,9 +13,10 @@ export class LoyaltyService {
    * Add one stamp — the core correctness pattern:
    *   1. append to the append-only ledger; the unique (merchant_id, idempotency_key)
    *      makes a retried or double-tapped scan a no-op, not a double-stamp.
-   *   2. recompute the balance FROM THE LEDGER (the source of truth) and cache it
-   *      on the enrollment as a projection.
-   * Both steps run in one tenant-scoped transaction.
+   *   2. the DB trigger (qrew_apply_stamp_delta) updates the cached projection
+   *      (enrollments.current_stamps) atomically — no manual recompute, no drift.
+   *      We just read the projection back.
+   * Runs in one tenant-scoped transaction.
    */
   addStamp(
     merchantId: string,
@@ -36,18 +37,13 @@ export class LoyaltyService {
         .onConflictDoNothing({ target: [stampEvents.merchantId, stampEvents.idempotencyKey] })
         .returning();
 
-      const [row] = await db
-        .select({ total: sql<number>`coalesce(sum(${stampEvents.delta}), 0)` })
-        .from(stampEvents)
-        .where(eq(stampEvents.enrollmentId, input.enrollmentId));
-      const currentStamps = Number(row?.total ?? 0);
-
-      await db
-        .update(enrollments)
-        .set({ currentStamps })
+      // current_stamps is maintained by the DB trigger; just read the projection back.
+      const [enrollment] = await db
+        .select({ currentStamps: enrollments.currentStamps })
+        .from(enrollments)
         .where(eq(enrollments.id, input.enrollmentId));
 
-      return { applied: inserted.length > 0, currentStamps };
+      return { applied: inserted.length > 0, currentStamps: enrollment?.currentStamps ?? 0 };
     });
   }
 }

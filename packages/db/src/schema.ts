@@ -105,7 +105,7 @@ export const enrollments = pgTable(
       .notNull()
       .references(() => customers.id, { onDelete: "cascade" }),
     cardSerial: text("card_serial").notNull(),
-    currentStamps: integer("current_stamps").notNull().default(0), // cached projection of the ledger
+    currentStamps: integer("current_stamps").notNull().default(0), // projection — trigger-maintained (migration 0001)
     applePassId: text("apple_pass_id"),
     googleObjectId: text("google_object_id"),
     status: text("status").notNull().default("active"),
