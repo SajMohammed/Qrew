@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: qrew
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d qrew"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/qrew
+      DATABASE_URL_APP: postgres://qrew_app:qrew_app@localhost:5432/qrew
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --no-frozen-lockfile
+
+      - name: Apply migrations (schema + RLS)
+        run: pnpm db:migrate
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # The tenant-isolation suite is the gate: if a merchant can read another's
+      # rows, this fails and the merge is blocked.
+      - name: Test (incl. RLS tenant-isolation)
+        run: pnpm test

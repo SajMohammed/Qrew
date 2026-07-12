@@ -1,0 +1,35 @@
+{
+  "name": "@qrew/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "migrate": "tsx src/migrate.ts",
+    "seed": "tsx src/seed.ts",
+    "studio": "drizzle-kit studio",
+    "generate": "drizzle-kit generate",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.0",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0",
+    "dotenv": "^16.4.5",
+    "vitest": "^3.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^7.0.0",
+    "@types/node": "^22.15.0"
+  }
+}

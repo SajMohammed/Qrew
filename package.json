@@ -1,0 +1,27 @@
+{
+  "name": "qrew",
+  "private": true,
+  "packageManager": "pnpm@11.5.3",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @qrew/db migrate",
+    "db:seed": "pnpm --filter @qrew/db seed",
+    "db:studio": "pnpm --filter @qrew/db studio",
+    "api:dev": "pnpm --filter @qrew/api dev"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^7.0.0",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.0"
+  }
+}

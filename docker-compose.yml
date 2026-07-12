@@ -1,0 +1,27 @@
+# Local-only dependencies. Production data lives on AWS me-central-1 (see infra/).
+services:
+  postgres:
+    image: postgres:16
+    container_name: qrew-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: qrew
+    ports:
+      - "5432:5432"
+    volumes:
+      - qrew_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d qrew"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7
+    container_name: qrew-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  qrew_pg:

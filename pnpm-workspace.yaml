@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Native binaries these deps need to compile/download at install time.
+allowBuilds:
+  "@swc/core": true
+  esbuild: true

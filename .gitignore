@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+*.log
+
+# env & secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# next / vite build output
+.next/
+out/
+
+# terraform
+infra/terraform/.terraform/
+*.tfstate
+*.tfstate.*
