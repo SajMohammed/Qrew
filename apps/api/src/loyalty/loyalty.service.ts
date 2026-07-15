@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { withTenant, loyaltyPrograms } from "@qrew/db";
-import { addStamp as coreAddStamp } from "@qrew/core";
+import { addStamp as coreAddStamp, redeem as coreRedeem } from "@qrew/core";
 
 @Injectable()
 export class LoyaltyService {
@@ -15,5 +15,13 @@ export class LoyaltyService {
     input: { enrollmentId: string; idempotencyKey: string; locationId?: string; staffId?: string },
   ) {
     return coreAddStamp({ merchantId, ...input });
+  }
+
+  /** Redeem a reward — delegates to the domain layer (verify-at-ledger + wallet sync). */
+  redeem(
+    merchantId: string,
+    input: { enrollmentId: string; idempotencyKey: string; staffId?: string },
+  ) {
+    return coreRedeem({ merchantId, ...input });
   }
 }

@@ -11,6 +11,12 @@ export const StampRequest = z.object({
 });
 export type StampRequest = z.infer<typeof StampRequest>;
 
+export const RedeemRequest = z.object({
+  enrollmentId: z.string().uuid(),
+  idempotencyKey: z.string().min(8),
+});
+export type RedeemRequest = z.infer<typeof RedeemRequest>;
+
 export const EnrollRequest = z.object({
   merchantId: z.string().uuid(), // from the merchant's counter QR (public routing, not auth)
   programId: z.string().uuid(),

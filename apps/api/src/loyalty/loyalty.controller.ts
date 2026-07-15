@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Req, UnauthorizedException } from "@nestjs/common";
 import type { Request } from "express";
-import { StampRequest } from "@qrew/contracts";
+import { StampRequest, RedeemRequest } from "@qrew/contracts";
 import { LoyaltyService } from "./loyalty.service";
 
 @Controller("loyalty")
@@ -19,6 +19,15 @@ export class LoyaltyController {
       enrollmentId: input.enrollmentId,
       idempotencyKey: input.idempotencyKey,
       locationId: input.locationId,
+    });
+  }
+
+  @Post("redeem")
+  redeem(@Req() req: Request, @Body() body: unknown) {
+    const input = RedeemRequest.parse(body);
+    return this.loyalty.redeem(this.tenant(req), {
+      enrollmentId: input.enrollmentId,
+      idempotencyKey: input.idempotencyKey,
     });
   }
 
