@@ -58,7 +58,7 @@ export function StampCard({
 
         <div className="sc-qr">
           <div className="sc-qr-box">
-            <QRCodeSVG value={card.serial} size={116} bgColor="transparent" fgColor="#ffffff" />
+            <QRCodeSVG value={card.qrToken || card.serial} size={116} bgColor="transparent" fgColor="#ffffff" />
           </div>
           <div className="sc-qr-cap">Show this to staff to earn a stamp</div>
         </div>

@@ -2,6 +2,7 @@ const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
 export interface CardView {
   serial: string;
+  qrToken: string;
   merchantName: string;
   programName: string;
   rewardText: string;

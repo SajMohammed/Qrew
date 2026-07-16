@@ -1,8 +1,11 @@
 import { eq } from "drizzle-orm";
 import { adminDb, merchants, loyaltyPrograms, enrollments } from "@qrew/db";
+import { mintCardToken } from "./token";
 
 export interface CardView {
   serial: string;
+  /** Short-lived signed token to render in the QR (rotates as the card polls). */
+  qrToken: string;
   merchantName: string;
   programName: string;
   rewardText: string;
@@ -39,6 +42,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
 
   return {
     serial: row.serial,
+    qrToken: mintCardToken(row.serial),
     merchantName: row.merchantName,
     programName: row.programName,
     rewardText: row.rewardText,
