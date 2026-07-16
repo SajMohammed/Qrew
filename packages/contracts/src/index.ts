@@ -17,6 +17,12 @@ export const RedeemRequest = z.object({
 });
 export type RedeemRequest = z.infer<typeof RedeemRequest>;
 
+export const ScanRequest = z.object({
+  serial: z.string().min(8), // the customer card serial from the scanned QR
+  idempotencyKey: z.string().min(8),
+});
+export type ScanRequest = z.infer<typeof ScanRequest>;
+
 export const EnrollRequest = z.object({
   merchantId: z.string().uuid(), // from the merchant's counter QR (public routing, not auth)
   programId: z.string().uuid(),

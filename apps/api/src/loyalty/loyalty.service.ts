@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { withTenant, loyaltyPrograms } from "@qrew/db";
-import { addStamp as coreAddStamp, redeem as coreRedeem } from "@qrew/core";
+import { addStamp as coreAddStamp, redeem as coreRedeem, scanStamp as coreScan } from "@qrew/core";
 
 @Injectable()
 export class LoyaltyService {
@@ -9,7 +9,7 @@ export class LoyaltyService {
     return withTenant(merchantId, (db) => db.select().from(loyaltyPrograms));
   }
 
-  /** Add one stamp — delegates to the shared domain layer (ledger + trigger + wallet sync). */
+  /** Add one stamp by enrollment id — delegates to the shared domain layer. */
   addStamp(
     merchantId: string,
     input: { enrollmentId: string; idempotencyKey: string; locationId?: string; staffId?: string },
@@ -17,11 +17,13 @@ export class LoyaltyService {
     return coreAddStamp({ merchantId, ...input });
   }
 
-  /** Redeem a reward — delegates to the domain layer (verify-at-ledger + wallet sync). */
-  redeem(
-    merchantId: string,
-    input: { enrollmentId: string; idempotencyKey: string; staffId?: string },
-  ) {
+  /** Add one stamp by scanned card serial (the staff-scanner path). */
+  scan(merchantId: string, input: { serial: string; idempotencyKey: string; staffId?: string }) {
+    return coreScan({ merchantId, ...input });
+  }
+
+  /** Redeem a reward — verify-at-ledger + wallet sync. */
+  redeem(merchantId: string, input: { enrollmentId: string; idempotencyKey: string; staffId?: string }) {
     return coreRedeem({ merchantId, ...input });
   }
 }
