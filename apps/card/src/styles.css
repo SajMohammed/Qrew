@@ -220,3 +220,19 @@ button.primary { background: var(--accent); color: #071a17; }
 .dev-row button.ghost {
   background: transparent; color: var(--brass); border: 1px solid var(--border);
 }
+
+.viewfoot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border);
+}
+.live { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(55, 169, 156, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(55, 169, 156, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(55, 169, 156, 0); }
+}
+button.link {
+  background: transparent; color: var(--brass); border: 0;
+  font-family: var(--mono); font-size: 12px; padding: 6px 4px;
+}

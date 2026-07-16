@@ -8,16 +8,19 @@ export function StampCard({
   err,
   onStamp,
   onRedeem,
+  onForget,
 }: {
   card: CardView;
   busy: boolean;
   err: string | null;
-  onStamp: () => void;
-  onRedeem: () => void;
+  onStamp?: () => void;
+  onRedeem?: () => void;
+  onForget?: () => void;
 }) {
   const total = card.stampsRequired;
   const cells = Array.from({ length: total }, (_, i) => i < card.currentStamps);
   const remaining = Math.max(0, total - card.currentStamps);
+  const showDev = Boolean(onStamp && onRedeem);
 
   return (
     <div className="screen card-screen">
@@ -73,15 +76,29 @@ export function StampCard({
         Wallet buttons light up when a provider (Google / PassKit) is connected.
       </p>
 
-      <div className="dev-row">
-        <span className="dev-label">DEV</span>
-        <button onClick={onStamp} disabled={busy}>
-          + Simulate stamp
-        </button>
-        <button className="ghost" onClick={onRedeem} disabled={busy || !card.rewardReady}>
-          Redeem
-        </button>
-      </div>
+      {showDev ? (
+        <div className="dev-row">
+          <span className="dev-label">DEV</span>
+          <button onClick={onStamp} disabled={busy}>
+            + Simulate stamp
+          </button>
+          <button className="ghost" onClick={onRedeem} disabled={busy || !card.rewardReady}>
+            Redeem
+          </button>
+        </div>
+      ) : (
+        <div className="viewfoot">
+          <span className="live">
+            <span className="live-dot" />
+            Live — updates as staff stamp your card
+          </span>
+          {onForget && (
+            <button className="link" onClick={onForget}>
+              Reset card
+            </button>
+          )}
+        </div>
+      )}
       {err && <p className="err">{err}</p>}
     </div>
   );
