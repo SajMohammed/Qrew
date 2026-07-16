@@ -1,0 +1,51 @@
+import { eq } from "drizzle-orm";
+import { adminDb, merchants, loyaltyPrograms, enrollments } from "@qrew/db";
+
+export interface CardView {
+  serial: string;
+  merchantName: string;
+  programName: string;
+  rewardText: string;
+  currentStamps: number;
+  stampsRequired: number;
+  bonusStamps: number;
+  rewardReady: boolean;
+  /** Add-to-Wallet links — null under the fake provider; a real save URL once wired. */
+  wallet: { apple: string | null; google: string | null };
+}
+
+/**
+ * Public read of a card by its serial. The serial is an unguessable capability token
+ * (a random UUID = the card's bearer secret), so this reads via adminDb filtered strictly
+ * by serial — the serial itself is the authorization, no tenant/session needed.
+ */
+export async function getCard(serial: string): Promise<CardView | null> {
+  const [row] = await adminDb
+    .select({
+      serial: enrollments.cardSerial,
+      currentStamps: enrollments.currentStamps,
+      merchantName: merchants.name,
+      programName: loyaltyPrograms.name,
+      rewardText: loyaltyPrograms.rewardText,
+      stampsRequired: loyaltyPrograms.stampsRequired,
+      bonusStamps: loyaltyPrograms.bonusStamps,
+    })
+    .from(enrollments)
+    .innerJoin(merchants, eq(merchants.id, enrollments.merchantId))
+    .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
+    .where(eq(enrollments.cardSerial, serial));
+
+  if (!row) return null;
+
+  return {
+    serial: row.serial,
+    merchantName: row.merchantName,
+    programName: row.programName,
+    rewardText: row.rewardText,
+    currentStamps: row.currentStamps,
+    stampsRequired: row.stampsRequired,
+    bonusStamps: row.bonusStamps,
+    rewardReady: row.currentStamps >= row.stampsRequired,
+    wallet: { apple: null, google: null }, // real provider fills these later
+  };
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Qrew Card",
+  "short_name": "Qrew",
+  "description": "Your loyalty card",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#17150F",
+  "theme_color": "#0E6B62",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

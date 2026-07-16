@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { HealthController } from "./health/health.controller";
 import { LoyaltyModule } from "./loyalty/loyalty.module";
 import { EnrollModule } from "./enroll/enroll.module";
+import { CardModule } from "./card/card.module";
 import { TenantMiddleware } from "./tenant/tenant.middleware";
 
 @Module({
@@ -10,6 +11,7 @@ import { TenantMiddleware } from "./tenant/tenant.middleware";
     ConfigModule.forRoot({ isGlobal: true }),
     LoyaltyModule,
     EnrollModule,
+    CardModule,
   ],
   controllers: [HealthController],
 })
