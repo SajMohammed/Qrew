@@ -98,24 +98,28 @@ export function App() {
   if (serial && !card) {
     return (
       <div className="screen join">
-        <div className="wordmark">
-          <span className="q">Q</span>rew
+        <div className="join-hero">
+          <div className="wordmark">
+            <span className="q">Q</span>rew
+          </div>
+          <p className="sub">Loading your card…</p>
         </div>
-        <p className="sub">Loading your card…</p>
       </div>
     );
   }
 
   return (
     <div className="screen join">
-      <div className="wordmark">
-        <span className="q">Q</span>rew
+      <div className="join-hero">
+        <div className="wordmark">
+          <span className="q">Q</span>rew
+        </div>
+        <h1>Join the card</h1>
+        <p className="sub">
+          Paste the demo merchant &amp; program ids (from the seed command), or open this page
+          with <code>?m=…&amp;p=…</code>.
+        </p>
       </div>
-      <h1>Join the card</h1>
-      <p className="sub">
-        Paste the demo merchant &amp; program ids (from the seed command), or open this page
-        with <code>?m=…&amp;p=…</code>.
-      </p>
       <label>
         Merchant ID
         <input value={merchantId} onChange={(e) => setMerchantId(e.target.value)} placeholder="merchant uuid" />

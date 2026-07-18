@@ -55,7 +55,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
     stampsRequired: row.stampsRequired,
     bonusStamps: row.bonusStamps,
     rewardReady: row.currentStamps >= row.stampsRequired,
-    brandColor: design.brandColor ?? "#0E6B62",
+    brandColor: design.brandColor ?? "#146A2E",
     stampIcon: design.stampIcon ?? "☕",
     wallet: { apple: null, google: null }, // real provider fills these later
   };

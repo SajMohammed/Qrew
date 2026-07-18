@@ -2,8 +2,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { getProgram, updateProgram, type Program } from "./api";
 
 const PRESET_COLORS = [
-  "#0E6B62", "#6C2A4B", "#1F5673", "#8A4B2F",
-  "#4A5240", "#3B2E5A", "#B0413E", "#2E7D57",
+  "#146A2E", "#0C2712", "#6C2A4B", "#1F5673",
+  "#8A4B2F", "#3B2E5A", "#B0413E", "#2E7D57",
 ];
 const STAMP_ICONS = ["☕", "✦", "★", "♥", "🍩", "🥐", "🍕", "🌮", "🍺", "💇", "🛍️", "🎁"];
 
@@ -26,7 +26,7 @@ export function Designer({ merchantId, merchantName }: { merchantId: string; mer
   const [rewardText, setRewardText] = useState("");
   const [stampsRequired, setStampsRequired] = useState(10);
   const [bonusStamps, setBonusStamps] = useState(2);
-  const [brandColor, setBrandColor] = useState("#0E6B62");
+  const [brandColor, setBrandColor] = useState("#146A2E");
   const [stampIcon, setStampIcon] = useState("☕");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [err, setErr] = useState<string | null>(null);

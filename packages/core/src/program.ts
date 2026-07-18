@@ -2,7 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import { withTenant, loyaltyPrograms } from "@qrew/db";
 
 export interface CardDesign {
-  brandColor: string; // hex, e.g. "#0E6B62"
+  brandColor: string; // hex, e.g. "#146A2E"
   stampIcon: string; // emoji, e.g. "☕"
 }
 
@@ -16,7 +16,8 @@ export interface ProgramView {
   cardDesign: CardDesign;
 }
 
-export const DEFAULT_DESIGN: CardDesign = { brandColor: "#0E6B62", stampIcon: "☕" };
+// Qrew forest green — an un-customized card is on-brand out of the box.
+export const DEFAULT_DESIGN: CardDesign = { brandColor: "#146A2E", stampIcon: "☕" };
 
 export function normalizeDesign(raw: unknown): CardDesign {
   const d = (raw ?? {}) as Partial<CardDesign>;

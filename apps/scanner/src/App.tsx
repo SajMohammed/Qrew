@@ -61,12 +61,14 @@ export function App() {
   if (stage === "login") {
     return (
       <div className="screen login">
-        <div className="brand">
-          <span className="dot" />
-          Qrew <span className="tag">Staff</span>
+        <div className="login-hero">
+          <div className="brand">
+            <span className="dot" />
+            Qrew <span className="tag">Staff</span>
+          </div>
+          <h1>Staff scanner</h1>
+          <p className="sub">Sign in to start stamping cards at the counter.</p>
         </div>
-        <h1>Staff scanner</h1>
-        <p className="sub">Sign in to start stamping cards at the counter.</p>
         <label>
           Merchant ID
           <input value={merchantId} onChange={(e) => setMerchantId(e.target.value)} placeholder="merchant uuid" />

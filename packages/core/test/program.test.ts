@@ -26,7 +26,7 @@ describe("program (card designer)", () => {
   it("returns the program with a default design", async () => {
     const p = await getProgram(merchantId);
     expect(p?.id).toBe(programId);
-    expect(p?.cardDesign.brandColor).toBe("#0E6B62");
+    expect(p?.cardDesign.brandColor).toBe("#146A2E");
     expect(p?.cardDesign.stampIcon).toBe("☕");
   });
 
