@@ -1,5 +1,5 @@
 {
-  "name": "@qrew/core",
+  "name": "@qrew/queue",
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
@@ -13,18 +13,13 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.0",
-    "@qrew/db": "workspace:*",
-    "@qrew/queue": "workspace:*",
-    "@qrew/wallet-core": "workspace:*"
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.0.0"
   },
   "devDependencies": {
-    "dotenv": "^16.4.5",
-    "vitest": "^3.0.0",
     "typescript": "^7.0.0",
     "@types/node": "^22.15.0"
   }

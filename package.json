@@ -16,7 +16,8 @@
     "db:migrate": "pnpm --filter @qrew/db migrate",
     "db:seed": "pnpm --filter @qrew/db seed",
     "db:studio": "pnpm --filter @qrew/db studio",
-    "api:dev": "pnpm --filter @qrew/api dev"
+    "api:dev": "pnpm --filter @qrew/api dev",
+    "worker:dev": "pnpm --filter @qrew/wallet-worker dev"
   },
   "devDependencies": {
     "turbo": "^2.5.0",

@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments, stampEvents } from "@qrew/db";
-import { getWalletProvider } from "@qrew/wallet-core";
+import { enqueueWalletSync } from "@qrew/queue";
 
 export interface AddStampInput {
   merchantId: string;
@@ -29,12 +29,10 @@ function cooldownMs(): number {
  *   1. cooldown guard — a re-scan of the same card within the window is ignored
  *      (belt-and-suspenders alongside the idempotency key).
  *   2. append to the ledger (idempotent); the DB trigger updates current_stamps.
- *   3. sync the wallet pass OUTSIDE the transaction.
- * TODO(2.5): move the wallet sync onto a BullMQ job so the request never waits on it.
+ *   3. enqueue a wallet-sync job — the wallet-worker updates the pass off the request path,
+ *      so the cashier never waits on Apple/Google.
  */
 export async function addStamp(input: AddStampInput): Promise<StampResult> {
-  const provider = getWalletProvider();
-
   const outcome = await withTenant(input.merchantId, async (db) => {
     const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.id, input.enrollmentId));
     if (!enrollment) throw new Error("enrollment not found");
@@ -85,21 +83,19 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
 
   const rewardReady = outcome.currentStamps >= outcome.program.stampsRequired;
 
-  // sync the wallet pass outside the transaction (TODO(2.5): enqueue a BullMQ job)
+  // Hand wallet propagation to the background worker so the request never waits on Apple/Google.
+  // Best-effort: the stamp is already committed to the ledger (the truth). If the queue's Redis
+  // is unreachable, we log and return anyway rather than fail a scan the customer already earned.
   if (outcome.applied && (outcome.enrollment.applePassId || outcome.enrollment.googleObjectId)) {
-    const ref = {
-      serial: outcome.enrollment.cardSerial,
-      applePassId: outcome.enrollment.applePassId ?? undefined,
-      googleObjectId: outcome.enrollment.googleObjectId ?? undefined,
-    };
-    await provider.updateStamps(ref, outcome.currentStamps);
-    const remaining = outcome.program.stampsRequired - outcome.currentStamps;
-    const message = rewardReady
-      ? "Reward ready 🎉"
-      : remaining === 1
-        ? "1 stamp to go"
-        : `${remaining} stamps to go`;
-    await provider.pushUpdate(ref, message);
+    try {
+      await enqueueWalletSync({
+        merchantId: input.merchantId,
+        enrollmentId: input.enrollmentId,
+        kind: "stamp",
+      });
+    } catch (err) {
+      console.error("[wallet] enqueue failed (stamp committed; pass will sync late):", err);
+    }
   }
 
   return {

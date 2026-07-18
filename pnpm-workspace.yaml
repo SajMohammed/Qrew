@@ -6,3 +6,4 @@ packages:
 allowBuilds:
   "@swc/core": true
   esbuild: true
+  msgpackr-extract: true # optional native accel for bullmq's msgpack (falls back to JS if unbuilt)

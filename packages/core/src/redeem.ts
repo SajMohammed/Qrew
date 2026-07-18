@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments, stampEvents, redemptions } from "@qrew/db";
-import { getWalletProvider } from "@qrew/wallet-core";
+import { enqueueWalletSync } from "@qrew/queue";
 
 export interface RedeemInput {
   merchantId: string;
@@ -25,11 +25,9 @@ export interface RedeemResult {
  *   2. VERIFY eligibility by recomputing sum(delta) FROM THE LEDGER (source of truth).
  *   3. append a `redemptions` record + a compensating negative stamp_event; the trigger
  *      resets current_stamps.
- *   4. sync the wallet pass outside the transaction.
+ *   4. enqueue a wallet-sync job — the wallet-worker resets the pass off the request path.
  */
 export async function redeem(input: RedeemInput): Promise<RedeemResult> {
-  const provider = getWalletProvider();
-
   const outcome = await withTenant(input.merchantId, async (db) => {
     const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.id, input.enrollmentId));
     if (!enrollment) throw new Error("enrollment not found");
@@ -90,19 +88,22 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
     };
   });
 
-  // sync the wallet pass outside the tx (TODO(2.5): enqueue a BullMQ job)
+  // Wallet propagation runs off the request path (see apps/wallet-worker). Best-effort: the
+  // redemption is already committed, so a queue outage must not fail the customer's reward.
   if (
     outcome.redeemed &&
     outcome.reason === "redeemed" &&
     (outcome.enrollment.applePassId || outcome.enrollment.googleObjectId)
   ) {
-    const ref = {
-      serial: outcome.enrollment.cardSerial,
-      applePassId: outcome.enrollment.applePassId ?? undefined,
-      googleObjectId: outcome.enrollment.googleObjectId ?? undefined,
-    };
-    await provider.updateStamps(ref, outcome.currentStamps);
-    await provider.pushUpdate(ref, "Reward redeemed — see you next time!");
+    try {
+      await enqueueWalletSync({
+        merchantId: input.merchantId,
+        enrollmentId: input.enrollmentId,
+        kind: "redeem",
+      });
+    } catch (err) {
+      console.error("[wallet] enqueue failed (redemption committed; pass will sync late):", err);
+    }
   }
 
   return {
