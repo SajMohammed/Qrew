@@ -162,6 +162,25 @@ export const redemptions = pgTable(
   ],
 );
 
+/**
+ * Marketing waitlist / early-access leads. NOT tenant-scoped — a prospective merchant with
+ * no account yet, so no `merchant_id`. Written only via the admin connection; RLS with no
+ * policy (migration 0002) keeps the app role out entirely.
+ */
+export const leads = pgTable(
+  "leads",
+  {
+    id: id(),
+    businessName: text("business_name").notNull(),
+    email: text("email").notNull(),
+    city: text("city"),
+    message: text("message"),
+    source: text("source").notNull().default("marketing"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("leads_email_uq").on(t.email)],
+);
+
 export const schema = {
   merchants,
   locations,
@@ -171,4 +190,5 @@ export const schema = {
   enrollments,
   stampEvents,
   redemptions,
+  leads,
 };

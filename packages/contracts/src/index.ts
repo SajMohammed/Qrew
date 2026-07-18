@@ -46,6 +46,15 @@ export const EnrollRequest = z.object({
 });
 export type EnrollRequest = z.infer<typeof EnrollRequest>;
 
+// Marketing waitlist / early-access capture (public, non-tenant).
+export const LeadRequest = z.object({
+  businessName: z.string().min(1).max(120),
+  email: z.string().email().max(200),
+  city: z.string().max(80).optional(),
+  message: z.string().max(500).optional(),
+});
+export type LeadRequest = z.infer<typeof LeadRequest>;
+
 export const ProgramDTO = z.object({
   id: z.string(),
   name: z.string(),
