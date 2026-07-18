@@ -7,3 +7,4 @@ allowBuilds:
   "@swc/core": true
   esbuild: true
   msgpackr-extract: true # optional native accel for bullmq's msgpack (falls back to JS if unbuilt)
+  sharp: false # Next's image lib — unused (no next/image on the marketing page); flip to true if added

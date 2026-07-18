@@ -36,7 +36,7 @@ apps/
   card/           # customer PWA — the wallet-native stamp card                :5173
   scanner/        # staff PWA — camera/QR scan to stamp                         :5174
   dashboard/      # owner SPA — stats + the self-serve card designer            :5175
-  (marketing — Next.js, planned)
+  marketing/      # Next.js — landing page + waitlist (/leads) capture           :3000
 packages/
   core/           # shared domain: enroll · stamp · scan · redeem · card · dashboard · program
   db/             # Drizzle schema · RLS migration · ledger trigger · withTenant client · tests
@@ -155,6 +155,7 @@ once 7.1 lands.
   placeholder header.
 - **A live wallet provider** — wire the PassKit (or native Apple/Google) adapter behind the
   existing port and light up the Add-to-Wallet buttons.
-- **Marketing site** (Next.js) and **`me-central-1` deployment** ([`infra/`](infra/)).
+- **`me-central-1` deployment** ([`infra/`](infra/)) — and wiring the marketing waitlist
+  into a follow-up (notifications / CRM) once leads start arriving.
 
 Product & plan docs: the **Build Blueprint** and **Implementation Plan** (Claude artifacts).
