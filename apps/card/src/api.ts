@@ -10,6 +10,8 @@ export interface CardView {
   stampsRequired: number;
   bonusStamps: number;
   rewardReady: boolean;
+  brandColor: string;
+  stampIcon: string;
   wallet: { apple: string | null; google: string | null };
 }
 

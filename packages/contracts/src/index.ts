@@ -23,6 +23,20 @@ export const ScanRequest = z.object({
 });
 export type ScanRequest = z.infer<typeof ScanRequest>;
 
+export const ProgramUpdate = z.object({
+  name: z.string().min(1).max(60).optional(),
+  rewardText: z.string().min(1).max(60).optional(),
+  stampsRequired: z.number().int().min(1).max(20).optional(),
+  bonusStamps: z.number().int().min(0).max(10).optional(),
+  cardDesign: z
+    .object({
+      brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "must be a #RRGGBB hex colour").optional(),
+      stampIcon: z.string().min(1).max(8).optional(),
+    })
+    .optional(),
+});
+export type ProgramUpdate = z.infer<typeof ProgramUpdate>;
+
 export const EnrollRequest = z.object({
   merchantId: z.string().uuid(), // from the merchant's counter QR (public routing, not auth)
   programId: z.string().uuid(),

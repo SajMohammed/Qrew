@@ -5,6 +5,7 @@ import { LoyaltyModule } from "./loyalty/loyalty.module";
 import { EnrollModule } from "./enroll/enroll.module";
 import { CardModule } from "./card/card.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
+import { ProgramModule } from "./program/program.module";
 import { TenantMiddleware } from "./tenant/tenant.middleware";
 
 @Module({
@@ -14,6 +15,7 @@ import { TenantMiddleware } from "./tenant/tenant.middleware";
     EnrollModule,
     CardModule,
     DashboardModule,
+    ProgramModule,
   ],
   controllers: [HealthController],
 })

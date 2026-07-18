@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { getDashboard, type Dashboard } from "./api";
+import { Designer } from "./Designer";
 
 function queryParam(name: string): string {
   return new URLSearchParams(window.location.search).get(name) ?? "";
 }
 
+type Tab = "overview" | "designer";
+
 export function App() {
   const [merchantId, setMerchantId] = useState(queryParam("m"));
   const [entered, setEntered] = useState(Boolean(queryParam("m")));
+  const [tab, setTab] = useState<Tab>("overview");
   const [data, setData] = useState<Dashboard | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,50 +64,66 @@ export function App() {
           </div>
           <div className="mname">{data?.merchantName ?? "…"}</div>
         </div>
-        <button className="refresh" onClick={load} disabled={loading}>
-          {loading ? "…" : "↻ Refresh"}
-        </button>
+        {tab === "overview" && (
+          <button className="refresh" onClick={load} disabled={loading}>
+            {loading ? "…" : "↻ Refresh"}
+          </button>
+        )}
       </header>
 
-      {err && <p className="err">{err}</p>}
+      <nav className="tabs">
+        <button className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")}>
+          Overview
+        </button>
+        <button className={tab === "designer" ? "on" : ""} onClick={() => setTab("designer")}>
+          Card designer
+        </button>
+      </nav>
 
-      <section className="stats">
-        <Stat label="Enrollments" value={data?.stats.enrollments} />
-        <Stat label="Active cards" value={data?.stats.activeCards} />
-        <Stat label="Reward-ready" value={data?.stats.rewardReady} accent />
-        <Stat label="Stamps issued" value={data?.stats.stampsIssued} />
-        <Stat label="Rewards redeemed" value={data?.stats.rewardsRedeemed} />
-        <Stat label="Avg stamps / card" value={avgStampsPerCard(data)} />
-      </section>
+      {tab === "designer" ? (
+        <Designer merchantId={merchantId} merchantName={data?.merchantName} />
+      ) : (
+        <>
+          {err && <p className="err">{err}</p>}
+          <section className="stats">
+            <Stat label="Enrollments" value={data?.stats.enrollments} />
+            <Stat label="Active cards" value={data?.stats.activeCards} />
+            <Stat label="Reward-ready" value={data?.stats.rewardReady} accent />
+            <Stat label="Stamps issued" value={data?.stats.stampsIssued} />
+            <Stat label="Rewards redeemed" value={data?.stats.rewardsRedeemed} />
+            <Stat label="Avg stamps / card" value={avgStampsPerCard(data)} />
+          </section>
 
-      <section className="recent">
-        <h2>Recent enrollments</h2>
-        <div className="list">
-          {(data?.recent ?? []).map((r) => {
-            const pct = Math.min(100, Math.round((r.currentStamps / r.stampsRequired) * 100));
-            return (
-              <div className="row" key={r.id}>
-                <div className="who">
-                  <div className="name">{r.customerName || "Guest"}</div>
-                  <div className="sub">
-                    {r.customerPhone || "—"} · {r.programName}
+          <section className="recent">
+            <h2>Recent enrollments</h2>
+            <div className="list">
+              {(data?.recent ?? []).map((r) => {
+                const pct = Math.min(100, Math.round((r.currentStamps / r.stampsRequired) * 100));
+                return (
+                  <div className="row" key={r.id}>
+                    <div className="who">
+                      <div className="name">{r.customerName || "Guest"}</div>
+                      <div className="sub">
+                        {r.customerPhone || "—"} · {r.programName}
+                      </div>
+                    </div>
+                    <div className="prog">
+                      <div className="bar">
+                        <span style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="pnum">
+                        {r.currentStamps}/{r.stampsRequired}
+                      </div>
+                    </div>
+                    <div className="when">{rel(r.createdAt)}</div>
                   </div>
-                </div>
-                <div className="prog">
-                  <div className="bar">
-                    <span style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className="pnum">
-                    {r.currentStamps}/{r.stampsRequired}
-                  </div>
-                </div>
-                <div className="when">{rel(r.createdAt)}</div>
-              </div>
-            );
-          })}
-          {data && data.recent.length === 0 && <div className="empty">No enrollments yet.</div>}
-        </div>
-      </section>
+                );
+              })}
+              {data && data.recent.length === 0 && <div className="empty">No enrollments yet.</div>}
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }

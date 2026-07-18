@@ -2,6 +2,17 @@ import type { CSSProperties } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { CardView } from "./api";
 
+// Pick white or dark text for legibility on the merchant's brand colour (auto-contrast).
+function textOn(hex: string): string {
+  const c = hex.replace("#", "");
+  if (c.length < 6) return "#fbfbf7";
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? "#1c1a15" : "#fbfbf7";
+}
+
 export function StampCard({
   card,
   busy,
@@ -24,7 +35,10 @@ export function StampCard({
 
   return (
     <div className="screen card-screen">
-      <div className={`stampcard${card.rewardReady ? " ready" : ""}`}>
+      <div
+        className={`stampcard${card.rewardReady ? " ready" : ""}`}
+        style={{ "--card-color": card.brandColor, "--card-ink": textOn(card.brandColor) } as CSSProperties}
+      >
         <div className="sc-top">
           <div className="sc-logo">{card.merchantName.charAt(0)}</div>
           <div className="sc-id">
@@ -44,7 +58,7 @@ export function StampCard({
               className={`stamp${on ? " on" : ""}`}
               style={{ animationDelay: `${i * 45}ms` }}
             >
-              {on ? "☕" : ""}
+              {on ? card.stampIcon : ""}
             </span>
           ))}
         </div>

@@ -13,6 +13,8 @@ export interface CardView {
   stampsRequired: number;
   bonusStamps: number;
   rewardReady: boolean;
+  brandColor: string; // per-merchant theming (from the card designer)
+  stampIcon: string;
   /** Add-to-Wallet links — null under the fake provider; a real save URL once wired. */
   wallet: { apple: string | null; google: string | null };
 }
@@ -32,6 +34,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
       rewardText: loyaltyPrograms.rewardText,
       stampsRequired: loyaltyPrograms.stampsRequired,
       bonusStamps: loyaltyPrograms.bonusStamps,
+      cardDesign: loyaltyPrograms.cardDesign,
     })
     .from(enrollments)
     .innerJoin(merchants, eq(merchants.id, enrollments.merchantId))
@@ -39,6 +42,8 @@ export async function getCard(serial: string): Promise<CardView | null> {
     .where(eq(enrollments.cardSerial, serial));
 
   if (!row) return null;
+
+  const design = (row.cardDesign ?? {}) as { brandColor?: string; stampIcon?: string };
 
   return {
     serial: row.serial,
@@ -50,6 +55,8 @@ export async function getCard(serial: string): Promise<CardView | null> {
     stampsRequired: row.stampsRequired,
     bonusStamps: row.bonusStamps,
     rewardReady: row.currentStamps >= row.stampsRequired,
+    brandColor: design.brandColor ?? "#0E6B62",
+    stampIcon: design.stampIcon ?? "☕",
     wallet: { apple: null, google: null }, // real provider fills these later
   };
 }

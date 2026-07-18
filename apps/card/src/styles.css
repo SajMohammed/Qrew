@@ -96,10 +96,10 @@ button.primary { background: var(--accent); color: #071a17; }
 .stampcard {
   border-radius: 26px;
   padding: 22px 22px 20px;
-  color: #fbfbf7;
+  color: var(--card-ink, #fbfbf7);
   position: relative;
   overflow: hidden;
-  background: linear-gradient(155deg, var(--card-a), var(--card-a-2));
+  background: linear-gradient(155deg, var(--card-color, #0e6b62), color-mix(in srgb, var(--card-color, #0e6b62) 45%, #05100d));
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 40px 70px -30px rgba(0, 0, 0, 0.8);
 }
 .stampcard::after {
@@ -150,7 +150,7 @@ button.primary { background: var(--accent); color: #071a17; }
   border-style: solid;
   border-color: transparent;
   background: rgba(255, 255, 255, 0.96);
-  color: var(--card-a);
+  color: var(--card-color, #0e6b62);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
 }
 @media (prefers-reduced-motion: no-preference) {
