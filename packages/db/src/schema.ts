@@ -58,7 +58,13 @@ export const staff = pgTable(
     pinHash: text("pin_hash"),
     createdAt: createdAt(),
   },
-  (t) => [index("staff_merchant_idx").on(t.merchantId)],
+  (t) => [
+    index("staff_merchant_idx").on(t.merchantId),
+    index("staff_external_auth_idx").on(t.externalAuthId), // Clerk userId → staff (auth lookup)
+    uniqueIndex("staff_merchant_external_auth_uq")
+      .on(t.merchantId, t.externalAuthId)
+      .where(sql`${t.externalAuthId} is not null`),
+  ],
 );
 
 export const loyaltyPrograms = pgTable(
