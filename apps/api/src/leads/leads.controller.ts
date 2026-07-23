@@ -1,9 +1,11 @@
 import { Controller, Post, Body } from "@nestjs/common";
 import { LeadRequest } from "@qrew/contracts";
 import { createLead } from "@qrew/core";
+import { Public } from "../auth/auth.decorators";
 
 // Public endpoint: the marketing site's waitlist form. No tenant — the sender is a
 // prospective merchant with no account yet.
+@Public()
 @Controller("leads")
 export class LeadsController {
   @Post()

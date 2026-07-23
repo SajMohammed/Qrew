@@ -1,12 +1,11 @@
-import { Controller, Get, Req, UnauthorizedException } from "@nestjs/common";
-import type { Request } from "express";
+import { Controller, Get } from "@nestjs/common";
 import { getDashboard } from "@qrew/core";
+import { Merchant } from "../auth/auth.decorators";
 
 @Controller("dashboard")
 export class DashboardController {
   @Get()
-  overview(@Req() req: Request) {
-    if (!req.merchantId) throw new UnauthorizedException("no tenant resolved");
-    return getDashboard(req.merchantId);
+  overview(@Merchant() merchantId: string) {
+    return getDashboard(merchantId);
   }
 }

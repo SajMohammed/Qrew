@@ -1,14 +1,6 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Req,
-  UnauthorizedException,
-  NotFoundException,
-} from "@nestjs/common";
-import type { Request } from "express";
+import { Controller, Get, Post, Body, NotFoundException } from "@nestjs/common";
 import { StampRequest, RedeemRequest, ScanRequest } from "@qrew/contracts";
+import { Merchant } from "../auth/auth.decorators";
 import { LoyaltyService } from "./loyalty.service";
 
 @Controller("loyalty")
@@ -16,14 +8,14 @@ export class LoyaltyController {
   constructor(private readonly loyalty: LoyaltyService) {}
 
   @Get("programs")
-  programs(@Req() req: Request) {
-    return this.loyalty.listPrograms(this.tenant(req));
+  programs(@Merchant() merchantId: string) {
+    return this.loyalty.listPrograms(merchantId);
   }
 
   @Post("stamp")
-  stamp(@Req() req: Request, @Body() body: unknown) {
+  stamp(@Merchant() merchantId: string, @Body() body: unknown) {
     const input = StampRequest.parse(body);
-    return this.loyalty.addStamp(this.tenant(req), {
+    return this.loyalty.addStamp(merchantId, {
       enrollmentId: input.enrollmentId,
       idempotencyKey: input.idempotencyKey,
       locationId: input.locationId,
@@ -32,9 +24,9 @@ export class LoyaltyController {
 
   // Staff scanner: stamp by the scanned card serial.
   @Post("scan")
-  async scan(@Req() req: Request, @Body() body: unknown) {
+  async scan(@Merchant() merchantId: string, @Body() body: unknown) {
     const input = ScanRequest.parse(body);
-    const result = await this.loyalty.scan(this.tenant(req), {
+    const result = await this.loyalty.scan(merchantId, {
       serial: input.serial,
       idempotencyKey: input.idempotencyKey,
     });
@@ -43,16 +35,11 @@ export class LoyaltyController {
   }
 
   @Post("redeem")
-  redeem(@Req() req: Request, @Body() body: unknown) {
+  redeem(@Merchant() merchantId: string, @Body() body: unknown) {
     const input = RedeemRequest.parse(body);
-    return this.loyalty.redeem(this.tenant(req), {
+    return this.loyalty.redeem(merchantId, {
       enrollmentId: input.enrollmentId,
       idempotencyKey: input.idempotencyKey,
     });
-  }
-
-  private tenant(req: Request): string {
-    if (!req.merchantId) throw new UnauthorizedException("no tenant resolved");
-    return req.merchantId;
   }
 }

@@ -1,36 +1,24 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Param,
-  Body,
-  Req,
-  UnauthorizedException,
-  NotFoundException,
-} from "@nestjs/common";
-import type { Request } from "express";
+import { Controller, Get, Patch, Param, Body, NotFoundException } from "@nestjs/common";
 import { ProgramUpdate } from "@qrew/contracts";
 import { getProgram, updateProgram } from "@qrew/core";
+import { Merchant, Roles } from "../auth/auth.decorators";
 
 @Controller("program")
 export class ProgramController {
   @Get()
-  async current(@Req() req: Request) {
-    const program = await getProgram(this.tenant(req));
+  async current(@Merchant() merchantId: string) {
+    const program = await getProgram(merchantId);
     if (!program) throw new NotFoundException("no program");
     return program;
   }
 
+  // Editing the card design is an owner/manager action; cashiers can't reach it.
+  @Roles("owner", "manager")
   @Patch(":id")
-  async update(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) {
+  async update(@Merchant() merchantId: string, @Param("id") id: string, @Body() body: unknown) {
     const patch = ProgramUpdate.parse(body);
-    const program = await updateProgram(this.tenant(req), id, patch);
+    const program = await updateProgram(merchantId, id, patch);
     if (!program) throw new NotFoundException("program not found");
     return program;
-  }
-
-  private tenant(req: Request): string {
-    if (!req.merchantId) throw new UnauthorizedException("no tenant resolved");
-    return req.merchantId;
   }
 }

@@ -10,25 +10,26 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/backend": "^3.12.0",
     "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "@nestjs/config": "^4.0.0",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1",
+    "@qrew/contracts": "workspace:*",
+    "@qrew/core": "workspace:*",
+    "@qrew/db": "workspace:*",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.44.0",
-    "zod": "^4.0.0",
-    "@qrew/db": "workspace:*",
-    "@qrew/contracts": "workspace:*",
-    "@qrew/core": "workspace:*"
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@swc/core": "^1.7.0",
-    "@swc/cli": "^0.4.0",
     "@swc-node/register": "^1.10.0",
-    "typescript": "^7.0.0",
+    "@swc/cli": "^0.4.0",
+    "@swc/core": "^1.7.0",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.15.0",
-    "@types/express": "^5.0.0"
+    "typescript": "^7.0.0"
   }
 }

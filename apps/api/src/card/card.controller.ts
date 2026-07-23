@@ -1,7 +1,9 @@
 import { Controller, Get, Param, NotFoundException } from "@nestjs/common";
 import { getCard } from "@qrew/core";
+import { Public } from "../auth/auth.decorators";
 
 // Public: the customer's live card, fetched by its serial (a capability token).
+@Public()
 @Controller("card")
 export class CardController {
   @Get(":serial")

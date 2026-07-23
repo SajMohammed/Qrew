@@ -6,6 +6,12 @@ import { ZodExceptionFilter } from "./common/zod-exception.filter";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  // Dev is same-origin via the Vite proxy, so CORS is a no-op there; set CORS_ORIGINS in a
+  // non-proxied deploy (the Authorization header makes requests preflighted).
+  app.enableCors({
+    origin: process.env.CORS_ORIGINS?.split(",").map((s) => s.trim()) ?? true,
+    allowedHeaders: ["authorization", "content-type", "x-merchant-id", "x-active-merchant"],
+  });
   app.useGlobalFilters(new ZodExceptionFilter());
   app.enableShutdownHooks();
   const port = Number(process.env.API_PORT ?? 4000);

@@ -1,9 +1,11 @@
 import { Controller, Post, Body } from "@nestjs/common";
 import { EnrollRequest } from "@qrew/contracts";
 import { enroll } from "@qrew/core";
+import { Public } from "../auth/auth.decorators";
 
 // Public endpoint: a customer enrolls from the merchant's QR landing. The merchant is
 // identified by the (public) QR context in the body — this is routing, not authentication.
+@Public()
 @Controller("enroll")
 export class EnrollController {
   @Post()
