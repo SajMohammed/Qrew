@@ -132,6 +132,13 @@ button.link { background: transparent; color: var(--forest-deep); font-weight: 7
 
 .manual { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
 
+/* cashier PIN bar */
+.cashier { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: -2px 0 2px; }
+.cashier-name { font-family: var(--sans); font-weight: 800; font-size: 14px; color: var(--forest-deep); }
+.pinrow { display: flex; gap: 8px; align-items: center; flex: 1; }
+.pinrow input { flex: 1; }
+.cashier .link, .pinrow .link { padding: 8px 10px; white-space: nowrap; }
+
 .banner {
   border-radius: 16px; padding: 16px; font-family: var(--sans); font-weight: 800; font-size: 16px; text-align: center;
   font-variant-numeric: tabular-nums;
