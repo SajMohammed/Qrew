@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { adminDb } from "./client";
 import { merchants, staff } from "./schema";
 
@@ -42,14 +42,20 @@ function slugify(name: string): string {
  * Idempotent — if this user already owns a merchant, returns that merchant's id and creates nothing.
  */
 export async function provisionMerchantForOwner(input: { userId: string; name: string }): Promise<string> {
-  const existing = await resolveStaffByClerkUser(input.userId);
-  if (existing.length > 0) return existing[0]!.merchantId;
-
   const merchantId = await adminDb.transaction(async (tx) => {
-    const [m] = await tx
-      .insert(merchants)
-      .values({ name: input.name, slug: slugify(input.name) })
-      .returning();
+    // Serialize concurrent onboarding for the same user (a dev StrictMode double-mount or a retry
+    // would otherwise create two merchants). The advisory lock releases at transaction end; a
+    // second caller then sees the first's committed staff row and returns it — idempotent.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.userId}))`);
+
+    const [existing] = await tx
+      .select({ merchantId: staff.merchantId })
+      .from(staff)
+      .where(eq(staff.externalAuthId, input.userId))
+      .limit(1);
+    if (existing) return existing.merchantId;
+
+    const [m] = await tx.insert(merchants).values({ name: input.name, slug: slugify(input.name) }).returning();
     await tx.insert(staff).values({
       merchantId: m!.id,
       externalAuthId: input.userId,
