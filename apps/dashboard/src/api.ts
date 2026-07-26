@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE ?? "/api";
+// Response/request shapes. The fetching lives in useApi.ts (it needs the Clerk token hook).
 
 export interface RecentEnrollment {
   id: string;
@@ -22,12 +22,6 @@ export interface Dashboard {
   recent: RecentEnrollment[];
 }
 
-export async function getDashboard(merchantId: string): Promise<Dashboard> {
-  const res = await fetch(`${BASE}/dashboard`, { headers: { "x-merchant-id": merchantId } });
-  if (!res.ok) throw new Error(`Dashboard failed (${res.status})`);
-  return res.json();
-}
-
 export interface Program {
   id: string;
   name: string;
@@ -45,19 +39,3 @@ export type ProgramPatch = Partial<{
   bonusStamps: number;
   cardDesign: { brandColor?: string; stampIcon?: string };
 }>;
-
-export async function getProgram(merchantId: string): Promise<Program> {
-  const res = await fetch(`${BASE}/program`, { headers: { "x-merchant-id": merchantId } });
-  if (!res.ok) throw new Error(`Program failed (${res.status})`);
-  return res.json();
-}
-
-export async function updateProgram(merchantId: string, id: string, patch: ProgramPatch): Promise<Program> {
-  const res = await fetch(`${BASE}/program/${id}`, {
-    method: "PATCH",
-    headers: { "content-type": "application/json", "x-merchant-id": merchantId },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) throw new Error(`Save failed (${res.status})`);
-  return res.json();
-}

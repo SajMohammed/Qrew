@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { getProgram, updateProgram, type Program } from "./api";
+import { useApi } from "./useApi";
+import type { Program } from "./api";
 
 const PRESET_COLORS = [
   "#146A2E", "#0C2712", "#6C2A4B", "#1F5673",
@@ -20,7 +21,8 @@ function textOn(hex: string): string {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#1c1a15" : "#fbfbf7";
 }
 
-export function Designer({ merchantId, merchantName }: { merchantId: string; merchantName?: string }) {
+export function Designer({ merchantName }: { merchantName?: string }) {
+  const api = useApi();
   const [program, setProgram] = useState<Program | null>(null);
   const [name, setName] = useState("");
   const [rewardText, setRewardText] = useState("");
@@ -32,7 +34,8 @@ export function Designer({ merchantId, merchantName }: { merchantId: string; mer
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    getProgram(merchantId)
+    api
+      .getProgram()
       .then((p) => {
         setProgram(p);
         setName(p.name);
@@ -43,14 +46,15 @@ export function Designer({ merchantId, merchantName }: { merchantId: string; mer
         setStampIcon(p.cardDesign.stampIcon);
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
-  }, [merchantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function save() {
     if (!program) return;
     setStatus("saving");
     setErr(null);
     try {
-      const updated = await updateProgram(merchantId, program.id, {
+      const updated = await api.updateProgram(program.id, {
         name,
         rewardText,
         stampsRequired,

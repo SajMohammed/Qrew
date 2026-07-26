@@ -55,6 +55,7 @@ button.primary { background: var(--lime); color: var(--ink); border: 0; border-r
 button.primary:disabled { opacity: 0.5; }
 
 .head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 26px; }
+.headright { display: flex; align-items: center; gap: 12px; }
 .mname { font-family: var(--sans); font-weight: 800; font-size: 28px; letter-spacing: -0.01em; margin-top: 8px; }
 .refresh {
   background: var(--surface); color: var(--muted); border: 1.5px solid var(--border);

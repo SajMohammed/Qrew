@@ -1,59 +1,70 @@
-import { useEffect, useState } from "react";
-import { getDashboard, type Dashboard } from "./api";
+import { useCallback, useEffect, useState } from "react";
+import { useAuth, SignIn, UserButton } from "@clerk/react";
+import { useApi, NeedsOnboarding } from "./useApi";
+import type { Dashboard } from "./api";
 import { Designer } from "./Designer";
-
-function queryParam(name: string): string {
-  return new URLSearchParams(window.location.search).get(name) ?? "";
-}
 
 type Tab = "overview" | "designer";
 
 export function App() {
-  const [merchantId, setMerchantId] = useState(queryParam("m"));
-  const [entered, setEntered] = useState(Boolean(queryParam("m")));
-  const [tab, setTab] = useState<Tab>("overview");
-  const [data, setData] = useState<Dashboard | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { isLoaded, isSignedIn } = useAuth();
 
-  async function load() {
-    setErr(null);
-    setLoading(true);
-    try {
-      setData(await getDashboard(merchantId));
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  if (!isLoaded) {
+    return (
+      <div className="wrap gate">
+        <p className="muted">Loading…</p>
+      </div>
+    );
   }
-
-  useEffect(() => {
-    if (!entered || !merchantId) return;
-    load();
-    const timer = window.setInterval(load, 10000);
-    return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entered, merchantId]);
-
-  if (!entered) {
+  if (!isSignedIn) {
     return (
       <div className="wrap gate">
         <div className="wordmark">
           <span className="q">Q</span>rew <span className="tag">Dashboard</span>
         </div>
-        <h1>Open your dashboard</h1>
-        <label>
-          Merchant ID
-          <input value={merchantId} onChange={(e) => setMerchantId(e.target.value)} placeholder="merchant uuid" />
-        </label>
-        <button className="primary" disabled={!merchantId} onClick={() => setEntered(true)}>
-          Open
-        </button>
-        {err && <p className="err">{err}</p>}
+        <h1>Sign in to your dashboard</h1>
+        <SignIn />
       </div>
     );
   }
+  return <DashboardApp />;
+}
+
+function DashboardApp() {
+  const api = useApi();
+  const [tab, setTab] = useState<Tab>("overview");
+  const [data, setData] = useState<Dashboard | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setErr(null);
+    setLoading(true);
+    try {
+      setData(await api.getDashboard());
+    } catch (e) {
+      if (e instanceof NeedsOnboarding) {
+        // First login: no merchant yet — provision one, then retry.
+        try {
+          await api.onboard();
+          setData(await api.getDashboard());
+        } catch (e2) {
+          setErr(e2 instanceof Error ? e2.message : String(e2));
+        }
+      } else {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="wrap">
@@ -64,11 +75,14 @@ export function App() {
           </div>
           <div className="mname">{data?.merchantName ?? "…"}</div>
         </div>
-        {tab === "overview" && (
-          <button className="refresh" onClick={load} disabled={loading}>
-            {loading ? "…" : "↻ Refresh"}
-          </button>
-        )}
+        <div className="headright">
+          {tab === "overview" && (
+            <button className="refresh" onClick={load} disabled={loading}>
+              {loading ? "…" : "↻ Refresh"}
+            </button>
+          )}
+          <UserButton />
+        </div>
       </header>
 
       <nav className="tabs">
@@ -81,7 +95,7 @@ export function App() {
       </nav>
 
       {tab === "designer" ? (
-        <Designer merchantId={merchantId} merchantName={data?.merchantName} />
+        <Designer merchantName={data?.merchantName} />
       ) : (
         <>
           {err && <p className="err">{err}</p>}
@@ -128,23 +142,10 @@ export function App() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  suffix,
-  accent,
-}: {
-  label: string;
-  value?: number;
-  suffix?: string;
-  accent?: boolean;
-}) {
+function Stat({ label, value, accent }: { label: string; value?: number; accent?: boolean }) {
   return (
     <div className={`stat${accent ? " accent" : ""}`}>
-      <div className="v">
-        {value ?? "—"}
-        {value != null && suffix ? suffix : ""}
-      </div>
+      <div className="v">{value ?? "—"}</div>
       <div className="l">{label}</div>
     </div>
   );
