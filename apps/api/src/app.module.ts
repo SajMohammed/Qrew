@@ -9,6 +9,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 import { ProgramModule } from "./program/program.module";
 import { LeadsModule } from "./leads/leads.module";
 import { OnboardingModule } from "./onboarding/onboarding.module";
+import { StaffModule } from "./staff/staff.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { OnboardingModule } from "./onboarding/onboarding.module";
     ProgramModule,
     LeadsModule,
     OnboardingModule,
+    StaffModule,
   ],
   controllers: [HealthController],
 })

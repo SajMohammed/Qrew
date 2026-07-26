@@ -4,24 +4,37 @@ import { z } from "zod";
 // The API validates with them; every frontend infers its types from them.
 // (No tRPC — end-to-end types come from sharing these schemas + a typed fetch client.)
 
+// An optional staff token (minted by POST /staff/verify-pin) attributes a scan/stamp/redeem to a
+// cashier on a shared scanner. Absent when the scanner runs Clerk-login-only.
+const staffToken = z.string().optional();
+
 export const StampRequest = z.object({
   enrollmentId: z.string().uuid(),
   idempotencyKey: z.string().min(8),
   locationId: z.string().uuid().optional(),
+  staffToken,
 });
 export type StampRequest = z.infer<typeof StampRequest>;
 
 export const RedeemRequest = z.object({
   enrollmentId: z.string().uuid(),
   idempotencyKey: z.string().min(8),
+  staffToken,
 });
 export type RedeemRequest = z.infer<typeof RedeemRequest>;
 
 export const ScanRequest = z.object({
   serial: z.string().min(8), // the customer card serial from the scanned QR
   idempotencyKey: z.string().min(8),
+  staffToken,
 });
 export type ScanRequest = z.infer<typeof ScanRequest>;
+
+// Cashier PIN → staff token (on a Clerk-authed scanner device).
+export const VerifyPinRequest = z.object({
+  pin: z.string().min(4).max(12),
+});
+export type VerifyPinRequest = z.infer<typeof VerifyPinRequest>;
 
 export const ProgramUpdate = z.object({
   name: z.string().min(1).max(60).optional(),
