@@ -38,6 +38,21 @@ describe("addStamp", () => {
     expect(r3.rewardReady).toBe(true);
   });
 
+  it("does not stamp past the reward threshold — the card caps until redeemed", async () => {
+    process.env.STAMP_COOLDOWN_SECONDS = "0";
+    const { enrollmentId } = await enroll({ merchantId, programId, phone: "+971500000013" });
+    await addStamp({ merchantId, enrollmentId, idempotencyKey: "t1" });
+    await addStamp({ merchantId, enrollmentId, idempotencyKey: "t2" });
+    const full = await addStamp({ merchantId, enrollmentId, idempotencyKey: "t3" });
+    expect(full.currentStamps).toBe(3);
+    expect(full.rewardReady).toBe(true);
+
+    const over = await addStamp({ merchantId, enrollmentId, idempotencyKey: "t4" });
+    expect(over.applied).toBe(false);
+    expect(over.reason).toBe("reward_ready");
+    expect(over.currentStamps).toBe(3); // capped — not 4
+  });
+
   it("a duplicate idempotency key does not add a stamp", async () => {
     process.env.STAMP_COOLDOWN_SECONDS = "0";
     const { enrollmentId } = await enroll({ merchantId, programId, phone: "+971500000011" });

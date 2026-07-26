@@ -10,7 +10,7 @@ export interface AddStampInput {
   staffId?: string;
 }
 
-export type StampReason = "applied" | "duplicate" | "cooldown";
+export type StampReason = "applied" | "duplicate" | "cooldown" | "reward_ready";
 
 export interface StampResult {
   applied: boolean;
@@ -26,6 +26,7 @@ function cooldownMs(): number {
 
 /**
  * Record one stamp:
+ *   0. reject if the card is already at the reward threshold — redeem before earning more.
  *   1. cooldown guard — a re-scan of the same card within the window is ignored
  *      (belt-and-suspenders alongside the idempotency key).
  *   2. append to the ledger (idempotent); the DB trigger updates current_stamps.
@@ -41,6 +42,17 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
       .from(loyaltyPrograms)
       .where(eq(loyaltyPrograms.id, enrollment.programId));
     if (!program) throw new Error("program not found");
+
+    // Don't stamp past the reward threshold — the card is full; the customer must redeem first.
+    if (enrollment.currentStamps >= program.stampsRequired) {
+      return {
+        applied: false,
+        reason: "reward_ready" as StampReason,
+        enrollment,
+        program,
+        currentStamps: enrollment.currentStamps,
+      };
+    }
 
     // cooldown: ignore a rapid re-scan of the same card
     const [last] = await db
