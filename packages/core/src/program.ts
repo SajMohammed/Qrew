@@ -85,3 +85,29 @@ export async function updateProgram(
     return updated ? toView(updated) : null;
   });
 }
+
+/** Seed a merchant's first loyalty program (idempotent) — used at onboarding after provisioning. */
+export async function createDefaultProgram(merchantId: string): Promise<ProgramView> {
+  return withTenant(merchantId, async (db) => {
+    const [existing] = await db
+      .select()
+      .from(loyaltyPrograms)
+      .where(eq(loyaltyPrograms.merchantId, merchantId))
+      .orderBy(asc(loyaltyPrograms.createdAt))
+      .limit(1);
+    if (existing) return toView(existing);
+
+    const [created] = await db
+      .insert(loyaltyPrograms)
+      .values({
+        merchantId,
+        name: "Loyalty Card",
+        stampsRequired: 10,
+        bonusStamps: 2,
+        rewardText: "1 free item",
+        cardDesign: DEFAULT_DESIGN,
+      })
+      .returning();
+    return toView(created!);
+  });
+}

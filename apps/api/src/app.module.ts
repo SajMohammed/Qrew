@@ -8,6 +8,7 @@ import { CardModule } from "./card/card.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { ProgramModule } from "./program/program.module";
 import { LeadsModule } from "./leads/leads.module";
+import { OnboardingModule } from "./onboarding/onboarding.module";
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { LeadsModule } from "./leads/leads.module";
     DashboardModule,
     ProgramModule,
     LeadsModule,
+    OnboardingModule,
   ],
   controllers: [HealthController],
 })

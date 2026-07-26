@@ -1,5 +1,6 @@
 import { SetMetadata, createParamDecorator, type ExecutionContext } from "@nestjs/common";
 import type { Request } from "express";
+import type { AuthContext } from "./request-context";
 
 /** Open a route to unauthenticated callers (enroll, card/:serial, leads, health). */
 export const IS_PUBLIC_KEY = "isPublic";
@@ -18,4 +19,11 @@ export const Merchant = createParamDecorator((_data: unknown, ctx: ExecutionCont
   const req = ctx.switchToHttp().getRequest<Request>();
   if (!req.merchantId) throw new Error("no merchant on request — ClerkAuthGuard misconfigured");
   return req.merchantId;
+});
+
+/** Inject the verified auth context (userId) — for @AllowNoMerchant routes like onboarding. */
+export const Auth = createParamDecorator((_data: unknown, ctx: ExecutionContext): AuthContext => {
+  const req = ctx.switchToHttp().getRequest<Request>();
+  if (!req.auth) throw new Error("no auth context — expected an authenticated request");
+  return req.auth;
 });

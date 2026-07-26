@@ -55,6 +55,12 @@ export const LeadRequest = z.object({
 });
 export type LeadRequest = z.infer<typeof LeadRequest>;
 
+// Merchant onboarding — first Clerk login creates a merchant + a default program.
+export const OnboardingRequest = z.object({
+  businessName: z.string().min(1).max(120).optional(),
+});
+export type OnboardingRequest = z.infer<typeof OnboardingRequest>;
+
 export const ProgramDTO = z.object({
   id: z.string(),
   name: z.string(),
