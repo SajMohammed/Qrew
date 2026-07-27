@@ -3,7 +3,7 @@ import { withTenant, enrollments } from "@qrew/db";
 import { addStamp, type StampResult } from "./stamp";
 import { verifyCardToken } from "./token";
 
-export type ScanResult = { found: false } | ({ found: true } & StampResult);
+export type ScanResult = { found: false } | ({ found: true; enrollmentId: string } & StampResult);
 
 export interface ScanInput {
   merchantId: string;
@@ -38,5 +38,5 @@ export async function scanStamp(input: ScanInput): Promise<ScanResult> {
     idempotencyKey: input.idempotencyKey,
     staffId: input.staffId,
   });
-  return { found: true, ...result };
+  return { found: true, enrollmentId, ...result };
 }

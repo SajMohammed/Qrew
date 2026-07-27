@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth, SignIn, UserButton } from "@clerk/react";
 import { useApi } from "./useApi";
-import type { ScanResult } from "./api";
+import type { ScanResult, RedeemResult } from "./api";
 
 export function App() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -39,6 +39,8 @@ function Scanner() {
   const [pinErr, setPinErr] = useState<string | null>(null);
   const [serial, setSerial] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [redeemed, setRedeemed] = useState<RedeemResult | null>(null);
+  const [redeeming, setRedeeming] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [camState, setCamState] = useState<"idle" | "on" | "off">("idle");
   const busyRef = useRef(false);
@@ -65,6 +67,7 @@ function Scanner() {
     if (!s || busyRef.current) return;
     busyRef.current = true;
     setErr(null);
+    setRedeemed(null); // a fresh scan clears any prior redemption confirmation
     try {
       setResult(await api.scan(s, staffTokenRef.current ?? undefined));
     } catch (e) {
@@ -72,6 +75,22 @@ function Scanner() {
     } finally {
       // brief debounce so a QR held in front of the camera doesn't spam stamps
       window.setTimeout(() => (busyRef.current = false), 1200);
+    }
+  }
+
+  // Redeem the just-scanned reward-ready card (staff action; attributed to the cashier if a PIN is set).
+  async function doRedeem() {
+    if (!result?.enrollmentId || redeeming) return;
+    setRedeeming(true);
+    setErr(null);
+    try {
+      const r = await api.redeem(result.enrollmentId, staffTokenRef.current ?? undefined);
+      setRedeemed(r);
+      setResult(null); // swap the "reward ready" banner for the redeemed confirmation
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRedeeming(false);
     }
   }
 
@@ -158,6 +177,14 @@ function Scanner() {
       </div>
 
       {result && <ResultBanner result={result} />}
+      {result?.found && result.rewardReady && result.enrollmentId && (
+        <button className="redeem" onClick={doRedeem} disabled={redeeming}>
+          {redeeming ? "Redeeming…" : "🎁 Redeem reward"}
+        </button>
+      )}
+      {redeemed?.redeemed && (
+        <div className="banner ok">✓ Reward redeemed{redeemed.rewardText ? ` — ${redeemed.rewardText}` : ""}</div>
+      )}
       {err && <p className="err">{err}</p>}
     </div>
   );

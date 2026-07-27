@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/react";
 import { useCallback, useMemo } from "react";
-import type { ScanResult } from "./api";
+import type { ScanResult, RedeemResult } from "./api";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
@@ -36,6 +36,15 @@ export function useApi() {
         });
         if (res.status === 404) return { found: false };
         if (!res.ok) throw new Error(`Scan failed (${res.status})`);
+        return res.json();
+      },
+      async redeem(enrollmentId: string, staffToken?: string): Promise<RedeemResult> {
+        const idempotencyKey = `redeem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const res = await call("/loyalty/redeem", {
+          method: "POST",
+          body: JSON.stringify({ enrollmentId, idempotencyKey, staffToken }),
+        });
+        if (!res.ok) throw new Error(`Redeem failed (${res.status})`);
         return res.json();
       },
       async verifyPin(pin: string): Promise<VerifiedCashier> {
