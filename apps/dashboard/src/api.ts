@@ -39,3 +39,27 @@ export type ProgramPatch = Partial<{
   bonusStamps: number;
   cardDesign: { brandColor?: string; stampIcon?: string };
 }>;
+
+// ── Scan tab (the counter) ────────────────────────────────────────────────────────
+export interface ScanResult {
+  found: boolean;
+  enrollmentId?: string; // present when found — lets us redeem this exact card
+  applied?: boolean;
+  reason?: "applied" | "duplicate" | "cooldown" | "reward_ready";
+  currentStamps?: number;
+  stampsRequired?: number;
+  rewardReady?: boolean;
+}
+
+export interface RedeemResult {
+  redeemed: boolean;
+  reason: "redeemed" | "insufficient" | "duplicate";
+  currentStamps: number;
+  rewardText?: string;
+}
+
+export interface VerifiedCashier {
+  staffToken: string;
+  name: string;
+  role: string;
+}

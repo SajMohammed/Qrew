@@ -1,6 +1,8 @@
 import { useAuth } from "@clerk/react";
 import { useCallback, useMemo } from "react";
-import type { Dashboard, Program, ProgramPatch } from "./api";
+import type { Dashboard, Program, ProgramPatch, ScanResult, RedeemResult, VerifiedCashier } from "./api";
+
+const rnd = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
@@ -47,6 +49,29 @@ export function useApi() {
       async updateProgram(id: string, patch: ProgramPatch): Promise<Program> {
         const res = await call(`/program/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
         if (!res.ok) throw new Error(`Save failed (${res.status})`);
+        return res.json();
+      },
+      // ── Scan tab ──
+      async scan(serial: string, staffToken?: string): Promise<ScanResult> {
+        const res = await call("/loyalty/scan", {
+          method: "POST",
+          body: JSON.stringify({ serial, idempotencyKey: `scan-${rnd()}`, staffToken }),
+        });
+        if (res.status === 404) return { found: false };
+        if (!res.ok) throw new Error(`Scan failed (${res.status})`);
+        return res.json();
+      },
+      async redeem(enrollmentId: string, staffToken?: string): Promise<RedeemResult> {
+        const res = await call("/loyalty/redeem", {
+          method: "POST",
+          body: JSON.stringify({ enrollmentId, idempotencyKey: `redeem-${rnd()}`, staffToken }),
+        });
+        if (!res.ok) throw new Error(`Redeem failed (${res.status})`);
+        return res.json();
+      },
+      async verifyPin(pin: string): Promise<VerifiedCashier> {
+        const res = await call("/staff/verify-pin", { method: "POST", body: JSON.stringify({ pin }) });
+        if (!res.ok) throw new Error(`PIN failed (${res.status})`);
         return res.json();
       },
     }),

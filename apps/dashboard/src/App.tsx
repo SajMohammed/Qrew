@@ -3,8 +3,9 @@ import { useAuth, SignIn, UserButton } from "@clerk/react";
 import { useApi, NeedsOnboarding } from "./useApi";
 import type { Dashboard } from "./api";
 import { Designer } from "./Designer";
+import { Scanner } from "./Scanner";
 
-type Tab = "overview" | "designer";
+type Tab = "overview" | "scan" | "designer";
 
 export function App() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -20,9 +21,9 @@ export function App() {
     return (
       <div className="wrap gate">
         <div className="wordmark">
-          <span className="q">Q</span>rew <span className="tag">Dashboard</span>
+          <span className="q">Q</span>rew <span className="tag">Shop</span>
         </div>
-        <h1>Sign in to your dashboard</h1>
+        <h1>Sign in to your shop</h1>
         <SignIn />
       </div>
     );
@@ -71,7 +72,7 @@ function DashboardApp() {
       <header className="head">
         <div>
           <div className="wordmark">
-            <span className="q">Q</span>rew <span className="tag">Dashboard</span>
+            <span className="q">Q</span>rew <span className="tag">Shop</span>
           </div>
           <div className="mname">{data?.merchantName ?? "…"}</div>
         </div>
@@ -89,12 +90,17 @@ function DashboardApp() {
         <button className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")}>
           Overview
         </button>
+        <button className={tab === "scan" ? "on" : ""} onClick={() => setTab("scan")}>
+          Scan
+        </button>
         <button className={tab === "designer" ? "on" : ""} onClick={() => setTab("designer")}>
           Card designer
         </button>
       </nav>
 
-      {tab === "designer" ? (
+      {tab === "scan" ? (
+        <Scanner />
+      ) : tab === "designer" ? (
         <Designer merchantName={data?.merchantName} />
       ) : (
         <>
