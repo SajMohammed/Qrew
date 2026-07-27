@@ -28,6 +28,7 @@ export interface RecentEnrollment {
 }
 
 export interface Dashboard {
+  merchantId: string; // the owner's own public id (routing for the enroll QR — not a secret)
   merchantName: string;
   stats: DashboardStats;
   recent: RecentEnrollment[];
@@ -66,6 +67,7 @@ export async function getDashboard(merchantId: string): Promise<Dashboard> {
       .limit(10);
 
     return {
+      merchantId,
       merchantName: merchant?.name ?? "",
       stats: {
         enrollments: Number(enr?.n ?? 0),

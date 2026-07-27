@@ -4,8 +4,9 @@ import { useApi, NeedsOnboarding } from "./useApi";
 import type { Dashboard } from "./api";
 import { Designer } from "./Designer";
 import { Scanner } from "./Scanner";
+import { CounterQR } from "./CounterQR";
 
-type Tab = "overview" | "scan" | "designer";
+type Tab = "overview" | "scan" | "counter" | "designer";
 
 export function App() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -93,6 +94,9 @@ function DashboardApp() {
         <button className={tab === "scan" ? "on" : ""} onClick={() => setTab("scan")}>
           Scan
         </button>
+        <button className={tab === "counter" ? "on" : ""} onClick={() => setTab("counter")}>
+          Counter QR
+        </button>
         <button className={tab === "designer" ? "on" : ""} onClick={() => setTab("designer")}>
           Card designer
         </button>
@@ -100,6 +104,12 @@ function DashboardApp() {
 
       {tab === "scan" ? (
         <Scanner />
+      ) : tab === "counter" ? (
+        data ? (
+          <CounterQR merchantId={data.merchantId} merchantName={data.merchantName} />
+        ) : (
+          <p className="muted">Loading…</p>
+        )
       ) : tab === "designer" ? (
         <Designer merchantName={data?.merchantName} />
       ) : (

@@ -11,6 +11,7 @@ export interface RecentEnrollment {
 }
 
 export interface Dashboard {
+  merchantId: string;
   merchantName: string;
   stats: {
     enrollments: number;
