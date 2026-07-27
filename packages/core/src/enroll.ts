@@ -16,6 +16,7 @@ export interface EnrollInput {
   phone?: string;
   name?: string;
   consent?: { sms?: boolean; whatsapp?: boolean };
+  customerAccountId?: string; // present when the consumer is signed in — links the card to "all my cards"
 }
 
 export interface EnrollResult {
@@ -50,13 +51,30 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
       .where(and(eq(loyaltyPrograms.id, input.programId), eq(loyaltyPrograms.active, true)));
     if (!program) throw new Error("program not found");
 
-    // find-or-create the customer (by phone, within the tenant)
+    // find-or-create the customer, within the tenant. A signed-in consumer is keyed by their
+    // account (one card-holder per merchant); a walk-in is keyed by phone as before.
     let customer: typeof customers.$inferSelect | undefined;
-    if (input.phone) {
+    if (input.customerAccountId) {
+      [customer] = await db
+        .select()
+        .from(customers)
+        .where(
+          and(eq(customers.merchantId, input.merchantId), eq(customers.customerAccountId, input.customerAccountId)),
+        );
+    }
+    if (!customer && input.phone) {
       [customer] = await db
         .select()
         .from(customers)
         .where(and(eq(customers.merchantId, input.merchantId), eq(customers.phone, input.phone)));
+      // adopt an existing anonymous phone-row into the account (claim-on-enroll)
+      if (customer && input.customerAccountId && !customer.customerAccountId) {
+        [customer] = await db
+          .update(customers)
+          .set({ customerAccountId: input.customerAccountId })
+          .where(eq(customers.id, customer.id))
+          .returning();
+      }
     }
     if (!customer) {
       [customer] = await db
@@ -66,6 +84,7 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
           phone: input.phone,
           name: input.name,
           consentFlags: input.consent ?? {},
+          customerAccountId: input.customerAccountId ?? null,
         })
         .returning();
     }

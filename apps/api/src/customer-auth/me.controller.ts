@@ -1,5 +1,6 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
-import { getMyCards } from "@qrew/db";
+import { Controller, Get, Post, Body, UseGuards, ConflictException } from "@nestjs/common";
+import { ClaimCardRequest } from "@qrew/contracts";
+import { getMyCards, claimCardBySerial } from "@qrew/db";
 import { Public } from "../auth/auth.decorators";
 import { CustomerAuthGuard, CustomerAccount } from "./customer-auth.guard";
 
@@ -14,6 +15,15 @@ import { CustomerAuthGuard, CustomerAccount } from "./customer-auth.guard";
 export class MeController {
   @Get("cards")
   cards(@CustomerAccount() accountId: string) {
+    return getMyCards(accountId);
+  }
+
+  // Fold an anonymous card (held by serial) into this account, then return the refreshed list.
+  @Post("claim")
+  async claim(@CustomerAccount() accountId: string, @Body() body: unknown) {
+    const { serial } = ClaimCardRequest.parse(body);
+    const ok = await claimCardBySerial(accountId, serial);
+    if (!ok) throw new ConflictException("card not found or already linked to another account");
     return getMyCards(accountId);
   }
 }

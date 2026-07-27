@@ -115,6 +115,33 @@ export async function revokeRefreshSession(refreshTokenHash: string): Promise<vo
     .where(eq(customerSessions.refreshTokenHash, refreshTokenHash));
 }
 
+/**
+ * Fold an anonymous (walk-in) card into a signed-in account, by its serial — the bridge for the
+ * hybrid UX (get an instant card, then sign in to save it). Possession of the unguessable serial is
+ * the credential. Refuses a card already owned by a DIFFERENT account (no stealing); a no-op if it's
+ * already this account's. Returns true when the card is (now) linked to this account.
+ */
+export async function claimCardBySerial(accountId: string, serial: string): Promise<boolean> {
+  return adminDb.transaction(async (tx) => {
+    const [e] = await tx
+      .select({ customerId: enrollments.customerId })
+      .from(enrollments)
+      .where(eq(enrollments.cardSerial, serial))
+      .limit(1);
+    if (!e) return false;
+    const [c] = await tx
+      .select({ id: customers.id, accountId: customers.customerAccountId })
+      .from(customers)
+      .where(eq(customers.id, e.customerId))
+      .limit(1)
+      .for("update");
+    if (!c) return false;
+    if (c.accountId) return c.accountId === accountId; // already linked — mine (ok) or someone else's (refuse)
+    await tx.update(customers).set({ customerAccountId: accountId }).where(eq(customers.id, c.id));
+    return true;
+  });
+}
+
 export interface MyCard {
   serial: string;
   merchantName: string;
