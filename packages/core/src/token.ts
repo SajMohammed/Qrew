@@ -5,8 +5,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // check) that attributes a cashier's scans.
 const CARD_SECRET = process.env.CARD_TOKEN_SECRET ?? "dev-card-token-secret-change-me";
 const STAFF_SECRET = process.env.STAFF_TOKEN_SECRET ?? "dev-staff-token-secret-change-me";
+const CUSTOMER_SECRET = process.env.CUSTOMER_TOKEN_SECRET ?? "dev-customer-token-secret-change-me";
 const CARD_TTL_MS = 120_000; // 2 minutes — refreshed as the card polls
 const STAFF_TTL_MS = 8 * 60 * 60 * 1000; // one shift
+export const CUSTOMER_ACCESS_TTL_MS = 15 * 60 * 1000; // 15 min — the refresh token rotates it
 
 /** A signed, expiring token: base64url(subject.expiry).base64url(hmac). */
 function mintSigned(secret: string, subject: string, ttlMs: number): string {
@@ -57,4 +59,14 @@ export function mintStaffToken(staffId: string, ttlMs: number = STAFF_TTL_MS): s
 /** Verify a staff token; return its staffId, or null if malformed / tampered / expired. */
 export function verifyStaffToken(token: string): string | null {
   return readSigned(STAFF_SECRET, token);
+}
+
+/** Mint a short-lived customer access token (subject = customer account id). Rotated via refresh. */
+export function mintCustomerToken(accountId: string, ttlMs: number = CUSTOMER_ACCESS_TTL_MS): string {
+  return mintSigned(CUSTOMER_SECRET, accountId, ttlMs);
+}
+
+/** Verify a customer access token; return its account id, or null if malformed / tampered / expired. */
+export function verifyCustomerToken(token: string): string | null {
+  return readSigned(CUSTOMER_SECRET, token);
 }
