@@ -91,11 +91,16 @@ export const customers = pgTable(
     phone: text("phone"), // PII — stays in-region (me-central-1). Never leaves the UAE.
     name: text("name"),
     consentFlags: jsonb("consent_flags").notNull().default(sql`'{}'::jsonb`), // per-channel TDRA consent
+    // links this merchant's customer to the global person (null = anonymous walk-in). See customerAccounts.
+    customerAccountId: uuid("customer_account_id").references(() => customerAccounts.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
   (t) => [
     index("customers_merchant_idx").on(t.merchantId),
     uniqueIndex("customers_merchant_phone_uq").on(t.merchantId, t.phone),
+    index("customers_account_idx").on(t.customerAccountId),
   ],
 );
 
@@ -187,6 +192,61 @@ export const leads = pgTable(
   (t) => [uniqueIndex("leads_email_uq").on(t.email)],
 );
 
+/**
+ * Customer accounts — OPTIONAL, cross-merchant consumer identity for the "all my cards" app.
+ * GLOBAL / admin-path like `leads`: a customer is a person, not a tenant, so no `merchant_id`;
+ * written only via the admin connection, RLS-forced with no policy. Staff auth (Clerk) and
+ * customer auth (these tables) are separate systems. See migration 0004.
+ */
+export const customerAccounts = pgTable(
+  "customer_accounts",
+  {
+    id: id(),
+    email: text("email"), // canonical; may be null (Apple private relay)
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("customer_accounts_email_uq").on(t.email).where(sql`${t.email} is not null`)],
+);
+
+/** One social login (Google/Apple) linked to an account. A person can link several. */
+export const customerIdentities = pgTable(
+  "customer_identities",
+  {
+    id: id(),
+    customerAccountId: uuid("customer_account_id")
+      .notNull()
+      .references(() => customerAccounts.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // google | apple
+    providerSub: text("provider_sub").notNull(),
+    email: text("email"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("customer_identities_provider_sub_uq").on(t.provider, t.providerSub),
+    index("customer_identities_account_idx").on(t.customerAccountId),
+  ],
+);
+
+/** Our own revocable refresh tokens (no per-MAU auth vendor). Store only the hash. */
+export const customerSessions = pgTable(
+  "customer_sessions",
+  {
+    id: id(),
+    customerAccountId: uuid("customer_account_id")
+      .notNull()
+      .references(() => customerAccounts.id, { onDelete: "cascade" }),
+    refreshTokenHash: text("refresh_token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    device: text("device"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("customer_sessions_refresh_uq").on(t.refreshTokenHash),
+    index("customer_sessions_account_idx").on(t.customerAccountId),
+  ],
+);
+
 export const schema = {
   merchants,
   locations,
@@ -197,4 +257,7 @@ export const schema = {
   stampEvents,
   redemptions,
   leads,
+  customerAccounts,
+  customerIdentities,
+  customerSessions,
 };
