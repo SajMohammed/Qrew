@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 // Dev proxy: the card calls /api/* and Vite forwards to the NestJS API (no CORS).
 export default defineConfig({
   plugins: [react()],
+  envDir: "../..", // read VITE_* (Google client id) from the repo-root .env, shared with the API
   server: {
     host: true, // bind 0.0.0.0 so a phone on the same network can reach it
     port: 5173,
