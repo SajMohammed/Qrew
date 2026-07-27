@@ -14,6 +14,7 @@ declare global {
       auth?: AuthContext;
       merchantId?: string;
       role?: string;
+      customerAccountId?: string; // set by CustomerAuthGuard (the consumer app — separate from Clerk)
     }
   }
 }

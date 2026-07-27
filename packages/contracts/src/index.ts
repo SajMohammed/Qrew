@@ -81,3 +81,24 @@ export const ProgramDTO = z.object({
   rewardText: z.string(),
 });
 export type ProgramDTO = z.infer<typeof ProgramDTO>;
+
+// ── Customer accounts (the consumer "all my cards" app) ──────────────────────────
+// Optional consumer identity via social login. Separate from staff/Clerk auth.
+
+// Sign in with a provider ID token (the API verifies it, then find-or-creates the account).
+export const SocialAuthRequest = z.object({
+  provider: z.enum(["google", "apple"]),
+  idToken: z.string().min(1),
+  device: z.string().max(120).optional(), // a label for the session (e.g. "iPhone Safari")
+});
+export type SocialAuthRequest = z.infer<typeof SocialAuthRequest>;
+
+// Rotate / revoke a session by its refresh token.
+export const RefreshRequest = z.object({ refreshToken: z.string().min(1) });
+export type RefreshRequest = z.infer<typeof RefreshRequest>;
+export const LogoutRequest = RefreshRequest;
+export type LogoutRequest = z.infer<typeof LogoutRequest>;
+
+// Fold an anonymous (walk-in) card into the signed-in account, by its serial.
+export const ClaimCardRequest = z.object({ serial: z.string().min(8) });
+export type ClaimCardRequest = z.infer<typeof ClaimCardRequest>;

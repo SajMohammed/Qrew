@@ -10,6 +10,7 @@ import { ProgramModule } from "./program/program.module";
 import { LeadsModule } from "./leads/leads.module";
 import { OnboardingModule } from "./onboarding/onboarding.module";
 import { StaffModule } from "./staff/staff.module";
+import { CustomerAuthModule } from "./customer-auth/customer-auth.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { StaffModule } from "./staff/staff.module";
     LeadsModule,
     OnboardingModule,
     StaffModule,
+    CustomerAuthModule,
   ],
   controllers: [HealthController],
 })
