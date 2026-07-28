@@ -138,9 +138,9 @@ function DashboardApp() {
                 return (
                   <div className="row" key={r.id}>
                     <div className="who">
-                      <div className="name">{r.customerName || "Guest"}</div>
+                      <div className="name">{r.customerName || r.customerEmail || "Guest"}</div>
                       <div className="sub">
-                        {r.customerPhone || "—"} · {r.programName}
+                        {[r.customerPhone, r.programName].filter(Boolean).join(" · ")}
                       </div>
                     </div>
                     <div className="prog">

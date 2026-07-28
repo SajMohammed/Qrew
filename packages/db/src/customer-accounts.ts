@@ -142,6 +142,16 @@ export async function claimCardBySerial(accountId: string, serial: string): Prom
   });
 }
 
+/** The account's email — read via adminDb so enroll can snapshot it onto the merchant's customer row. */
+export async function getAccountEmail(accountId: string): Promise<string | null> {
+  const [a] = await adminDb
+    .select({ email: customerAccounts.email })
+    .from(customerAccounts)
+    .where(eq(customerAccounts.id, accountId))
+    .limit(1);
+  return a?.email ?? null;
+}
+
 export interface MyCard {
   serial: string;
   merchantName: string;

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   adminDb,
   closeDb,
@@ -105,5 +105,20 @@ describe("customer cards — enroll linking + claim", () => {
       .from(customers)
       .where(eq(customers.id, vEnr!.customerId));
     expect(vCust!.accountId).toBeNull();
+  });
+
+  // A signed-in customer's account email is snapshotted onto the merchant's row, so the dashboard
+  // shows who enrolled instead of "Guest".
+  it("captures the signed-in customer's account email onto the merchant row", async () => {
+    const email = `whoami-${sfx}@ex.com`;
+    const { accountId } = await signInWithProvider({ provider: "google", sub: `who-${sfx}`, email, emailVerified: true });
+    accountIds.add(accountId);
+    await enroll({ merchantId, programId, customerAccountId: accountId });
+
+    const [cust] = await adminDb
+      .select({ email: customers.email })
+      .from(customers)
+      .where(and(eq(customers.merchantId, merchantId), eq(customers.customerAccountId, accountId)));
+    expect(cust!.email).toBe(email);
   });
 });

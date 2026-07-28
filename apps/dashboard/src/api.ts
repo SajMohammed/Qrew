@@ -3,6 +3,7 @@
 export interface RecentEnrollment {
   id: string;
   customerName: string | null;
+  customerEmail: string | null;
   customerPhone: string | null;
   programName: string;
   currentStamps: number;

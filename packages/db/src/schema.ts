@@ -91,6 +91,7 @@ export const customers = pgTable(
     merchantId: merchantId(),
     phone: text("phone"), // PII — stays in-region (me-central-1). Never leaves the UAE.
     name: text("name"),
+    email: text("email"), // CRM snapshot of a signed-in customer's account email (set at enroll time)
     consentFlags: jsonb("consent_flags").notNull().default(sql`'{}'::jsonb`), // per-channel TDRA consent
     // links this merchant's customer to the global person (null = anonymous walk-in). See customerAccounts.
     customerAccountId: uuid("customer_account_id").references(() => customerAccounts.id, {

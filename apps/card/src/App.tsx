@@ -146,7 +146,7 @@ export function App() {
 
   const addShopCard = () =>
     void run(async () => {
-      const r = await enroll({ merchantId: shop.m, programId: shop.p, name: auth.signedIn ? undefined : "Guest" }, auth.token);
+      const r = await enroll({ merchantId: shop.m, programId: shop.p }, auth.token);
       setEnrollCtx({ serial: r.serial, enrollmentId: r.enrollmentId, merchantId: shop.m });
       if (!auth.token) {
         const next = [...new Set([...localSerials, r.serial])];

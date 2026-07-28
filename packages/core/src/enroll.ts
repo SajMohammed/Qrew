@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import {
   withTenant,
+  getAccountEmail,
   merchants,
   loyaltyPrograms,
   customers,
@@ -41,6 +42,10 @@ export interface EnrollResult {
 export async function enroll(input: EnrollInput): Promise<EnrollResult> {
   const provider = getWalletProvider();
 
+  // A signed-in customer's email — read OUTSIDE the tenant tx (the account is global/admin-path) and
+  // snapshotted onto the merchant's customer row so the dashboard shows who enrolled, not "Guest".
+  const accountEmail = input.customerAccountId ? await getAccountEmail(input.customerAccountId) : null;
+
   // tx1 — create/find rows, tenant-scoped, no external calls inside the transaction.
   const created = await withTenant(input.merchantId, async (db) => {
     const [merchant] = await db.select({ name: merchants.name }).from(merchants);
@@ -65,12 +70,21 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
         .where(
           and(eq(customers.merchantId, input.merchantId), eq(customers.customerAccountId, input.customerAccountId)),
         );
+      if (customer && !customer.email && accountEmail) {
+        // backfill the CRM email onto a row created before it was captured
+        [customer] = await db
+          .update(customers)
+          .set({ email: accountEmail })
+          .where(eq(customers.id, customer.id))
+          .returning();
+      }
       if (!customer) {
         [customer] = await db
           .insert(customers)
           .values({
             merchantId: input.merchantId,
             name: input.name,
+            email: accountEmail,
             consentFlags: input.consent ?? {},
             customerAccountId: input.customerAccountId,
             // phone intentionally omitted — a signed-in customer's phone isn't a trust boundary

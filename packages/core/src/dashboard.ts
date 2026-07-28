@@ -20,6 +20,7 @@ export interface DashboardStats {
 export interface RecentEnrollment {
   id: string;
   customerName: string | null;
+  customerEmail: string | null;
   customerPhone: string | null;
   programName: string;
   currentStamps: number;
@@ -54,6 +55,7 @@ export async function getDashboard(merchantId: string): Promise<Dashboard> {
       .select({
         id: enrollments.id,
         customerName: customers.name,
+        customerEmail: customers.email,
         customerPhone: customers.phone,
         programName: loyaltyPrograms.name,
         currentStamps: enrollments.currentStamps,
@@ -79,6 +81,7 @@ export async function getDashboard(merchantId: string): Promise<Dashboard> {
       recent: recent.map((r) => ({
         id: r.id,
         customerName: r.customerName,
+        customerEmail: r.customerEmail,
         customerPhone: r.customerPhone,
         programName: r.programName,
         currentStamps: r.currentStamps,
