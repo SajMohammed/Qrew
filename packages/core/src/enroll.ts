@@ -9,6 +9,7 @@ import {
   stampEvents,
 } from "@qrew/db";
 import { getWalletProvider } from "@qrew/wallet-core";
+import { NotFoundError } from "./errors";
 
 export interface EnrollInput {
   merchantId: string; // from the merchant's (public) counter QR — routing, not auth
@@ -43,13 +44,13 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
   // tx1 — create/find rows, tenant-scoped, no external calls inside the transaction.
   const created = await withTenant(input.merchantId, async (db) => {
     const [merchant] = await db.select({ name: merchants.name }).from(merchants);
-    if (!merchant) throw new Error("merchant not found");
+    if (!merchant) throw new NotFoundError("merchant not found");
 
     const [program] = await db
       .select()
       .from(loyaltyPrograms)
       .where(and(eq(loyaltyPrograms.id, input.programId), eq(loyaltyPrograms.active, true)));
-    if (!program) throw new Error("program not found");
+    if (!program) throw new NotFoundError("program not found");
 
     // find-or-create the customer, within the tenant.
     let customer: typeof customers.$inferSelect | undefined;

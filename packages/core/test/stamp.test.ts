@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { adminDb, closeDb, merchants, loyaltyPrograms } from "@qrew/db";
-import { enroll, addStamp } from "../src/index";
+import { enroll, addStamp, NotFoundError } from "../src/index";
 
 let merchantId: string;
 let programId: string;
@@ -94,5 +94,12 @@ describe("addStamp", () => {
     expect([a, b].filter((r) => r.applied).length).toBe(1); // exactly one stamped
     expect([a, b].filter((r) => r.reason === "reward_ready").length).toBe(1); // the other hit the cap
     expect(Math.max(a.currentStamps, b.currentStamps)).toBe(3); // capped at 3 — never 4
+  });
+
+  // C2: an unknown enrollment is a domain NotFoundError (→ 404, not a 500).
+  it("throws NotFoundError for an unknown enrollment", async () => {
+    await expect(
+      addStamp({ merchantId, enrollmentId: "00000000-0000-0000-0000-000000000000", idempotencyKey: "nf-stamp" }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

@@ -10,7 +10,7 @@ const staffToken = z.string().optional();
 
 export const StampRequest = z.object({
   enrollmentId: z.string().uuid(),
-  idempotencyKey: z.string().min(8),
+  idempotencyKey: z.string().min(8).max(200),
   locationId: z.string().uuid().optional(),
   staffToken,
 });
@@ -18,14 +18,14 @@ export type StampRequest = z.infer<typeof StampRequest>;
 
 export const RedeemRequest = z.object({
   enrollmentId: z.string().uuid(),
-  idempotencyKey: z.string().min(8),
+  idempotencyKey: z.string().min(8).max(200),
   staffToken,
 });
 export type RedeemRequest = z.infer<typeof RedeemRequest>;
 
 export const ScanRequest = z.object({
-  serial: z.string().min(8), // the customer card serial from the scanned QR
-  idempotencyKey: z.string().min(8),
+  serial: z.string().min(8).max(200), // the customer card serial from the scanned QR
+  idempotencyKey: z.string().min(8).max(200),
   staffToken,
 });
 export type ScanRequest = z.infer<typeof ScanRequest>;
@@ -53,8 +53,8 @@ export type ProgramUpdate = z.infer<typeof ProgramUpdate>;
 export const EnrollRequest = z.object({
   merchantId: z.string().uuid(), // from the merchant's counter QR (public routing, not auth)
   programId: z.string().uuid(),
-  phone: z.string().min(5).optional(),
-  name: z.string().min(1).optional(),
+  phone: z.string().min(5).max(32).optional(),
+  name: z.string().min(1).max(120).optional(),
   consent: z.object({ sms: z.boolean().optional(), whatsapp: z.boolean().optional() }).optional(),
 });
 export type EnrollRequest = z.infer<typeof EnrollRequest>;
@@ -88,17 +88,17 @@ export type ProgramDTO = z.infer<typeof ProgramDTO>;
 // Sign in with a provider ID token (the API verifies it, then find-or-creates the account).
 export const SocialAuthRequest = z.object({
   provider: z.enum(["google", "apple"]),
-  idToken: z.string().min(1),
+  idToken: z.string().min(1).max(8192), // a provider JWT (~1-2 KB); cap well above that
   device: z.string().max(120).optional(), // a label for the session (e.g. "iPhone Safari")
 });
 export type SocialAuthRequest = z.infer<typeof SocialAuthRequest>;
 
 // Rotate / revoke a session by its refresh token.
-export const RefreshRequest = z.object({ refreshToken: z.string().min(1) });
+export const RefreshRequest = z.object({ refreshToken: z.string().min(1).max(512) });
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
 export const LogoutRequest = RefreshRequest;
 export type LogoutRequest = z.infer<typeof LogoutRequest>;
 
 // Fold an anonymous (walk-in) card into the signed-in account, by its serial.
-export const ClaimCardRequest = z.object({ serial: z.string().min(8) });
+export const ClaimCardRequest = z.object({ serial: z.string().min(8).max(200) });
 export type ClaimCardRequest = z.infer<typeof ClaimCardRequest>;

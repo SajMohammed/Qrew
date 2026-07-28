@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body, NotFoundException } from "@nestjs/common";
+import { Controller, Get, Patch, Param, Body, NotFoundException, ParseUUIDPipe } from "@nestjs/common";
 import { ProgramUpdate } from "@qrew/contracts";
 import { getProgram, updateProgram } from "@qrew/core";
 import { Merchant, Roles } from "../auth/auth.decorators";
@@ -15,7 +15,7 @@ export class ProgramController {
   // Editing the card design is an owner/manager action; cashiers can't reach it.
   @Roles("owner", "manager")
   @Patch(":id")
-  async update(@Merchant() merchantId: string, @Param("id") id: string, @Body() body: unknown) {
+  async update(@Merchant() merchantId: string, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
     const patch = ProgramUpdate.parse(body);
     const program = await updateProgram(merchantId, id, patch);
     if (!program) throw new NotFoundException("program not found");

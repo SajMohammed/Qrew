@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { adminDb, closeDb, merchants, loyaltyPrograms, redemptions } from "@qrew/db";
-import { enroll, addStamp, redeem } from "../src/index";
+import { enroll, addStamp, redeem, NotFoundError } from "../src/index";
 
 let merchantId: string;
 let programId: string;
@@ -81,5 +81,12 @@ describe("redeem", () => {
       .from(redemptions)
       .where(and(eq(redemptions.merchantId, merchantId), eq(redemptions.enrollmentId, enrollmentId)));
     expect(rows).toHaveLength(1); // exactly one reward handed out
+  });
+
+  // C2: an unknown enrollment is a domain NotFoundError (→ 404, not a 500).
+  it("throws NotFoundError for an unknown enrollment", async () => {
+    await expect(
+      redeem({ merchantId, enrollmentId: "00000000-0000-0000-0000-000000000000", idempotencyKey: "nf-redeem" }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

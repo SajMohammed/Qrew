@@ -10,7 +10,7 @@ import {
   stampEvents,
   customerAccounts,
 } from "@qrew/db";
-import { enroll, signInWithProvider } from "../src/index";
+import { enroll, signInWithProvider, NotFoundError } from "../src/index";
 
 let merchantId: string;
 let programId: string;
@@ -88,5 +88,12 @@ describe("enroll", () => {
       .where(and(eq(customers.merchantId, merchantId), eq(customers.customerAccountId, accountId)));
     const enrs = await adminDb.select().from(enrollments).where(eq(enrollments.customerId, cust!.id));
     expect(enrs).toHaveLength(1); // one customer row, one enrollment
+  });
+
+  // C2: an unknown program is a domain NotFoundError (→ the API maps it to 404, not a 500).
+  it("throws NotFoundError for an unknown program", async () => {
+    await expect(
+      enroll({ merchantId, programId: "00000000-0000-0000-0000-000000000000" }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

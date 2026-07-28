@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments, stampEvents } from "@qrew/db";
 import { enqueueWalletSync } from "@qrew/queue";
+import { NotFoundError } from "./errors";
 
 export interface AddStampInput {
   merchantId: string;
@@ -42,12 +43,12 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
       .from(enrollments)
       .where(eq(enrollments.id, input.enrollmentId))
       .for("update");
-    if (!enrollment) throw new Error("enrollment not found");
+    if (!enrollment) throw new NotFoundError("enrollment not found");
     const [program] = await db
       .select()
       .from(loyaltyPrograms)
       .where(eq(loyaltyPrograms.id, enrollment.programId));
-    if (!program) throw new Error("program not found");
+    if (!program) throw new NotFoundError("program not found");
 
     // Don't stamp past the reward threshold — the card is full; the customer must redeem first.
     if (enrollment.currentStamps >= program.stampsRequired) {

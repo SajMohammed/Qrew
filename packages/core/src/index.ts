@@ -9,3 +9,4 @@ export * from "./lead";
 export * from "./staff";
 export * from "./token";
 export * from "./social-auth";
+export * from "./errors";
