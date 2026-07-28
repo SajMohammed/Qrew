@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth, SignIn, UserButton } from "@clerk/react";
 import { useApi, NeedsOnboarding } from "./useApi";
 import type { Dashboard } from "./api";
@@ -38,8 +38,13 @@ function DashboardApp() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const inFlight = useRef(false);
 
   const load = useCallback(async () => {
+    // The 10s poll must not overlap a slow first-login: a re-entrant call would fire POST /onboarding
+    // a second time while the first is still provisioning.
+    if (inFlight.current) return;
+    inFlight.current = true;
     setErr(null);
     setLoading(true);
     try {
@@ -58,6 +63,7 @@ function DashboardApp() {
       }
     } finally {
       setLoading(false);
+      inFlight.current = false;
     }
   }, [api]);
 

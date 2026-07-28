@@ -46,6 +46,7 @@ export function App() {
   const [tiles, setTiles] = useState<CardTile[]>([]);
   const [selected, setSelected] = useState<string | null>(() => param("card") || null);
   const [card, setCard] = useState<CardView | null>(null);
+  const [detailError, setDetailError] = useState(false);
   const [enrollCtx, setEnrollCtx] = useState<{ serial: string; enrollmentId: string; merchantId: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -74,7 +75,8 @@ export function App() {
   }, [auth.token, localSerials]);
 
   useEffect(() => {
-    if (auth.ready) void loadTiles();
+    // surface load failures (e.g. an expired token 401) instead of silently showing an empty grid
+    if (auth.ready) loadTiles().catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [auth.ready, loadTiles]);
 
   // Reset the one-shot claim guard whenever we're signed out, so a later sign-in claims again.
@@ -89,16 +91,15 @@ export function App() {
     const locals = readLocal();
     if (locals.length === 0) return;
     void (async () => {
+      // Keep any serial that failed for a TRANSIENT reason (network / just-expired token) so the card
+      // isn't wiped from the device before it lands on the account — claimCard returns false in that case.
+      const remaining: string[] = [];
       for (const s of locals) {
-        try {
-          await claimCard(auth.token!, s);
-        } catch {
-          /* a card already owned / gone — skip it */
-        }
+        if (!(await claimCard(auth.token!, s))) remaining.push(s);
       }
-      writeLocal([]);
-      setLocalSerials([]);
-      await loadTiles();
+      writeLocal(remaining);
+      setLocalSerials(remaining);
+      await loadTiles().catch(() => {});
     })();
   }, [auth.token, loadTiles]);
 
@@ -106,15 +107,22 @@ export function App() {
   useEffect(() => {
     if (!selected) {
       setCard(null);
+      setDetailError(false);
       return;
     }
+    setDetailError(false);
     let alive = true;
+    let loaded = false; // once we've shown the card, a later poll blip must NOT flip to the error screen
     const load = async () => {
       try {
         const c = await getCard(selected);
-        if (alive) setCard(c);
+        if (alive) {
+          setCard(c);
+          loaded = true;
+          setDetailError(false);
+        }
       } catch {
-        if (alive) setCard(null);
+        if (alive && !loaded) setDetailError(true); // only a dead-end if the card never loaded
       }
     };
     void load();
@@ -177,6 +185,20 @@ export function App() {
         onStamp={enrolled ? devStamp : undefined}
         onRedeem={enrolled ? devRedeem : undefined}
       />
+    );
+  }
+  if (selected && detailError) {
+    return (
+      <div className="screen center">
+        <button className="back" onClick={backHome}>
+          ‹ All cards
+        </button>
+        <div className="empty">
+          <div className="empty-art">🔍</div>
+          <h1>Card not found</h1>
+          <p className="sub">This card may have been removed. Head back to your cards.</p>
+        </div>
+      </div>
     );
   }
   if (selected && !card) {

@@ -158,13 +158,19 @@ export async function getMyCards(token: string): Promise<MyCard[]> {
   return res.json();
 }
 
-// Fold an anonymous card into the account; returns the refreshed list.
-export async function claimCard(token: string, serial: string): Promise<MyCard[]> {
-  const res = await fetch(`${BASE}/me/claim`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-    body: JSON.stringify({ serial }),
-  });
-  if (!res.ok) throw new Error(`Claim failed (${res.status})`);
-  return res.json();
+// Fold an anonymous card into the account. Returns true when the serial is DONE and safe to drop from
+// the device — claimed, or definitively gone / not ours (404/409). Returns false on a TRANSIENT failure
+// (network, or a just-expired token → 401/5xx) so the caller keeps it and retries, never losing a card.
+export async function claimCard(token: string, serial: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE}/me/claim`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ serial }),
+    });
+    if (res.ok) return true;
+    return res.status === 404 || res.status === 409; // definitive → drop; else transient → keep
+  } catch {
+    return false; // network error → keep and retry
+  }
 }

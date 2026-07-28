@@ -13,15 +13,38 @@ const CARD_ORIGIN =
 export function CounterQR({ merchantId, merchantName }: { merchantId: string; merchantName: string }) {
   const api = useApi();
   const [program, setProgram] = useState<Program | null>(null);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    let alive = true;
     api
       .getProgram()
-      .then(setProgram)
-      .catch(() => setProgram(null));
-  }, [api]);
+      .then((p) => {
+        if (alive) {
+          setProgram(p);
+          setError(false);
+        }
+      })
+      .catch(() => {
+        if (alive) setError(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [api, reloadKey]);
 
+  if (error) {
+    return (
+      <div className="counterqr">
+        <p className="muted">Couldn't load your card.</p>
+        <button className="refresh" onClick={() => setReloadKey((k) => k + 1)}>
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (!program) return <p className="muted">Loading your card…</p>;
 
   // The static "enroll" deep-link — scanning it opens the customer app on this shop's card.

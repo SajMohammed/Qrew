@@ -20,10 +20,12 @@ export function useCustomerAuth(): CustomerAuth {
   const refreshRef = useRef<string | null>(localStorage.getItem(REFRESH_KEY));
   const timer = useRef<number | undefined>(undefined);
   const restoreRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false));
+  const lastRefresh = useRef(0);
 
   const apply = useCallback((t: AuthTokens) => {
     setToken(t.accessToken);
     refreshRef.current = t.refreshToken;
+    lastRefresh.current = Date.now();
     localStorage.setItem(REFRESH_KEY, t.refreshToken);
     window.clearTimeout(timer.current);
     // refresh a minute before the access token expires so requests never hit a 401
@@ -40,9 +42,14 @@ export function useCustomerAuth(): CustomerAuth {
   const restore = useCallback(async (): Promise<boolean> => {
     const rt = refreshRef.current;
     if (!rt) return false;
-    const t = await refreshAuth(rt);
+    let t: AuthTokens | null;
+    try {
+      t = await refreshAuth(rt);
+    } catch {
+      return false; // network error — keep the session; a later resume / timer will retry
+    }
     if (!t) {
-      clear();
+      clear(); // the server rejected the refresh token (invalid/expired/revoked) — log out
       return false;
     }
     apply(t);
@@ -57,6 +64,22 @@ export function useCustomerAuth(): CustomerAuth {
     void restore().finally(() => setReady(true));
     return () => window.clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refresh on resume: background/PWA timers get throttled, so the scheduled refresh may fire late or
+  // not at all. Throttled to 5 min so a routine tab-focus doesn't rotate the token needlessly.
+  useEffect(() => {
+    const onVisible = () => {
+      if (
+        document.visibilityState === "visible" &&
+        refreshRef.current &&
+        Date.now() - lastRefresh.current > 5 * 60 * 1000
+      ) {
+        void restoreRef.current();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   const login = useCallback(

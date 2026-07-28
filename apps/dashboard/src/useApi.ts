@@ -7,7 +7,12 @@ const rnd = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
 /** The signed-in user has no merchant yet — the guard answered 409 needs_onboarding. */
-export class NeedsOnboarding extends Error {}
+export class NeedsOnboarding extends Error {
+  constructor() {
+    super("Setting up your shop…"); // a non-empty message so a retry-lag doesn't blank the overview
+    this.name = "NeedsOnboarding";
+  }
+}
 
 // Threads the Clerk session token onto every API call (the api.ts functions are plain modules and
 // can't call the useAuth hook themselves). The server derives the merchant from the token — no

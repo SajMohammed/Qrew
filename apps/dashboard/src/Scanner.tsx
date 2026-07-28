@@ -80,14 +80,35 @@ export function Scanner() {
           (text: string) => void doScan(text),
           () => {},
         );
-        if (!cancelled) setCamState("on");
+        if (cancelled) {
+          // Unmounted during camera startup — start() only just acquired the stream, so the cleanup
+          // below couldn't stop it (it wasn't "scanning" yet). Stop it here or the camera leaks (light stays on).
+          await instance.stop().catch(() => {});
+          instance.clear();
+          return;
+        }
+        setCamState("on");
       } catch {
         if (!cancelled) setCamState("off");
       }
     })();
     return () => {
       cancelled = true;
-      scanner?.stop().then(() => scanner?.clear()).catch(() => {});
+      // html5-qrcode.stop() THROWS synchronously if it isn't scanning yet, so it can't be chained off
+      // a promise — guard it. (The startup-window leak is handled by the cancelled check above.)
+      const s = scanner;
+      if (!s) return;
+      try {
+        s.stop()
+          .then(() => s.clear())
+          .catch(() => {});
+      } catch {
+        try {
+          s.clear();
+        } catch {
+          /* not started — nothing to release */
+        }
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
