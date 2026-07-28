@@ -256,7 +256,13 @@ export function App() {
       )}
 
       {!auth.signedIn && auth.ready && (
-        <SignInPanel onGoogle={auth.signInGoogle} onDev={auth.signInDev} compact={tiles.length > 0} />
+        <SignInPanel
+          onGoogle={auth.signInGoogle}
+          onDev={auth.signInDev}
+          // compact = follow the content instead of anchoring to the bottom (avoids a big gap under
+          // the enroll preview / when cards are shown); only the bare empty state pins it to the bottom.
+          compact={tiles.length > 0 || Boolean(shop.m && shop.p)}
+        />
       )}
       {err && <p className="err">{err}</p>}
     </div>
