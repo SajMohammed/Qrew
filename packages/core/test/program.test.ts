@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { adminDb, closeDb, merchants, loyaltyPrograms } from "@qrew/db";
-import { enroll, getProgram, updateProgram, getCard } from "../src/index";
+import { enroll, getProgram, updateProgram, getCard, getShopPreview } from "../src/index";
 
 let merchantId: string;
 let programId: string;
@@ -48,5 +48,16 @@ describe("program (card designer)", () => {
     expect(card?.brandColor).toBe("#6C2A4B");
     expect(card?.stampIcon).toBe("☕");
     expect(card?.rewardText).toBe("free pastry");
+  });
+
+  it("getShopPreview returns the public shop branding for the enroll landing", async () => {
+    const preview = await getShopPreview(merchantId, programId);
+    expect(preview?.merchantName).toBe("Design Co");
+    expect(preview?.rewardText).toBe("free pastry");
+    expect(preview?.stampsRequired).toBe(8);
+    expect(preview?.brandColor).toBe("#6C2A4B");
+    expect(preview?.stampIcon).toBe("☕");
+    // unknown program → null (the endpoint maps this to 404)
+    expect(await getShopPreview(merchantId, "00000000-0000-4000-8000-000000000000")).toBeNull();
   });
 });

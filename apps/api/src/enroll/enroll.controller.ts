@@ -1,7 +1,7 @@
-import { Controller, Post, Body, Req } from "@nestjs/common";
+import { Controller, Post, Get, Body, Req, Query, NotFoundException } from "@nestjs/common";
 import type { Request } from "express";
-import { EnrollRequest } from "@qrew/contracts";
-import { enroll, verifyCustomerToken } from "@qrew/core";
+import { EnrollRequest, PreviewQuery } from "@qrew/contracts";
+import { enroll, getShopPreview, verifyCustomerToken } from "@qrew/core";
 import { Public } from "../auth/auth.decorators";
 
 // Public endpoint: a customer enrolls from the merchant's QR landing. The merchant is
@@ -9,6 +9,15 @@ import { Public } from "../auth/auth.decorators";
 @Public()
 @Controller("enroll")
 export class EnrollController {
+  // Pre-enrollment card preview — public shop branding for the landing page (no customer data).
+  @Get("preview")
+  async preview(@Query() query: unknown) {
+    const { m, p } = PreviewQuery.parse(query);
+    const preview = await getShopPreview(m, p);
+    if (!preview) throw new NotFoundException("shop or program not found");
+    return preview;
+  }
+
   @Post()
   enroll(@Req() req: Request, @Body() body: unknown) {
     const input = EnrollRequest.parse(body); // zod validation at the boundary

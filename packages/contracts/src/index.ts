@@ -59,6 +59,10 @@ export const EnrollRequest = z.object({
 });
 export type EnrollRequest = z.infer<typeof EnrollRequest>;
 
+// Public pre-enrollment card preview — the (routing) ids from the counter QR.
+export const PreviewQuery = z.object({ m: z.string().uuid(), p: z.string().uuid() });
+export type PreviewQuery = z.infer<typeof PreviewQuery>;
+
 // Marketing waitlist / early-access capture (public, non-tenant).
 export const LeadRequest = z.object({
   businessName: z.string().min(1).max(120),

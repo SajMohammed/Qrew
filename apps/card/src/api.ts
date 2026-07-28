@@ -22,6 +22,23 @@ export interface EnrollResult {
   alreadyEnrolled: boolean;
 }
 
+// Public pre-enrollment preview of a shop's card, for the enroll landing.
+export interface ShopPreview {
+  merchantName: string;
+  programName: string;
+  rewardText: string;
+  stampsRequired: number;
+  bonusStamps: number;
+  brandColor: string;
+  stampIcon: string;
+}
+
+export async function getShopPreview(m: string, p: string): Promise<ShopPreview> {
+  const res = await fetch(`${BASE}/enroll/preview?m=${encodeURIComponent(m)}&p=${encodeURIComponent(p)}`);
+  if (!res.ok) throw new Error(`Preview failed (${res.status})`);
+  return res.json();
+}
+
 // The lightweight per-card summary from GET /me/cards (the grid). cardDesign is the program's
 // jsonb; we normalize it into a tile below.
 export interface MyCard {

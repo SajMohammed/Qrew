@@ -1,5 +1,5 @@
-import { asc, eq } from "drizzle-orm";
-import { withTenant, loyaltyPrograms } from "@qrew/db";
+import { and, asc, eq } from "drizzle-orm";
+import { withTenant, merchants, loyaltyPrograms } from "@qrew/db";
 
 export interface CardDesign {
   brandColor: string; // hex, e.g. "#146A2E"
@@ -25,6 +25,42 @@ export function normalizeDesign(raw: unknown): CardDesign {
     brandColor: typeof d.brandColor === "string" ? d.brandColor : DEFAULT_DESIGN.brandColor,
     stampIcon: typeof d.stampIcon === "string" ? d.stampIcon : DEFAULT_DESIGN.stampIcon,
   };
+}
+
+export interface ShopPreview {
+  merchantName: string;
+  programName: string;
+  rewardText: string;
+  stampsRequired: number;
+  bonusStamps: number;
+  brandColor: string;
+  stampIcon: string;
+}
+
+/**
+ * Public pre-enrollment preview of a shop's card — merchant + active-program branding, by the routing
+ * ids from the counter QR. Read via withTenant(merchantId) exactly like enroll; everything returned is
+ * public shop branding (name, reward, design), no customer data.
+ */
+export async function getShopPreview(merchantId: string, programId: string): Promise<ShopPreview | null> {
+  return withTenant(merchantId, async (db) => {
+    const [merchant] = await db.select({ name: merchants.name }).from(merchants);
+    const [program] = await db
+      .select()
+      .from(loyaltyPrograms)
+      .where(and(eq(loyaltyPrograms.id, programId), eq(loyaltyPrograms.active, true)));
+    if (!merchant || !program) return null;
+    const design = normalizeDesign(program.cardDesign);
+    return {
+      merchantName: merchant.name,
+      programName: program.name,
+      rewardText: program.rewardText,
+      stampsRequired: program.stampsRequired,
+      bonusStamps: program.bonusStamps,
+      brandColor: design.brandColor,
+      stampIcon: design.stampIcon,
+    };
+  });
 }
 
 function toView(p: typeof loyaltyPrograms.$inferSelect): ProgramView {

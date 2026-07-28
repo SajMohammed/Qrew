@@ -6,14 +6,17 @@ import {
   redeemReward,
   getMyCards,
   claimCard,
+  getShopPreview,
   tileFromMyCard,
   tileFromCardView,
   type CardView,
   type CardTile,
+  type ShopPreview,
 } from "./api";
 import { useCustomerAuth } from "./useCustomerAuth";
 import { StampCard } from "./StampCard";
 import { CardsGrid } from "./CardsGrid";
+import { CardPreview } from "./CardPreview";
 import { SignInPanel } from "./SignInPanel";
 
 function param(name: string): string {
@@ -48,9 +51,16 @@ export function App() {
   const [card, setCard] = useState<CardView | null>(null);
   const [detailError, setDetailError] = useState(false);
   const [enrollCtx, setEnrollCtx] = useState<{ serial: string; enrollmentId: string; merchantId: string } | null>(null);
+  const [preview, setPreview] = useState<ShopPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const claimedRef = useRef(false);
+
+  // Fetch the shop's card preview when arriving from a counter QR (?m=&p=), so the customer sees what
+  // they'll get before enrolling.
+  useEffect(() => {
+    if (shop.m && shop.p) getShopPreview(shop.m, shop.p).then(setPreview).catch(() => setPreview(null));
+  }, [shop.m, shop.p]);
 
   const run = useCallback(async (fn: () => Promise<void>) => {
     setErr(null);
@@ -224,9 +234,12 @@ export function App() {
       </header>
 
       {shop.m && shop.p && (
-        <button className="shop-cta" disabled={busy} onClick={addShopCard}>
-          {busy ? "Getting your card…" : "＋ Get this shop's card"}
-        </button>
+        <div className="enroll-shop">
+          {preview && <CardPreview preview={preview} />}
+          <button className="shop-cta" disabled={busy} onClick={addShopCard}>
+            {busy ? "Getting your card…" : "＋ Get this shop's card"}
+          </button>
+        </div>
       )}
 
       {tiles.length > 0 ? (
@@ -234,7 +247,7 @@ export function App() {
           <h1 className="home-h1">{auth.signedIn ? "Your cards" : "Cards on this device"}</h1>
           <CardsGrid cards={tiles} onOpen={openCard} />
         </>
-      ) : (
+      ) : shop.m && shop.p ? null : (
         <div className="empty">
           <div className="empty-art">🎟️</div>
           <h1>No cards yet</h1>
