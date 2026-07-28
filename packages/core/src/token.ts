@@ -3,9 +3,36 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // A card's QR encodes a short-lived HMAC-signed token (not the raw serial), so an old screenshot
 // can't be replayed once it expires. The same primitive mints a shift-long staff token (from a PIN
 // check) that attributes a cashier's scans.
-const CARD_SECRET = process.env.CARD_TOKEN_SECRET ?? "dev-card-token-secret-change-me";
-const STAFF_SECRET = process.env.STAFF_TOKEN_SECRET ?? "dev-staff-token-secret-change-me";
-const CUSTOMER_SECRET = process.env.CUSTOMER_TOKEN_SECRET ?? "dev-customer-token-secret-change-me";
+// Dev/CI fall back to these committed defaults so local runs need no config. They are PUBLIC —
+// production must set real secrets; assertTokenSecretsConfigured() (called at API bootstrap) refuses
+// to start otherwise, so a token can never be signed with a known key in prod.
+const TOKEN_SECRET_DEFAULTS = {
+  CARD_TOKEN_SECRET: "dev-card-token-secret-change-me",
+  STAFF_TOKEN_SECRET: "dev-staff-token-secret-change-me",
+  CUSTOMER_TOKEN_SECRET: "dev-customer-token-secret-change-me",
+} as const;
+
+const CARD_SECRET = process.env.CARD_TOKEN_SECRET ?? TOKEN_SECRET_DEFAULTS.CARD_TOKEN_SECRET;
+const STAFF_SECRET = process.env.STAFF_TOKEN_SECRET ?? TOKEN_SECRET_DEFAULTS.STAFF_TOKEN_SECRET;
+const CUSTOMER_SECRET = process.env.CUSTOMER_TOKEN_SECRET ?? TOKEN_SECRET_DEFAULTS.CUSTOMER_TOKEN_SECRET;
+
+/**
+ * Fail closed: throw if any HMAC token secret is unset or still the committed dev default. Call at
+ * API bootstrap in production — a mis-set secret then refuses to boot rather than signing tokens
+ * (customer sessions, staff shift tokens, card QRs) with a publicly-known key.
+ */
+export function assertTokenSecretsConfigured(): void {
+  const unsafe = Object.entries(TOKEN_SECRET_DEFAULTS)
+    .filter(([name, dflt]) => {
+      const v = process.env[name];
+      return !v || v === dflt;
+    })
+    .map(([name]) => name);
+  if (unsafe.length > 0) {
+    throw new Error(`Refusing to start: set a strong secret for ${unsafe.join(", ")} (the dev default is public).`);
+  }
+}
+
 const CARD_TTL_MS = 120_000; // 2 minutes — refreshed as the card polls
 const STAFF_TTL_MS = 8 * 60 * 60 * 1000; // one shift
 export const CUSTOMER_ACCESS_TTL_MS = 15 * 60 * 1000; // 15 min — the refresh token rotates it

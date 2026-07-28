@@ -51,42 +51,50 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
       .where(and(eq(loyaltyPrograms.id, input.programId), eq(loyaltyPrograms.active, true)));
     if (!program) throw new Error("program not found");
 
-    // find-or-create the customer, within the tenant. A signed-in consumer is keyed by their
-    // account (one card-holder per merchant); a walk-in is keyed by phone as before.
+    // find-or-create the customer, within the tenant.
     let customer: typeof customers.$inferSelect | undefined;
     if (input.customerAccountId) {
+      // Signed-in: identified STRICTLY by account. The phone is NOT a matching key here — it's
+      // unverified, so using it would let a caller bind to (read/hijack) a row they don't own via
+      // someone else's number. Folding an anonymous card into an account is done separately and
+      // securely via claimCardBySerial (possession of the serial is the proof).
       [customer] = await db
         .select()
         .from(customers)
         .where(
           and(eq(customers.merchantId, input.merchantId), eq(customers.customerAccountId, input.customerAccountId)),
         );
-    }
-    if (!customer && input.phone) {
-      [customer] = await db
-        .select()
-        .from(customers)
-        .where(and(eq(customers.merchantId, input.merchantId), eq(customers.phone, input.phone)));
-      // adopt an existing anonymous phone-row into the account (claim-on-enroll)
-      if (customer && input.customerAccountId && !customer.customerAccountId) {
+      if (!customer) {
         [customer] = await db
-          .update(customers)
-          .set({ customerAccountId: input.customerAccountId })
-          .where(eq(customers.id, customer.id))
+          .insert(customers)
+          .values({
+            merchantId: input.merchantId,
+            name: input.name,
+            consentFlags: input.consent ?? {},
+            customerAccountId: input.customerAccountId,
+            // phone intentionally omitted — a signed-in customer's phone isn't a trust boundary
+          })
           .returning();
       }
-    }
-    if (!customer) {
-      [customer] = await db
-        .insert(customers)
-        .values({
-          merchantId: input.merchantId,
-          phone: input.phone,
-          name: input.name,
-          consentFlags: input.consent ?? {},
-          customerAccountId: input.customerAccountId ?? null,
-        })
-        .returning();
+    } else {
+      // Anonymous walk-in: keyed by phone (find-or-create).
+      if (input.phone) {
+        [customer] = await db
+          .select()
+          .from(customers)
+          .where(and(eq(customers.merchantId, input.merchantId), eq(customers.phone, input.phone)));
+      }
+      if (!customer) {
+        [customer] = await db
+          .insert(customers)
+          .values({
+            merchantId: input.merchantId,
+            phone: input.phone,
+            name: input.name,
+            consentFlags: input.consent ?? {},
+          })
+          .returning();
+      }
     }
 
     // idempotent: reuse an existing active enrollment for this customer + program

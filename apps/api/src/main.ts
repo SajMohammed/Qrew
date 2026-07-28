@@ -1,10 +1,14 @@
 import "./load-env"; // must be first: populates env before @qrew/db loads
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import { assertTokenSecretsConfigured } from "@qrew/core";
 import { AppModule } from "./app.module";
 import { ZodExceptionFilter } from "./common/zod-exception.filter";
 
 async function bootstrap(): Promise<void> {
+  // Fail closed in production: never sign tokens with the public dev-default secrets.
+  if (process.env.NODE_ENV === "production") assertTokenSecretsConfigured();
+
   const app = await NestFactory.create(AppModule);
   // Dev is same-origin via the Vite proxy, so CORS is a no-op there; set CORS_ORIGINS in a
   // non-proxied deploy (the Authorization header makes requests preflighted).

@@ -5,6 +5,8 @@ import {
   closeDb,
   merchants,
   loyaltyPrograms,
+  customers,
+  enrollments,
   customerAccounts,
   getMyCards,
   claimCardBySerial,
@@ -76,5 +78,32 @@ describe("customer cards — enroll linking + claim", () => {
 
     expect(await claimCardBySerial(other, anon.serial)).toBe(false); // already owned — refused
     expect(await claimCardBySerial(accountId, anon.serial)).toBe(true); // idempotent for the owner
+  });
+
+  // Security regression (S2): a signed-in caller must not reach another person's row via a phone
+  // number. Enroll is keyed strictly by account; phone is not a trust boundary for signed-in callers.
+  it("a signed-in enroll cannot bind to another person's row via phone (no hijack or disclosure)", async () => {
+    const victimPhone = `+97155${sfx}victim`;
+    const victim = await enroll({ merchantId, programId, phone: victimPhone }); // anonymous victim card
+    const attacker = await newAccount(9);
+
+    // attacker signs in and supplies the VICTIM's phone
+    const res = await enroll({ merchantId, programId, phone: victimPhone, customerAccountId: attacker });
+
+    // (1) attacker gets their OWN new card — never the victim's serial (no disclosure)
+    expect(res.serial).not.toBe(victim.serial);
+    expect(res.alreadyEnrolled).toBe(false);
+
+    // (2) the victim's row is NOT hijacked — still anonymous (account id null), still claimable by
+    //     whoever actually holds the serial
+    const [vEnr] = await adminDb
+      .select({ customerId: enrollments.customerId })
+      .from(enrollments)
+      .where(eq(enrollments.cardSerial, victim.serial));
+    const [vCust] = await adminDb
+      .select({ accountId: customers.customerAccountId })
+      .from(customers)
+      .where(eq(customers.id, vEnr!.customerId));
+    expect(vCust!.accountId).toBeNull();
   });
 });
