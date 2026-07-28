@@ -35,7 +35,13 @@ function cooldownMs(): number {
  */
 export async function addStamp(input: AddStampInput): Promise<StampResult> {
   const outcome = await withTenant(input.merchantId, async (db) => {
-    const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.id, input.enrollmentId));
+    // Lock the card row so two simultaneous scans serialize — otherwise both read a stale count and
+    // both stamp, pushing current_stamps past the cap (and past the cooldown).
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(eq(enrollments.id, input.enrollmentId))
+      .for("update");
     if (!enrollment) throw new Error("enrollment not found");
     const [program] = await db
       .select()

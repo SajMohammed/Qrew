@@ -61,4 +61,25 @@ describe("redeem", () => {
     expect(r.redeemed).toBe(false);
     expect(r.reason).toBe("insufficient");
   });
+
+  // Concurrency regression (C1): two simultaneous redeems (distinct keys) on a full card must issue
+  // the reward exactly once and never drive the balance negative — the FOR UPDATE lock serializes them.
+  it("two concurrent redeems issue the reward once and never go negative", async () => {
+    const enrollmentId = await enrolledWith3Stamps("+971500000023");
+    const [a, b] = await Promise.all([
+      redeem({ merchantId, enrollmentId, idempotencyKey: "rd-cc-a" }),
+      redeem({ merchantId, enrollmentId, idempotencyKey: "rd-cc-b" }),
+    ]);
+    // one real redemption; the loser blocks, re-reads balance 0, returns insufficient
+    expect([a, b].filter((r) => r.reason === "redeemed").length).toBe(1);
+    expect([a, b].filter((r) => r.reason === "insufficient").length).toBe(1);
+    expect(a.currentStamps).toBeGreaterThanOrEqual(0);
+    expect(b.currentStamps).toBeGreaterThanOrEqual(0);
+
+    const rows = await adminDb
+      .select()
+      .from(redemptions)
+      .where(and(eq(redemptions.merchantId, merchantId), eq(redemptions.enrollmentId, enrollmentId)));
+    expect(rows).toHaveLength(1); // exactly one reward handed out
+  });
 });

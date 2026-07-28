@@ -1,14 +1,24 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { and, eq } from "drizzle-orm";
-import { adminDb, closeDb, merchants, loyaltyPrograms, enrollments, stampEvents } from "@qrew/db";
-import { enroll } from "../src/index";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  adminDb,
+  closeDb,
+  merchants,
+  loyaltyPrograms,
+  customers,
+  enrollments,
+  stampEvents,
+  customerAccounts,
+} from "@qrew/db";
+import { enroll, signInWithProvider } from "../src/index";
 
 let merchantId: string;
 let programId: string;
+const sfx = process.pid.toString(36);
+const accountIds = new Set<string>();
 
 beforeAll(async () => {
-  const s = process.pid.toString(36);
-  const [m] = await adminDb.insert(merchants).values({ name: "Enroll Co", slug: `enr-${s}` }).returning();
+  const [m] = await adminDb.insert(merchants).values({ name: "Enroll Co", slug: `enr-${sfx}` }).returning();
   merchantId = m!.id;
   const [p] = await adminDb
     .insert(loyaltyPrograms)
@@ -19,6 +29,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await adminDb.delete(merchants).where(eq(merchants.id, merchantId)); // cascades
+  if (accountIds.size) await adminDb.delete(customerAccounts).where(inArray(customerAccounts.id, [...accountIds]));
   await closeDb();
 });
 
@@ -48,5 +59,34 @@ describe("enroll", () => {
       .from(stampEvents)
       .where(and(eq(stampEvents.merchantId, merchantId), eq(stampEvents.source, "signup_bonus")));
     expect(bonuses).toHaveLength(1);
+  });
+
+  // Concurrency regression (C1): two simultaneous enrolls for the same account must produce ONE card
+  // and seed the signup bonus ONCE — the (customer_id, program_id) unique index + onConflict make the
+  // loser reuse the winner's card instead of forking a duplicate + double bonus.
+  it("two concurrent enrolls for the same account make one card + one bonus", async () => {
+    const { accountId } = await signInWithProvider({
+      provider: "google",
+      sub: `enr-cc-${sfx}`,
+      email: `enr-cc-${sfx}@ex.com`,
+      emailVerified: true,
+    });
+    accountIds.add(accountId);
+
+    const [a, b] = await Promise.all([
+      enroll({ merchantId, programId, customerAccountId: accountId }),
+      enroll({ merchantId, programId, customerAccountId: accountId }),
+    ]);
+
+    expect(a.serial).toBe(b.serial); // one and the same card
+    expect([a, b].filter((r) => !r.alreadyEnrolled).length).toBe(1); // exactly one winner
+    expect(Math.max(a.currentStamps, b.currentStamps)).toBe(2); // bonus seeded once (program bonus=2), not 4
+
+    const [cust] = await adminDb
+      .select()
+      .from(customers)
+      .where(and(eq(customers.merchantId, merchantId), eq(customers.customerAccountId, accountId)));
+    const enrs = await adminDb.select().from(enrollments).where(eq(enrollments.customerId, cust!.id));
+    expect(enrs).toHaveLength(1); // one customer row, one enrollment
   });
 });

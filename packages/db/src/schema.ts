@@ -9,6 +9,7 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -101,6 +102,10 @@ export const customers = pgTable(
     index("customers_merchant_idx").on(t.merchantId),
     uniqueIndex("customers_merchant_phone_uq").on(t.merchantId, t.phone),
     index("customers_account_idx").on(t.customerAccountId),
+    // one customer row per (merchant, account); anonymous walk-ins (null account) are unaffected
+    uniqueIndex("customers_merchant_account_uq")
+      .on(t.merchantId, t.customerAccountId)
+      .where(sql`${t.customerAccountId} is not null`),
   ],
 );
 
@@ -125,6 +130,10 @@ export const enrollments = pgTable(
   (t) => [
     index("enrollments_merchant_idx").on(t.merchantId),
     uniqueIndex("enrollments_card_serial_uq").on(t.cardSerial),
+    // one card per customer per program (blocks the duplicate-enrollment / double-bonus race)
+    uniqueIndex("enrollments_customer_program_uq").on(t.customerId, t.programId),
+    // the projection can never go negative — backstop behind the redeem FOR UPDATE fix
+    check("enrollments_current_stamps_nonneg", sql`${t.currentStamps} >= 0`),
   ],
 );
 

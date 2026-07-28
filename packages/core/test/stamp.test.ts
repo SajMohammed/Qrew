@@ -77,4 +77,22 @@ describe("addStamp", () => {
     expect(second.applied).toBe(false);
     expect(second.reason).toBe("cooldown");
   });
+
+  // Concurrency regression (C1): two simultaneous scans (distinct keys) on a card one below the cap
+  // must not both apply — the FOR UPDATE lock serializes them so the count can't exceed the threshold.
+  it("two concurrent scans at the cap don't exceed it", async () => {
+    process.env.STAMP_COOLDOWN_SECONDS = "0";
+    const { enrollmentId } = await enroll({ merchantId, programId, phone: "+971500000014" });
+    await addStamp({ merchantId, enrollmentId, idempotencyKey: "cap-1" });
+    await addStamp({ merchantId, enrollmentId, idempotencyKey: "cap-2" }); // now 2/3
+
+    const [a, b] = await Promise.all([
+      addStamp({ merchantId, enrollmentId, idempotencyKey: "cap-3a" }),
+      addStamp({ merchantId, enrollmentId, idempotencyKey: "cap-3b" }),
+    ]);
+
+    expect([a, b].filter((r) => r.applied).length).toBe(1); // exactly one stamped
+    expect([a, b].filter((r) => r.reason === "reward_ready").length).toBe(1); // the other hit the cap
+    expect(Math.max(a.currentStamps, b.currentStamps)).toBe(3); // capped at 3 — never 4
+  });
 });

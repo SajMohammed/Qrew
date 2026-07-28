@@ -29,7 +29,14 @@ export interface RedeemResult {
  */
 export async function redeem(input: RedeemInput): Promise<RedeemResult> {
   const outcome = await withTenant(input.merchantId, async (db) => {
-    const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.id, input.enrollmentId));
+    // Lock the card row so two simultaneous redeems serialize — otherwise both pass the ledger
+    // eligibility check on a stale snapshot and both spend, double-issuing the reward and driving
+    // the balance negative. The second redeem then blocks, re-reads balance 0, and returns insufficient.
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(eq(enrollments.id, input.enrollmentId))
+      .for("update");
     if (!enrollment) throw new Error("enrollment not found");
     const [program] = await db
       .select()

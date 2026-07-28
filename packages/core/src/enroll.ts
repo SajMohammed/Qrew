@@ -74,7 +74,20 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
             customerAccountId: input.customerAccountId,
             // phone intentionally omitted — a signed-in customer's phone isn't a trust boundary
           })
+          .onConflictDoNothing()
           .returning();
+        if (!customer) {
+          // lost a concurrent enroll for this account — reuse the winner's row
+          [customer] = await db
+            .select()
+            .from(customers)
+            .where(
+              and(
+                eq(customers.merchantId, input.merchantId),
+                eq(customers.customerAccountId, input.customerAccountId),
+              ),
+            );
+        }
       }
     } else {
       // Anonymous walk-in: keyed by phone (find-or-create).
@@ -93,7 +106,15 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
             name: input.name,
             consentFlags: input.consent ?? {},
           })
+          .onConflictDoNothing()
           .returning();
+        if (!customer && input.phone) {
+          // lost a concurrent enroll for this phone — reuse the winner's row
+          [customer] = await db
+            .select()
+            .from(customers)
+            .where(and(eq(customers.merchantId, input.merchantId), eq(customers.phone, input.phone)));
+        }
       }
     }
 
@@ -121,19 +142,34 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
         customerId: customer!.id,
         cardSerial: serial,
       })
+      .onConflictDoNothing()
       .returning();
+    if (!enrollment) {
+      // lost a concurrent enroll for this (customer, program) — reuse the winner's card, seed NO bonus
+      const [raced] = await db
+        .select()
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.customerId, customer!.id),
+            eq(enrollments.programId, program.id),
+            eq(enrollments.status, "active"),
+          ),
+        );
+      return { alreadyEnrolled: true as const, enrollment: raced!, program, merchantName: merchant.name };
+    }
 
     // endowed-progress bonus — ledger append; the trigger updates current_stamps
     if (program.bonusStamps > 0) {
       await db.insert(stampEvents).values({
         merchantId: input.merchantId,
-        enrollmentId: enrollment!.id,
+        enrollmentId: enrollment.id,
         delta: program.bonusStamps,
         source: "signup_bonus",
-        idempotencyKey: `bonus:${enrollment!.id}`,
+        idempotencyKey: `bonus:${enrollment.id}`,
       });
     }
-    return { alreadyEnrolled: false as const, enrollment: enrollment!, program, merchantName: merchant.name };
+    return { alreadyEnrolled: false as const, enrollment, program, merchantName: merchant.name };
   });
 
   const e = created.enrollment;
