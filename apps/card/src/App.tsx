@@ -55,6 +55,9 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const claimedRef = useRef(false);
+  // The QR's signed token is valid ~2 min; hold it steady across the 4s stamp-poll (refresh only near
+  // expiry) so it doesn't visibly change every few seconds while the customer is showing it to staff.
+  const qrRef = useRef<{ token: string; at: number } | null>(null);
 
   // Fetch the shop's card preview when arriving from a counter QR (?m=&p=), so the customer sees what
   // they'll get before enrolling.
@@ -121,13 +124,19 @@ export function App() {
       return;
     }
     setDetailError(false);
+    qrRef.current = null; // new card → adopt a fresh stable token on first load
     let alive = true;
     let loaded = false; // once we've shown the card, a later poll blip must NOT flip to the error screen
     const load = async () => {
       try {
         const c = await getCard(selected);
         if (alive) {
-          setCard(c);
+          // Hold the QR steady: only adopt a fresh token when we have none or the current is near expiry.
+          // Stamp counts still update every poll; the code just stops flickering every 4s.
+          if (!qrRef.current || Date.now() - qrRef.current.at > 100_000) {
+            qrRef.current = { token: c.qrToken, at: Date.now() };
+          }
+          setCard({ ...c, qrToken: qrRef.current.token });
           loaded = true;
           setDetailError(false);
         }
