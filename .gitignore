@@ -24,3 +24,8 @@ out/
 infra/terraform/.terraform/
 *.tfstate
 *.tfstate.*
+
+# AI agent tooling (Clerk skills / Claude Code config) — local, regenerate via `npx skills add`
+.agents/
+.claude/
+skills-lock.json
