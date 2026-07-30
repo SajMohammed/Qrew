@@ -8,7 +8,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:ital,wght@0,300..900;1,400..700&display=swap" rel="stylesheet" />
-    <title>Qrew · Dashboard</title>
+    <title>Qrew · Shop</title>
+    <script>
+      // Apply the saved theme before first paint, or a light flash precedes every dark-mode load.
+      (function () {
+        try {
+          var t = localStorage.getItem("qrew-theme");
+          var dark =
+            t === "dark" ||
+            ((t === "system" || !t) && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {
+          /* private mode — fall back to the light default */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,6 +1,17 @@
 import { useAuth } from "@clerk/react";
 import { useCallback, useMemo } from "react";
-import type { Dashboard, Program, ProgramPatch, ScanResult, RedeemResult, VerifiedCashier } from "./api";
+import type {
+  Dashboard,
+  Program,
+  ProgramPatch,
+  ScanResult,
+  RedeemResult,
+  VerifiedCashier,
+  Analytics,
+  AnalyticsRange,
+  CustomerList,
+  CustomersParams,
+} from "./api";
 
 const rnd = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -11,6 +22,18 @@ export class NeedsOnboarding extends Error {
   constructor() {
     super("Setting up your shop…"); // a non-empty message so a retry-lag doesn't blank the overview
     this.name = "NeedsOnboarding";
+  }
+}
+
+/**
+ * Signed in, but this staff member's role can't read the management screens — the API restricts
+ * analytics and the customer book to owners and managers. Distinct from a generic failure so the
+ * UI can say so plainly instead of showing a broken dashboard.
+ */
+export class Forbidden extends Error {
+  constructor() {
+    super("Your account doesn't have access to this shop's management screens.");
+    this.name = "Forbidden";
   }
 }
 
@@ -45,6 +68,26 @@ export function useApi() {
           body: JSON.stringify(businessName ? { businessName } : {}),
         });
         if (!res.ok) throw new Error(`Onboarding failed (${res.status})`);
+      },
+      // ── Owner console ──
+      async getAnalytics(range: AnalyticsRange): Promise<Analytics> {
+        const res = await call(`/analytics?range=${range}`);
+        if (res.status === 409) throw new NeedsOnboarding();
+        if (res.status === 403) throw new Forbidden();
+        if (!res.ok) throw new Error(`Analytics failed (${res.status})`);
+        return res.json();
+      },
+      async getCustomers(params: CustomersParams = {}): Promise<CustomerList> {
+        const qs = new URLSearchParams();
+        if (params.filter && params.filter !== "all") qs.set("filter", params.filter);
+        if (params.search) qs.set("search", params.search);
+        if (params.limit !== undefined) qs.set("limit", String(params.limit));
+        if (params.offset) qs.set("offset", String(params.offset));
+        const res = await call(`/customers${qs.size ? `?${qs}` : ""}`);
+        if (res.status === 409) throw new NeedsOnboarding();
+        if (res.status === 403) throw new Forbidden();
+        if (!res.ok) throw new Error(`Customers failed (${res.status})`);
+        return res.json();
       },
       async getProgram(): Promise<Program> {
         const res = await call("/program");

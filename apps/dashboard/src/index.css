@@ -1,0 +1,307 @@
+@import "tailwindcss";
+
+/* The theme switcher stamps `.dark` on <html> (shadcn's convention), so `dark:` follows it. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Qrew Shop — owner console theme.
+ *
+ * White/neutral ground with green kept as an ACCENT: it marks what's actionable (the active nav
+ * item, chart fills, primary buttons) and never tints the whole surface. The merchant's own brand
+ * colour belongs on the customer's card, not on this chrome.
+ *
+ * Every text token below was contrast-checked against the surface it sits on — the muted/faint
+ * tiers clear WCAG AA (4.5:1) in BOTH themes, which matters here because they carry real
+ * information: table headers, customer emails, timestamps and chart labels.
+ */
+:root {
+  --radius: 0.875rem; /* cards land on 18px via --radius-xl */
+
+  --background: #f4f5f7;
+  --foreground: #14181d;
+  --card: #ffffff;
+  --card-foreground: #14181d;
+  --popover: #ffffff;
+  --popover-foreground: #14181d;
+
+  --primary: #146a2e;
+  --primary-foreground: #f4fbe9;
+  --secondary: #f1f3f5;
+  --secondary-foreground: #14181d;
+  --muted: #f1f3f5;
+  --muted-foreground: #4f5864; /* secondary text — 7.5:1 on white */
+  --faint: #6e7783; /* tertiary: labels, captions, timestamps — 4.54:1 on white */
+  --accent: #f1f3f5;
+  --accent-foreground: #14181d;
+  --destructive: #d64550;
+
+  --border: #e8eaee;
+  --input: #e8eaee;
+  --ring: #1f9e46;
+
+  /* Qrew brand + semantic state. Status colours are reserved and never reused as a chart series. */
+  --lime: #cbfa5b;
+  --lime-deep: #7fb519;
+  --forest: #146a2e;
+  --success: #1f9e46;
+  --warning: #cf8500;
+
+  /* Sequential single-hue ramp: magnitude only, light → dark. Never a rainbow. */
+  --chart-1: #aee15e;
+  --chart-2: #55bf59;
+  --chart-3: #2c9646;
+  --chart-4: #14682d;
+  --chart-5: #0c4a1f;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #14181d;
+  --sidebar-primary: #146a2e;
+  --sidebar-primary-foreground: #f4fbe9;
+  --sidebar-accent: #f1f3f5;
+  --sidebar-accent-foreground: #14181d;
+  --sidebar-border: #e8eaee;
+  --sidebar-ring: #1f9e46;
+}
+
+/*
+ * Dark is a neutral charcoal, re-stepped rather than inverted: the greens are lightened so they
+ * still read as accents on a dark ground instead of disappearing into it.
+ */
+.dark {
+  --background: #0c0e11;
+  --foreground: #e8ebef;
+  --card: #15181d;
+  --card-foreground: #e8ebef;
+  --popover: #15181d;
+  --popover-foreground: #e8ebef;
+
+  --primary: #7fd457;
+  --primary-foreground: #0c2712;
+  --secondary: #1c2027;
+  --secondary-foreground: #e8ebef;
+  --muted: #1c2027;
+  --muted-foreground: #aab3be; /* 8.2:1 on the card surface */
+  --faint: #8a939e; /* 5.7:1 — still AA at 10px */
+  --accent: #1c2027;
+  --accent-foreground: #e8ebef;
+  --destructive: #e0715f;
+
+  --border: #242932;
+  --input: #242932;
+  --ring: #7fd457;
+
+  --lime: #cbfa5b;
+  --lime-deep: #cbfa5b;
+  --forest: #7fd457;
+  --success: #56c96f;
+  --warning: #e0a53f;
+
+  --chart-1: #2f7a36;
+  --chart-2: #45a94f;
+  --chart-3: #74d46a;
+  --chart-4: #a5e77f;
+  --chart-5: #cbfa5b;
+
+  --sidebar: #121519;
+  --sidebar-foreground: #e8ebef;
+  --sidebar-primary: #7fd457;
+  --sidebar-primary-foreground: #0c2712;
+  --sidebar-accent: #1c2027;
+  --sidebar-accent-foreground: #e8ebef;
+  --sidebar-border: #242932;
+  --sidebar-ring: #7fd457;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-lime: var(--lime);
+  --color-lime-deep: var(--lime-deep);
+  --color-forest: var(--forest);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Anton", "Archivo", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/*
+ * The sidebar width has to be interpolatable for the collapse to glide rather than snap. A plain
+ * custom property jumps between values; registering it as a <length> lets the browser tween it.
+ */
+@property --rail {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 244px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    /* Keep native form controls and scrollbars in step with the chosen theme. */
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  /*
+   * Tailwind v4's Preflight drops the browser's default pointer on buttons, so anything actionable
+   * reads as inert text. Put it back once, here, rather than remembering it on every control.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  summary,
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="color"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+  /* Digits that sit in columns must line up — KPIs, tables, chart axes. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* One easing for the whole app, so nothing feels out of step with anything else. */
+  .rail-shell {
+    transition: --rail 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  /* Labels fold away with the rail instead of vanishing the instant it starts moving. */
+  .rail-label {
+    transition:
+      opacity 180ms ease,
+      max-width 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    max-width: 12rem;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .rail-label[data-collapsed="true"] {
+    max-width: 0;
+    opacity: 0;
+  }
+
+  /* Screens settle in rather than appearing, which makes navigation feel continuous. */
+  .rise {
+    animation: qrew-rise 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  @keyframes qrew-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/*
+ * Motion is a nicety, never a requirement. Anyone who has asked their OS to calm things down gets
+ * the same interface without the movement.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * html5-qrcode injects its own markup into #reader, outside React's tree, so it can't be styled with
+ * utility classes. The !important on the video is the library's own inline sizing being overridden.
+ */
+#reader {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #0c2712;
+}
+#reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+#reader img[alt="Info icon"] {
+  display: none;
+}
+
+/*
+ * The counter poster prints on its own — everything else is app chrome. Kept as plain CSS because
+ * it targets the print medium rather than a component state.
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-poster,
+  .print-poster * {
+    visibility: visible;
+  }
+  .print-poster {
+    position: absolute;
+    left: 50%;
+    top: 40px;
+    transform: translateX(-50%);
+    border: 0 !important;
+    box-shadow: none !important;
+    width: 380px;
+  }
+}

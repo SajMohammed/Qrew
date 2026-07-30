@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { Printer } from "lucide-react";
 import { useApi } from "./useApi";
 import type { Program } from "./api";
 
@@ -37,15 +38,19 @@ export function CounterQR({ merchantId, merchantName }: { merchantId: string; me
 
   if (error) {
     return (
-      <div className="counterqr">
-        <p className="muted">Couldn't load your card.</p>
-        <button className="refresh" onClick={() => setReloadKey((k) => k + 1)}>
+      <div className="mx-auto flex w-full max-w-[460px] flex-col items-center gap-3">
+        <p className="text-muted-foreground text-sm">Couldn't load your card.</p>
+        <button
+          type="button"
+          onClick={() => setReloadKey((k) => k + 1)}
+          className="border-border bg-card min-h-11 rounded-xl border px-4 text-sm font-bold"
+        >
           Retry
         </button>
       </div>
     );
   }
-  if (!program) return <p className="muted">Loading your card…</p>;
+  if (!program) return <p className="text-muted-foreground text-sm">Loading your card…</p>;
 
   // The static "enroll" deep-link — scanning it opens the customer app on this shop's card.
   const enrollUrl = `${CARD_ORIGIN}/?m=${merchantId}&p=${program.id}`;
@@ -61,39 +66,53 @@ export function CounterQR({ merchantId, merchantName }: { merchantId: string; me
   }
 
   return (
-    <div className="counterqr">
-      <div className="cq-intro">
-        <h2>Your counter code</h2>
-        <p className="muted">
-          Print this and put it on your counter. Customers scan it with their phone camera to get your
-          stamp card — no app install needed.
+    <div className="mx-auto flex w-full max-w-[460px] flex-col gap-4">
+      <header>
+        <h1 className="text-2xl font-extrabold tracking-tight">Your counter code</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Print this and put it on your counter. Customers scan it with their phone camera to get
+          your stamp card — no app install needed.
         </p>
-      </div>
+      </header>
 
-      {/* the printable poster */}
-      <div className="poster" style={{ "--brand": program.cardDesign.brandColor } as CSSProperties}>
-        <div className="poster-brand">
-          <span className="q">Q</span>rew
+      {/* The printable poster. `print-poster` is what the @media print rule keeps on the page. */}
+      <div
+        className="print-poster border-border flex flex-col items-center gap-3 rounded-3xl border bg-white px-6 py-7 text-center shadow-lg"
+        style={{ "--brand": program.cardDesign.brandColor } as CSSProperties}
+      >
+        <div className="font-display text-2xl tracking-wide text-[#0c2712]">
+          <span className="text-[var(--brand)]">Q</span>rew
         </div>
-        <div className="poster-shop">{merchantName}</div>
-        <div className="poster-qr">
+        <div className="text-lg font-extrabold text-[#0c2712]">{merchantName}</div>
+        <div className="rounded-2xl border border-[#e8eaee] bg-white p-3">
           <QRCodeSVG value={enrollUrl} size={232} level="M" bgColor="#ffffff" fgColor="#0c2712" />
         </div>
-        <div className="poster-cta">Scan to collect stamps</div>
-        <div className="poster-reward">
+        <div className="text-base font-bold text-[#0c2712]">Scan to collect stamps</div>
+        <div className="text-sm text-[#4f5864]">
           Collect {program.stampsRequired} · earn <strong>{program.rewardText}</strong>
         </div>
       </div>
 
-      <div className="cq-actions">
-        <button className="primary" onClick={() => window.print()}>
-          🖨 Print poster
+      <div className="flex flex-col gap-2.5 sm:flex-row">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="bg-primary text-primary-foreground inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-bold transition hover:brightness-110"
+        >
+          <Printer className="size-4" aria-hidden />
+          Print poster
         </button>
-        <button className="refresh" onClick={copyLink}>
+        <button
+          type="button"
+          onClick={copyLink}
+          className="border-border bg-card min-h-12 flex-1 rounded-xl border text-sm font-bold"
+        >
           {copied ? "Copied ✓" : "Copy link"}
         </button>
       </div>
-      <code className="cq-url">{enrollUrl}</code>
+      <code className="bg-muted text-muted-foreground overflow-x-auto rounded-lg px-3 py-2 font-mono text-[11px] break-all">
+        {enrollUrl}
+      </code>
     </div>
   );
 }
