@@ -49,7 +49,8 @@ export function StampCard({
       celebrated.current = true;
       setCelebrate(true);
       buzz([18, 60, 24]);
-      const t = window.setTimeout(() => setCelebrate(false), 1600);
+      // Comfortably longer than the burst itself, so it ends by finishing rather than by being cut.
+      const t = window.setTimeout(() => setCelebrate(false), 1900);
       return () => window.clearTimeout(t);
     }
     if (!card.rewardReady) celebrated.current = false;
