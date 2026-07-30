@@ -6,6 +6,8 @@ import { LoyaltyModule } from "./loyalty/loyalty.module";
 import { EnrollModule } from "./enroll/enroll.module";
 import { CardModule } from "./card/card.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
+import { CustomersModule } from "./customers/customers.module";
 import { ProgramModule } from "./program/program.module";
 import { LeadsModule } from "./leads/leads.module";
 import { OnboardingModule } from "./onboarding/onboarding.module";
@@ -20,6 +22,8 @@ import { CustomerAuthModule } from "./customer-auth/customer-auth.module";
     EnrollModule,
     CardModule,
     DashboardModule,
+    AnalyticsModule,
+    CustomersModule,
     ProgramModule,
     LeadsModule,
     OnboardingModule,

@@ -106,3 +106,22 @@ export type LogoutRequest = z.infer<typeof LogoutRequest>;
 // Fold an anonymous (walk-in) card into the signed-in account, by its serial.
 export const ClaimCardRequest = z.object({ serial: z.string().min(8).max(200) });
 export type ClaimCardRequest = z.infer<typeof ClaimCardRequest>;
+
+// ── Shop analytics / CRM (the owner console) ─────────────────────────────────────
+// Query strings arrive as text, so numeric bounds are coerced before they are validated.
+
+// How far back the dashboard looks. A closed set, not free-form days — every window has a
+// matching "previous period" the API knows how to compare against.
+export const AnalyticsQuery = z.object({
+  range: z.enum(["7d", "30d", "90d"]).default("30d"),
+});
+export type AnalyticsQuery = z.infer<typeof AnalyticsQuery>;
+
+// The Customers tab: one actionable segment at a time, searchable and paged.
+export const CustomersQuery = z.object({
+  filter: z.enum(["all", "at_risk", "reward_ready", "regulars"]).default("all"),
+  search: z.string().max(120).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+export type CustomersQuery = z.infer<typeof CustomersQuery>;
