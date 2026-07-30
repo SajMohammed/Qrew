@@ -4,6 +4,8 @@ export * from "./scan";
 export * from "./redeem";
 export * from "./card";
 export * from "./dashboard";
+export * from "./analytics";
+export * from "./customer-list";
 export * from "./program";
 export * from "./lead";
 export * from "./staff";
