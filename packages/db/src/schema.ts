@@ -157,6 +157,8 @@ export const stampEvents = pgTable(
   (t) => [
     index("stamp_events_merchant_idx").on(t.merchantId),
     index("stamp_events_enrollment_idx").on(t.enrollmentId),
+    // the analytics dashboard reads this ledger by time within a tenant (stamps per day, period totals)
+    index("stamp_events_merchant_created_idx").on(t.merchantId, t.createdAt),
     // a retried / double-tapped stamp with the same key is a no-op, not a double
     uniqueIndex("stamp_events_idem_uq").on(t.merchantId, t.idempotencyKey),
   ],
@@ -179,6 +181,9 @@ export const redemptions = pgTable(
   },
   (t) => [
     index("redemptions_merchant_idx").on(t.merchantId),
+    // "has this card ever earned a reward?" — the retention ladder joins redemptions per enrollment
+    index("redemptions_enrollment_idx").on(t.enrollmentId),
+    index("redemptions_merchant_created_idx").on(t.merchantId, t.createdAt),
     uniqueIndex("redemptions_idem_uq").on(t.merchantId, t.idempotencyKey),
   ],
 );
