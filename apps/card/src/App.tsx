@@ -18,6 +18,10 @@ import { StampCard } from "./StampCard";
 import { CardsGrid } from "./CardsGrid";
 import { CardPreview } from "./CardPreview";
 import { SignInPanel } from "./SignInPanel";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { PullToRefresh } from "@/components/PullToRefresh";
+import { CardsSkeleton, CardDetailSkeleton } from "@/components/Skeleton";
+import { buzz } from "@/lib/haptics";
 
 function param(name: string): string {
   return new URLSearchParams(window.location.search).get(name) ?? "";
@@ -42,15 +46,22 @@ function writeLocal(serials: string[]): void {
   localStorage.removeItem("qrew.card");
 }
 
+const SCREEN = "mx-auto w-full max-w-[440px] sm:max-w-[560px]";
+
 export function App() {
   const auth = useCustomerAuth();
   const [shop, setShop] = useState(() => ({ m: param("m"), p: param("p") }));
   const [localSerials, setLocalSerials] = useState<string[]>(readLocal);
   const [tiles, setTiles] = useState<CardTile[]>([]);
+  const [tilesLoaded, setTilesLoaded] = useState(false);
   const [selected, setSelected] = useState<string | null>(() => param("card") || null);
   const [card, setCard] = useState<CardView | null>(null);
   const [detailError, setDetailError] = useState(false);
-  const [enrollCtx, setEnrollCtx] = useState<{ serial: string; enrollmentId: string; merchantId: string } | null>(null);
+  const [enrollCtx, setEnrollCtx] = useState<{
+    serial: string;
+    enrollmentId: string;
+    merchantId: string;
+  } | null>(null);
   const [preview, setPreview] = useState<ShopPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -62,7 +73,10 @@ export function App() {
   // Fetch the shop's card preview when arriving from a counter QR (?m=&p=), so the customer sees what
   // they'll get before enrolling.
   useEffect(() => {
-    if (shop.m && shop.p) getShopPreview(shop.m, shop.p).then(setPreview).catch(() => setPreview(null));
+    if (shop.m && shop.p)
+      getShopPreview(shop.m, shop.p)
+        .then(setPreview)
+        .catch(() => setPreview(null));
   }, [shop.m, shop.p]);
 
   const run = useCallback(async (fn: () => Promise<void>) => {
@@ -83,8 +97,11 @@ export function App() {
       setTiles((await getMyCards(auth.token)).map(tileFromMyCard));
     } else {
       const settled = await Promise.allSettled(localSerials.map((s) => getCard(s)));
-      setTiles(settled.flatMap((r) => (r.status === "fulfilled" ? [tileFromCardView(r.value)] : [])));
+      setTiles(
+        settled.flatMap((r) => (r.status === "fulfilled" ? [tileFromCardView(r.value)] : [])),
+      );
     }
+    setTilesLoaded(true);
   }, [auth.token, localSerials]);
 
   useEffect(() => {
@@ -152,16 +169,35 @@ export function App() {
     };
   }, [selected]);
 
-  const openCard = (serial: string) => {
+  /*
+   * Real history entries, so the phone's Back button moves from a card to the wallet instead of
+   * closing the app. `popstate` is the single source of truth for which screen is showing.
+   */
+  const openCard = useCallback((serial: string) => {
+    window.history.pushState({ card: serial }, "", `?card=${serial}`);
     setSelected(serial);
-    window.history.replaceState(null, "", `?card=${serial}`);
-  };
-  const backHome = () => {
-    setSelected(null);
-    setCard(null);
+  }, []);
+
+  const backHome = useCallback(() => {
+    if ((window.history.state as { card?: string } | null)?.card) {
+      window.history.back(); // popstate below clears the selection
+      return;
+    }
+    // Deep-linked straight to a card: there's nothing to go back to, so rewrite in place.
     window.history.replaceState(null, "", window.location.pathname);
+    setSelected(null);
     void loadTiles();
-  };
+  }, [loadTiles]);
+
+  useEffect(() => {
+    const onPop = () => {
+      const next = new URLSearchParams(window.location.search).get("card");
+      setSelected(next || null);
+      if (!next) void loadTiles();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [loadTiles]);
 
   const addShopCard = () =>
     void run(async () => {
@@ -173,6 +209,7 @@ export function App() {
         setLocalSerials(next);
       }
       setShop({ m: "", p: "" }); // got it — hide the CTA
+      buzz([12, 40, 16]);
       openCard(r.serial);
     });
 
@@ -192,88 +229,122 @@ export function App() {
     });
   };
 
-  // ── card detail ──────────────────────────────────────────────────────────────
-  if (selected && card) {
-    const enrolled = enrollCtx?.serial === selected;
-    return (
-      <StampCard
-        card={card}
-        busy={busy}
-        err={err}
-        onBack={backHome}
-        onStamp={enrolled ? devStamp : undefined}
-        onRedeem={enrolled ? devRedeem : undefined}
-      />
-    );
-  }
-  if (selected && detailError) {
-    return (
-      <div className="screen center">
-        <button className="back" onClick={backHome}>
-          ‹ All cards
-        </button>
-        <div className="empty">
-          <div className="empty-art">🔍</div>
-          <h1>Card not found</h1>
-          <p className="sub">This card may have been removed. Head back to your cards.</p>
-        </div>
-      </div>
-    );
-  }
-  if (selected && !card) {
-    return (
-      <div className="screen center">
-        <p className="sub">Loading your card…</p>
-      </div>
-    );
-  }
+  const screen = selected ? (card ? "detail" : detailError ? "missing" : "loading") : "home";
 
-  // ── home ─────────────────────────────────────────────────────────────────────
   return (
-    <div className="screen home">
-      <header className="home-top">
-        <div className="wordmark">
-          <span className="q">Q</span>rew
-        </div>
-        {auth.signedIn && (
-          <button className="link" onClick={() => void auth.signOut()}>
-            Sign out
-          </button>
+    <div
+      key={screen === "detail" ? `detail:${selected}` : screen}
+      className="screen-in min-h-dvh"
+    >
+        {screen === "detail" && card && (
+          <StampCard
+            card={card}
+            busy={busy}
+            err={err}
+            onBack={backHome}
+            onStamp={enrollCtx?.serial === selected ? devStamp : undefined}
+            onRedeem={enrollCtx?.serial === selected ? devRedeem : undefined}
+          />
         )}
-      </header>
 
-      {shop.m && shop.p && (
-        <div className="enroll-shop">
-          {preview && <CardPreview preview={preview} />}
-          <button className="shop-cta" disabled={busy} onClick={addShopCard}>
-            {busy ? "Getting your card…" : "＋ Get this shop's card"}
-          </button>
-        </div>
-      )}
+        {screen === "missing" && (
+          <div className={`${SCREEN} flex flex-col gap-4 px-5 pt-4`}>
+            <button
+              type="button"
+              onClick={backHome}
+              className="text-muted-foreground -ml-1 self-start rounded-lg px-1 py-2 text-sm font-semibold"
+            >
+              ‹ All cards
+            </button>
+            <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <span className="text-4xl" aria-hidden>
+                🔍
+              </span>
+              <h1 className="text-xl font-extrabold">Card not found</h1>
+              <p className="text-muted-foreground text-sm">
+                This card may have been removed. Head back to your cards.
+              </p>
+            </div>
+          </div>
+        )}
 
-      {tiles.length > 0 ? (
-        <>
-          <h1 className="home-h1">{auth.signedIn ? "Your cards" : "Cards on this device"}</h1>
-          <CardsGrid cards={tiles} onOpen={openCard} />
-        </>
-      ) : shop.m && shop.p ? null : (
-        <div className="empty">
-          <div className="empty-art">🎟️</div>
-          <h1>No cards yet</h1>
-          <p className="sub">Scan a shop's Qrew code to get your first stamp card.</p>
-        </div>
-      )}
+        {screen === "loading" && (
+          <div className={`${SCREEN} px-5 pt-14`}>
+            <CardDetailSkeleton />
+          </div>
+        )}
 
-      {!auth.signedIn && auth.ready && (
-        <SignInPanel
-          onGoogle={auth.signInGoogle}
-          onDev={auth.signInDev}
-          // compact = follow the content instead of anchoring to the bottom (avoids a big gap under
-          // the enroll preview / when cards are shown); only the bare empty state pins it to the bottom.
-          compact={tiles.length > 0 || Boolean(shop.m && shop.p)}
-        />
-      )}
-      {err && <p className="err">{err}</p>}
+        {screen === "home" && (
+          <PullToRefresh onRefresh={loadTiles}>
+            <div
+              className={`${SCREEN} flex min-h-dvh flex-col gap-4 px-5 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]`}
+            >
+              <header className="flex items-center gap-3">
+                <span className="font-display text-2xl tracking-wide">
+                  <span className="text-primary">Q</span>rew
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <ThemeToggle />
+                  {auth.signedIn && (
+                    <button
+                      type="button"
+                      onClick={() => void auth.signOut()}
+                      className="text-muted-foreground rounded-lg px-2 py-2 text-[13px] font-semibold"
+                    >
+                      Sign out
+                    </button>
+                  )}
+                </div>
+              </header>
+
+              {shop.m && shop.p && (
+                <div className="flex flex-col gap-3">
+                  {preview && <CardPreview preview={preview} />}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={addShopCard}
+                    className="bg-primary text-primary-foreground min-h-13 w-full rounded-2xl text-[15px] font-extrabold transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {busy ? "Getting your card…" : "＋ Get this shop's card"}
+                  </button>
+                </div>
+              )}
+
+              {!tilesLoaded ? (
+                <CardsSkeleton />
+              ) : tiles.length > 0 ? (
+                <>
+                  <h1 className="text-xl font-extrabold tracking-tight">
+                    {auth.signedIn ? "Your cards" : "Cards on this device"}
+                  </h1>
+                  <CardsGrid cards={tiles} onOpen={openCard} />
+                </>
+              ) : shop.m && shop.p ? null : (
+                <div className="flex flex-col items-center gap-2 py-16 text-center">
+                  <span className="text-4xl" aria-hidden>
+                    🎟️
+                  </span>
+                  <h1 className="text-xl font-extrabold">No cards yet</h1>
+                  <p className="text-muted-foreground text-sm">
+                    Scan a shop's Qrew code to get your first stamp card.
+                  </p>
+                </div>
+              )}
+
+              {!auth.signedIn && auth.ready && (
+                <SignInPanel
+                  onGoogle={auth.signInGoogle}
+                  onDev={auth.signInDev}
+                  // compact = follow the content instead of anchoring to the bottom (avoids a big gap under
+                  // the enroll preview / when cards are shown); only the bare empty state pins it to the bottom.
+                  compact={tiles.length > 0 || Boolean(shop.m && shop.p)}
+                />
+              )}
+              {err && <p className="text-destructive text-center text-sm">{err}</p>}
+            </div>
+          </PullToRefresh>
+        )}
     </div>
   );
 }

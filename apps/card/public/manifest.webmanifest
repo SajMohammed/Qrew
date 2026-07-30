@@ -1,13 +1,16 @@
 {
+  "id": "/",
   "name": "Qrew Card",
   "short_name": "Qrew",
-  "description": "Your loyalty card",
+  "description": "Every shop's stamp card, in one place",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0C2712",
-  "theme_color": "#146A2E",
+  "background_color": "#f4f5f7",
+  "theme_color": "#f4f5f7",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ]
 }

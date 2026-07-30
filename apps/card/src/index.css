@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+/* The theme switcher stamps `.dark` on <html>, matching the shop app's convention. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Qrew Card — the customer's wallet.
+ *
+ * THE SPLIT RULE, which decides everything below: the app chrome is Qrew's and follows the
+ * viewer's light/dark preference; the stamp card itself is the MERCHANT's and keeps their brand
+ * colour in both themes. So the tokens here dress the shell only — a card never reads from them.
+ *
+ * Text tiers were contrast-checked against the surface they sit on, in both themes.
+ */
+:root {
+  --radius: 1rem;
+
+  --background: #f4f5f7;
+  --foreground: #14181d;
+  --surface: #ffffff;
+  --panel: #f1f3f5;
+  --muted-foreground: #4f5864; /* secondary text — 7.5:1 on white */
+  --faint: #6e7783; /* captions, timestamps — 4.54:1 on white */
+  --border: #e8eaee;
+
+  --primary: #146a2e;
+  --primary-foreground: #f4fbe9;
+  --lime: #cbfa5b;
+  --forest: #146a2e;
+  --success: #1f9e46;
+  --destructive: #d64550;
+
+  /* The Qrew hero gradient — used on the app's own surfaces, never on a merchant's card. */
+  --grad: linear-gradient(160deg, #cbfa5b 0%, #86e056 34%, #38ad4c 68%, #146a2e 100%);
+}
+
+.dark {
+  --background: #0c0e11;
+  --foreground: #e8ebef;
+  --surface: #15181d;
+  --panel: #1c2027;
+  --muted-foreground: #aab3be;
+  --faint: #8a939e;
+  --border: #242932;
+
+  --primary: #7fd457;
+  --primary-foreground: #0c2712;
+  --lime: #cbfa5b;
+  --forest: #7fd457;
+  --success: #56c96f;
+  --destructive: #e0715f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-panel: var(--panel);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-lime: var(--lime);
+  --color-forest: var(--forest);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+
+  --font-sans: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Anton", "Archivo", sans-serif;
+
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.375rem);
+  --radius-2xl: calc(var(--radius) + 0.625rem);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    /* A soft lift behind the content, tuned per theme rather than a single fixed gradient. */
+    background-image: radial-gradient(120% 70% at 50% -10%, color-mix(in srgb, var(--lime) 22%, transparent), transparent 70%);
+    background-attachment: fixed;
+    /* The status bar overlays the app on iOS (viewport-fit=cover + black-translucent), so the
+       top inset has to be honoured or the header hides underneath it. */
+    padding-top: env(safe-area-inset-top);
+  }
+  button:not(:disabled),
+  a[href],
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  /* Stop iOS rubber-banding the whole page so pull-to-refresh owns the gesture. */
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+@layer components {
+  /*
+   * The stamp card. Deliberately NOT themed: this surface belongs to the merchant, so it stays on
+   * their brand colour whichever theme the customer is using. `--card-color` and `--card-ink` are
+   * set inline per card; `--card-ink` flips the text for pale brand colours.
+   */
+  .stampcard {
+    background: linear-gradient(
+      155deg,
+      var(--card-color, #146a2e),
+      color-mix(in srgb, var(--card-color, #146a2e) 45%, #05100d)
+    );
+    color: var(--card-ink, #fbfbf7);
+    box-shadow:
+      0 2px 6px rgba(12, 39, 18, 0.14),
+      0 40px 70px -34px rgba(12, 39, 18, 0.5);
+  }
+  .stampcard::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 90% at 85% -10%, rgba(255, 255, 255, 0.22), transparent 60%);
+    pointer-events: none;
+  }
+  .stampcard.ready {
+    box-shadow:
+      0 0 0 2px var(--lime),
+      0 2px 6px rgba(12, 39, 18, 0.14),
+      0 40px 70px -34px rgba(12, 39, 18, 0.5),
+      0 0 44px -6px rgba(203, 250, 91, 0.6);
+  }
+  /*
+   * Chrome drawn ON the card is tinted from --card-ink rather than hardcoded white, so a pale
+   * brand colour doesn't leave invisible white-on-white pills and borders.
+   */
+  .on-card-soft {
+    background: color-mix(in srgb, var(--card-ink, #fbfbf7) 16%, transparent);
+  }
+  .on-card-line {
+    border-color: color-mix(in srgb, var(--card-ink, #fbfbf7) 42%, transparent);
+  }
+
+  /*
+   * Screen changes are a CSS keyframe, not an AnimatePresence tree. Importing AnimatePresence pulls
+   * Motion's projection/layout machinery into the bundle and defeats LazyMotion — a ~100KB gzip tax
+   * for a fade the platform can do for free.
+   */
+  .screen-in {
+    animation: qrew-screen-in 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  @keyframes qrew-screen-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .live-dot {
+    animation: qrew-pulse 2s infinite;
+  }
+  @keyframes qrew-pulse {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 50%, transparent);
+    }
+    70% {
+      box-shadow: 0 0 0 8px transparent;
+    }
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

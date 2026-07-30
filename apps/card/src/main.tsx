@@ -1,11 +1,19 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { LazyMotion, domAnimation } from "motion/react";
 import { App } from "./App";
-import "./styles.css";
+import { ThemeProvider } from "@/lib/theme";
+import "./index.css";
 
+// LazyMotion + the `m` component keep Motion's runtime to a few KB, which matters on a card that
+// has to open fast at a counter. `strict` fails the build if a heavyweight `motion.*` sneaks in.
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider>
+      <LazyMotion features={domAnimation} strict>
+        <App />
+      </LazyMotion>
+    </ThemeProvider>
   </React.StrictMode>,
 );
 
