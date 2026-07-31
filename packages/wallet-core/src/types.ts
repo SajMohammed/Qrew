@@ -50,6 +50,9 @@ export interface PassContent {
 /** What changed on a card after a scan. */
 export interface PassUpdate {
   currentStamps: number;
+  stampsRequired: number;
+  /** The card serial — a wallet barcode is static, so it carries this rather than a token. */
+  serial: string;
   /** Public URL of the redrawn stamp strip, when one is configured. */
   stripUrl?: string;
 }

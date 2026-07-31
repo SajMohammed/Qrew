@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "doctor": "tsx scripts/doctor.ts",
-    "selftest": "tsx scripts/selftest.ts"
+    "selftest": "tsx scripts/selftest.ts",
+    "resync": "tsx scripts/resync.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
@@ -24,5 +25,8 @@
     "tsx": "^4.23.0",
     "typescript": "^7.0.0",
     "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@qrew/db": "workspace:*"
   }
 }

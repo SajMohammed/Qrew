@@ -334,6 +334,10 @@ importers:
         version: 7.0.2
 
   packages/wallet-core:
+    dependencies:
+      '@qrew/db':
+        specifier: workspace:*
+        version: link:../db
     devDependencies:
       '@types/node':
         specifier: ^22.15.0

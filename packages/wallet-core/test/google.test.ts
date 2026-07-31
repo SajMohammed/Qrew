@@ -76,10 +76,15 @@ describe("GoogleWalletProvider", () => {
     expect(obj.id).toContain(CONTENT.serial);
     expect(obj.state).toBe("ACTIVE");
     expect(obj.loyaltyPoints.balance.int).toBe(3);
-    // The barcode must carry the rotating token the staff app scans — not the raw serial.
+    // The barcode carries the SERIAL, never the app's rotating token: a wallet pass is frozen
+    // until patched, and a card token expires in two minutes — a pass built on one would stop
+    // scanning at the till.
     expect(obj.barcode.type).toBe("QR_CODE");
-    expect(obj.barcode.value).toBe(CONTENT.qrToken);
-    expect(obj.hexBackgroundColor).toBe("#6C2A4B");
+    expect(obj.barcode.value).toBe(CONTENT.serial);
+    expect(obj.barcode.value).not.toBe(CONTENT.qrToken);
+    // Colour belongs to the CLASS. An object-level colour overrides it, which would freeze every
+    // saved pass at the colour it had when the customer added it.
+    expect(obj.hexBackgroundColor).toBeUndefined();
     expect(obj.textModulesData.find((t: any) => t.id === "reward").body).toBe("1 free item");
     // The member is the CUSTOMER, not the shop — the shop is already the title.
     expect(obj.accountName).toBe("Sara M.");
@@ -89,6 +94,7 @@ describe("GoogleWalletProvider", () => {
     const cls = withEnv().toClass(CONTENT) as Record<string, any>;
     expect(cls.issuerName).toBe("Nadia's Coffee");
     expect(cls.programName).toBe("Loyalty Card");
+    // The class is where colour lives, so editing it in the designer reaches every saved pass.
     expect(cls.hexBackgroundColor).toBe("#6C2A4B");
     // Google rejects a class with no program logo, so one is always present.
     expect(cls.programLogo.sourceUri.uri).toBe("https://cdn.example.com/qrew-mark-512.png");
@@ -141,7 +147,7 @@ describe("GoogleWalletProvider", () => {
     const object = payload.payload.loyaltyObjects[0];
     expect(object.id).toBe(`3388000000022222222.${CONTENT.serial}`);
     expect(object.classId).toBe(`3388000000022222222.${CONTENT.programId}`);
-    expect(object.barcode.value).toBe(CONTENT.qrToken);
+    expect(object.barcode.value).toBe(CONTENT.serial);
     expect(object.loyaltyPoints.balance.int).toBe(3);
   });
 });

@@ -45,6 +45,8 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
   // 1) reflect the current count on the pass, then 2) nudge the lock screen. With a real
   // provider these are the slow external calls we moved off the request path.
   await provider.updateStamps(ref, {
+    serial: enrollment.cardSerial,
+    stampsRequired,
     currentStamps: enrollment.currentStamps,
     // The strip URL embeds the count, so this is what actually redraws the stamps on the pass.
     stripUrl: stripUrlFor(enrollment.cardSerial, enrollment.currentStamps),

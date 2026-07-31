@@ -20,7 +20,8 @@
     "worker:dev": "pnpm --filter @qrew/wallet-worker dev",
     "wallet:doctor": "pnpm --filter @qrew/wallet-core doctor",
     "wallet:selftest": "pnpm --filter @qrew/wallet-core selftest",
-    "strip:serve": "pnpm --filter @qrew/core strip:serve"
+    "strip:serve": "pnpm --filter @qrew/core strip:serve",
+    "wallet:resync": "pnpm --filter @qrew/wallet-core resync"
   },
   "devDependencies": {
     "turbo": "^2.5.0",

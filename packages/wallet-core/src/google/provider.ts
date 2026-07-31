@@ -115,6 +115,14 @@ export class GoogleWalletProvider implements WalletProvider {
     const id = this.resolveObjectId(ref);
     await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
       loyaltyPoints: { balance: { int: update.currentStamps }, label: "Stamps" },
+      // The caption under the barcode is part of the count too — left alone it sits there
+      // contradicting the number directly above it. Sent whole, because a partial barcode object
+      // would drop the value along with it.
+      barcode: {
+        type: "QR_CODE",
+        value: update.serial,
+        alternateText: `${update.currentStamps}/${update.stampsRequired}`,
+      },
       // Re-point the strip as well. Its URL carries the count, so leaving it alone would keep the
       // customer looking at the picture drawn before this scan.
       ...(update.stripUrl ? { heroImage: { sourceUri: { uri: update.stripUrl } } } : {}),
@@ -194,9 +202,17 @@ export class GoogleWalletProvider implements WalletProvider {
         label: "Stamps",
         balance: { int: content.currentStamps },
       },
+      /*
+       * The barcode carries the SERIAL, not the app's rotating token.
+       *
+       * A wallet pass is a stored object: whatever goes in here is frozen until we patch it, and a
+       * card token lives two minutes. Embedding one would produce a pass that scans for two minutes
+       * and then tells the customer "card not found" at the till. The serial is already the card's
+       * capability — the same value the app's QR falls back to — so this loses nothing.
+       */
       barcode: {
         type: "QR_CODE",
-        value: content.qrToken,
+        value: content.serial,
         alternateText: `${content.currentStamps}/${content.stampsRequired}`,
       },
       textModulesData: [
@@ -207,7 +223,14 @@ export class GoogleWalletProvider implements WalletProvider {
           id: "progress",
         },
       ],
-      hexBackgroundColor: content.brandColor ?? "#146A2E",
+      /*
+       * NO hexBackgroundColor here on purpose.
+       *
+       * Colour is a TEMPLATE concern — it belongs to the shop, not to one customer's card — and an
+       * object-level colour OVERRIDES the class. Setting it here meant that editing the brand colour
+       * in the card designer updated the class correctly and changed nothing anybody could see,
+       * because every saved pass kept the colour frozen into it at save time.
+       */
       // The stamp strip. It belongs on the OBJECT, not the class, because it is redrawn every time
       // this customer's count changes — the class is shared by everyone on the programme.
       ...(content.stripUrl ? { heroImage: { sourceUri: { uri: content.stripUrl } } } : {}),
