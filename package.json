@@ -17,7 +17,8 @@
     "db:seed": "pnpm --filter @qrew/db seed",
     "db:studio": "pnpm --filter @qrew/db studio",
     "api:dev": "pnpm --filter @qrew/api dev",
-    "worker:dev": "pnpm --filter @qrew/wallet-worker dev"
+    "worker:dev": "pnpm --filter @qrew/wallet-worker dev",
+    "wallet:doctor": "pnpm --filter @qrew/wallet-core doctor"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
