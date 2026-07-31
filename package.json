@@ -18,7 +18,8 @@
     "db:studio": "pnpm --filter @qrew/db studio",
     "api:dev": "pnpm --filter @qrew/api dev",
     "worker:dev": "pnpm --filter @qrew/wallet-worker dev",
-    "wallet:doctor": "pnpm --filter @qrew/wallet-core doctor"
+    "wallet:doctor": "pnpm --filter @qrew/wallet-core doctor",
+    "wallet:selftest": "pnpm --filter @qrew/wallet-core selftest"
   },
   "devDependencies": {
     "turbo": "^2.5.0",

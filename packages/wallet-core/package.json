@@ -15,7 +15,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "doctor": "tsx scripts/doctor.ts"
+    "doctor": "tsx scripts/doctor.ts",
+    "selftest": "tsx scripts/selftest.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
