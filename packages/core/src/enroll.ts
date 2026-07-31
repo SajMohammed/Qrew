@@ -202,6 +202,7 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
   // issue the wallet pass OUTSIDE the transaction
   const ref = await provider.issuePass({
     serial: e.cardSerial,
+    programId: created.program.id,
     merchantName: created.merchantName,
     programName: created.program.name,
     rewardText: created.program.rewardText,

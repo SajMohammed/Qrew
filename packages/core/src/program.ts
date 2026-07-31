@@ -1,5 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { withTenant, merchants, loyaltyPrograms } from "@qrew/db";
+import { getWalletProvider } from "@qrew/wallet-core";
 
 export interface CardDesign {
   brandColor: string; // hex, e.g. "#146A2E"
@@ -118,7 +119,41 @@ export async function updateProgram(
       .where(eq(loyaltyPrograms.id, programId))
       .returning();
 
-    return updated ? toView(updated) : null;
+    if (!updated) return null;
+
+    const [merchant] = await db.select({ name: merchants.name }).from(merchants);
+    return { view: toView(updated), merchantName: merchant?.name ?? "", updated };
+  }).then(async (result) => {
+    if (!result) return null;
+    const { view, merchantName, updated } = result;
+
+    /*
+     * Push the new design onto the wallet template, so a card already sitting in a customer's
+     * wallet picks up the shop's new colour, name and logo — that is what makes the card designer
+     * mean anything beyond our own app.
+     *
+     * Best-effort and deliberately after the commit: the design is saved either way, and a wallet
+     * outage must not fail the owner's save.
+     */
+    try {
+      const design = normalizeDesign(updated.cardDesign);
+      await getWalletProvider().syncTemplate({
+        serial: "",
+        programId: updated.id,
+        merchantName,
+        programName: updated.name,
+        rewardText: updated.rewardText,
+        currentStamps: 0,
+        stampsRequired: updated.stampsRequired,
+        qrToken: "",
+        brandColor: design.brandColor,
+        logoUrl: (updated.cardDesign as { logoUrl?: string } | null)?.logoUrl,
+      });
+    } catch (err) {
+      console.error("[wallet] could not sync the card design to the wallet template:", err);
+    }
+
+    return view;
   });
 }
 

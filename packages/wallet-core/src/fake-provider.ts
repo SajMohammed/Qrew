@@ -19,6 +19,10 @@ export class FakeWalletProvider implements WalletProvider {
     return `https://example.invalid/fake-wallet/${encodeURIComponent(content.serial)}`;
   }
 
+  async syncTemplate(_content: PassContent): Promise<void> {
+    /* nothing to sync in memory */
+  }
+
   async issuePass(content: PassContent): Promise<PassRef> {
     this.passes.set(content.serial, { content, currentStamps: content.currentStamps });
     return {

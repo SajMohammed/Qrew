@@ -142,7 +142,7 @@ export class GoogleWalletProvider implements WalletProvider {
       );
     }
     return {
-      id: this.classId(content.programName || content.merchantName),
+      id: this.classId(content.programId),
       issuerName: content.merchantName,
       programName: content.programName,
       reviewStatus: "UNDER_REVIEW", // becomes APPROVED automatically for loyalty classes
@@ -155,10 +155,11 @@ export class GoogleWalletProvider implements WalletProvider {
   toObject(content: PassContent): Record<string, unknown> {
     return {
       id: this.objectId(content.serial),
-      classId: this.classId(content.programName || content.merchantName),
+      classId: this.classId(content.programId),
       state: "ACTIVE",
       accountId: content.serial,
-      accountName: content.merchantName,
+      // The member is the CUSTOMER. The shop is already the issuer/title above.
+      ...(content.customerName ? { accountName: content.customerName } : {}),
       loyaltyPoints: {
         label: "Stamps",
         balance: { int: content.currentStamps },
@@ -182,8 +183,21 @@ export class GoogleWalletProvider implements WalletProvider {
 
   // ── transport ────────────────────────────────────────────────────────────────
 
+  /**
+   * Push the current design onto the class. Unlike ensureClass this always writes, because it is
+   * called when the owner has just changed something and expects to see it.
+   */
+  async syncTemplate(content: PassContent): Promise<void> {
+    const id = this.classId(content.programId);
+    const body = this.toClass(content);
+    const existing = await this.request("GET", `/loyaltyClass/${encodeURIComponent(id)}`);
+    if (existing) await this.request("PATCH", `/loyaltyClass/${encodeURIComponent(id)}`, body);
+    else await this.request("POST", "/loyaltyClass", body);
+    this.ensuredClasses.add(id);
+  }
+
   private async ensureClass(content: PassContent): Promise<void> {
-    const id = this.classId(content.programName || content.merchantName);
+    const id = this.classId(content.programId);
     if (this.ensuredClasses.has(id)) return;
     const existing = await this.request("GET", `/loyaltyClass/${encodeURIComponent(id)}`);
     if (!existing) await this.request("POST", "/loyaltyClass", this.toClass(content));

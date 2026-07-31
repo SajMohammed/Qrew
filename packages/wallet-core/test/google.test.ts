@@ -14,6 +14,8 @@ let privateKey: string;
 
 const CONTENT: PassContent = {
   serial: "bc5da23a-b964-4dfe-b461-c455d26ac019",
+  programId: "296d2bb5-d7bc-4cc3-b4fd-b2a51d92be6c",
+  customerName: "Sara M.",
   merchantName: "Nadia's Coffee",
   programName: "Loyalty Card",
   rewardText: "1 free item",
@@ -61,8 +63,12 @@ describe("GoogleWalletProvider", () => {
     expect(p.objectId(CONTENT.serial)).toBe(`3388000000022222222.${CONTENT.serial}`);
     expect(p.objectId(CONTENT.serial)).toBe(p.objectId(CONTENT.serial));
     // Google ids allow only [A-Za-z0-9._-] — anything else must be scrubbed, not passed through.
-    expect(p.classId("Loyalty Card")).toBe("3388000000022222222.Loyalty_Card");
     expect(p.classId("Café / Brunch")).toMatch(/^3388000000022222222\.[A-Za-z0-9._-]+$/);
+
+    // The class is keyed on the programme ID, never its name: two shops both calling their card
+    // "Loyalty Card" must not collide onto one class and inherit each other's branding.
+    expect(p.classId(CONTENT.programId)).toBe(`3388000000022222222.${CONTENT.programId}`);
+    expect(p.classId("prog-a")).not.toBe(p.classId("prog-b"));
   });
 
   it("maps a card onto the loyalty object Google expects", () => {
@@ -75,6 +81,8 @@ describe("GoogleWalletProvider", () => {
     expect(obj.barcode.value).toBe(CONTENT.qrToken);
     expect(obj.hexBackgroundColor).toBe("#6C2A4B");
     expect(obj.textModulesData.find((t: any) => t.id === "reward").body).toBe("1 free item");
+    // The member is the CUSTOMER, not the shop — the shop is already the title.
+    expect(obj.accountName).toBe("Sara M.");
   });
 
   it("builds the class from the merchant's own branding", () => {
@@ -113,6 +121,11 @@ describe("GoogleWalletProvider", () => {
     expect(verifier.verify(publicKey, Buffer.from(signature!, "base64url"))).toBe(true);
   });
 
+  it("omits the member name for an anonymous walk-in", () => {
+    const obj = withEnv().toObject({ ...CONTENT, customerName: null }) as Record<string, any>;
+    expect(obj.accountName).toBeUndefined();
+  });
+
   it("signs a save assertion carrying the whole card", () => {
     // buildSaveJwt is pure, so this asserts exactly what Google will act on — no network, and no
     // mock standing in for the real payload.
@@ -127,6 +140,7 @@ describe("GoogleWalletProvider", () => {
     // provision passes for the many customers who never add one.
     const object = payload.payload.loyaltyObjects[0];
     expect(object.id).toBe(`3388000000022222222.${CONTENT.serial}`);
+    expect(object.classId).toBe(`3388000000022222222.${CONTENT.programId}`);
     expect(object.barcode.value).toBe(CONTENT.qrToken);
     expect(object.loyaltyPoints.balance.int).toBe(3);
   });

@@ -19,8 +19,16 @@ export interface PassRef {
 /** The data a pass can display. Kept deliberately small — passes are constrained. */
 export interface PassContent {
   serial: string;
+  /**
+   * The programme's id. The wallet CLASS is keyed on this, never on the programme's name —
+   * two shops both calling their card "Loyalty Card" must not collide onto one class, because a
+   * class carries the issuer name, colours and logo of whoever created it first.
+   */
+  programId: string;
   merchantName: string;
   programName: string;
+  /** The cardholder. Shown as the member name; omitted for anonymous walk-ins. */
+  customerName?: string | null;
   rewardText: string;
   currentStamps: number;
   stampsRequired: number;
@@ -36,6 +44,12 @@ export interface WalletProvider {
    * Returns null rather than throwing — the card screen must render with or without a pass.
    */
   getSaveUrl(content: PassContent): Promise<string | null>;
+  /**
+   * Push the shop's current card design onto the wallet TEMPLATE (Google calls it a class), so
+   * editing the card in the console is reflected on every pass already in a customer's wallet.
+   * Best-effort: the design is saved in our DB regardless.
+   */
+  syncTemplate(content: PassContent): Promise<void>;
   /** Create a pass for a new enrollment; returns platform ids to persist. */
   issuePass(content: PassContent): Promise<PassRef>;
   /** Update the stamp count (and derived visual) on an existing pass. */

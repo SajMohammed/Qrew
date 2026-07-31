@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { adminDb, merchants, loyaltyPrograms, enrollments } from "@qrew/db";
+import { adminDb, merchants, loyaltyPrograms, enrollments, customers } from "@qrew/db";
 import { getWalletProvider } from "@qrew/wallet-core";
 import { mintCardToken } from "./token";
 
@@ -29,6 +29,8 @@ export async function getCard(serial: string): Promise<CardView | null> {
   const [row] = await adminDb
     .select({
       serial: enrollments.cardSerial,
+      programId: enrollments.programId,
+      customerName: customers.name,
       currentStamps: enrollments.currentStamps,
       merchantName: merchants.name,
       programName: loyaltyPrograms.name,
@@ -39,12 +41,17 @@ export async function getCard(serial: string): Promise<CardView | null> {
     })
     .from(enrollments)
     .innerJoin(merchants, eq(merchants.id, enrollments.merchantId))
+    .innerJoin(customers, eq(customers.id, enrollments.customerId))
     .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
     .where(eq(enrollments.cardSerial, serial));
 
   if (!row) return null;
 
-  const design = (row.cardDesign ?? {}) as { brandColor?: string; stampIcon?: string };
+  const design = (row.cardDesign ?? {}) as {
+    brandColor?: string;
+    stampIcon?: string;
+    logoUrl?: string;
+  };
   const qrToken = mintCardToken(row.serial);
 
   /*
@@ -54,6 +61,8 @@ export async function getCard(serial: string): Promise<CardView | null> {
    */
   const google = await getWalletProvider().getSaveUrl({
     serial: row.serial,
+    programId: row.programId,
+    customerName: row.customerName,
     merchantName: row.merchantName,
     programName: row.programName,
     rewardText: row.rewardText,
@@ -61,6 +70,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
     stampsRequired: row.stampsRequired,
     qrToken,
     brandColor: design.brandColor ?? "#146A2E",
+    logoUrl: design.logoUrl, // the shop's own mark, when they've set one
   });
 
   return {

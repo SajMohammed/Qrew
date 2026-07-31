@@ -23,6 +23,10 @@ export class PassKitProvider implements WalletProvider {
     return null; // TODO: the vendor exposes its own save link per member
   }
 
+  async syncTemplate(_content: PassContent): Promise<void> {
+    // TODO: the vendor owns the template; push design changes here.
+  }
+
   async issuePass(content: PassContent): Promise<PassRef> {
     // TODO: create the member/pass from `content`; map the vendor response to PassRef.
     const res = await this.request("POST", "/members/member", this.toVendorMember(content));
