@@ -31,6 +31,11 @@ export interface PassContent {
 }
 
 export interface WalletProvider {
+  /**
+   * A link that adds this card to the customer's wallet, or null when the provider has none.
+   * Returns null rather than throwing — the card screen must render with or without a pass.
+   */
+  getSaveUrl(content: PassContent): Promise<string | null>;
   /** Create a pass for a new enrollment; returns platform ids to persist. */
   issuePass(content: PassContent): Promise<PassRef>;
   /** Update the stamp count (and derived visual) on an existing pass. */

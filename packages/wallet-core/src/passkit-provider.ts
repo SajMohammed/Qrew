@@ -19,6 +19,10 @@ export class PassKitProvider implements WalletProvider {
     this.baseUrl = process.env.PASSKIT_BASE_URL ?? "https://api.pub1.passkit.io";
   }
 
+  async getSaveUrl(_content: PassContent): Promise<string | null> {
+    return null; // TODO: the vendor exposes its own save link per member
+  }
+
   async issuePass(content: PassContent): Promise<PassRef> {
     // TODO: create the member/pass from `content`; map the vendor response to PassRef.
     const res = await this.request("POST", "/members/member", this.toVendorMember(content));

@@ -14,6 +14,11 @@ interface FakePass {
 export class FakeWalletProvider implements WalletProvider {
   private readonly passes = new Map<string, FakePass>();
 
+  /** A recognisably fake link, so dev can exercise the button without Google credentials. */
+  async getSaveUrl(content: PassContent): Promise<string | null> {
+    return `https://example.invalid/fake-wallet/${encodeURIComponent(content.serial)}`;
+  }
+
   async issuePass(content: PassContent): Promise<PassRef> {
     this.passes.set(content.serial, { content, currentStamps: content.currentStamps });
     return {
