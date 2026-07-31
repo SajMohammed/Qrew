@@ -5,6 +5,7 @@ import { useApi, NeedsOnboarding, Forbidden } from "./useApi";
 import { AppShell, Wordmark, type ManageView } from "@/components/AppShell";
 import { Dashboard } from "@/screens/Dashboard";
 import { Customers } from "@/screens/Customers";
+import { Team } from "@/screens/Team";
 import { CounterMode } from "@/screens/CounterMode";
 import { CounterQR } from "./CounterQR";
 import { Designer } from "./Designer";
@@ -154,6 +155,7 @@ function ShopApp() {
           />
         )}
         {view === "customers" && <Customers key={customerFilter} initialFilter={customerFilter} />}
+        {view === "team" && <Team />}
         {view === "designer" && <Designer merchantName={data?.merchantName} />}
         {view === "counterqr" &&
           (data ? (

@@ -6,6 +6,7 @@ import {
   CreditCard,
   QrCode,
   ConciergeBell,
+  UsersRound,
   Lock,
   Moon,
   Sun,
@@ -16,13 +17,14 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 
 /** The management surface. Counter mode is deliberately not one of these — it replaces the shell. */
-export type ManageView = "dashboard" | "customers" | "designer" | "counterqr";
+export type ManageView = "dashboard" | "customers" | "designer" | "counterqr" | "team";
 
 const NAV: { id: ManageView; label: string; short: string; icon: typeof LayoutGrid }[] = [
   { id: "dashboard", label: "Dashboard", short: "Home", icon: LayoutGrid },
   { id: "customers", label: "Customers", short: "People", icon: Users },
   { id: "designer", label: "Card designer", short: "Card", icon: CreditCard },
   { id: "counterqr", label: "Counter QR", short: "QR", icon: QrCode },
+  { id: "team", label: "Team", short: "Team", icon: UsersRound },
 ];
 
 const RAIL_KEY = "qrew-rail-collapsed";
@@ -157,7 +159,7 @@ export function AppShell({ view, onNavigate, onEnterCounter, shopName, children 
 
         {/* Thumb-reachable nav, clear of the home indicator on iOS. */}
         <nav
-          className="bg-sidebar/95 border-sidebar-border fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t backdrop-blur lg:hidden"
+          className="bg-sidebar/95 border-sidebar-border fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t backdrop-blur lg:hidden"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           {NAV.map((item) => (

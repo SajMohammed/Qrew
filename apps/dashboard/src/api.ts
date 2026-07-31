@@ -137,6 +137,18 @@ export interface CustomerList {
   offset: number;
 }
 
+// ── Team ──────────────────────────────────────────────────────────────────────────
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: string;
+  /** Whether a counter PIN is set — i.e. whether they can actually work the till. */
+  hasPin: boolean;
+  /** True when they sign in with their own account (Clerk) rather than a PIN. */
+  linkedAccount: boolean;
+  createdAt: string;
+}
+
 export interface CustomersParams {
   filter?: CustomerFilter;
   search?: string;

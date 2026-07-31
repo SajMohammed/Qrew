@@ -11,9 +11,26 @@ import type {
   AnalyticsRange,
   CustomerList,
   CustomersParams,
+  StaffMember,
 } from "./api";
 
 const rnd = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+/**
+ * Prefer the server's own explanation over a bare status code. Validation failures carry a field
+ * message ("PIN must be 4-6 digits") that is far more use to the reader than "(400)".
+ */
+async function describe(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { issues?: { message: string }[]; message?: string };
+    const issue = body.issues?.[0]?.message;
+    if (issue) return issue;
+    if (typeof body.message === "string" && body.message) return body.message;
+  } catch {
+    /* not JSON — fall through to the generic message */
+  }
+  return `${fallback} (${res.status})`;
+}
 
 const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
@@ -121,6 +138,25 @@ export function useApi() {
         const res = await call("/staff/verify-pin", { method: "POST", body: JSON.stringify({ pin }) });
         if (!res.ok) throw new Error(`PIN failed (${res.status})`);
         return res.json();
+      },
+      // ── Team ──
+      async getStaff(): Promise<StaffMember[]> {
+        const res = await call("/staff");
+        if (res.status === 403) throw new Forbidden();
+        if (!res.ok) throw new Error(`Team failed (${res.status})`);
+        return res.json();
+      },
+      async addStaff(input: { name: string; pin: string; role: string }): Promise<void> {
+        const res = await call("/staff", { method: "POST", body: JSON.stringify(input) });
+        if (!res.ok) throw new Error(await describe(res, "Could not add them"));
+      },
+      async resetStaffPin(id: string, pin: string): Promise<void> {
+        const res = await call(`/staff/${id}/pin`, { method: "PATCH", body: JSON.stringify({ pin }) });
+        if (!res.ok) throw new Error(await describe(res, "Could not change the PIN"));
+      },
+      async removeStaff(id: string): Promise<void> {
+        const res = await call(`/staff/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await describe(res, "Could not remove them"));
       },
     }),
     [call],

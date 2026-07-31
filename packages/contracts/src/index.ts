@@ -36,6 +36,21 @@ export const VerifyPinRequest = z.object({
 });
 export type VerifyPinRequest = z.infer<typeof VerifyPinRequest>;
 
+// Adding someone to the team. Role is deliberately limited to manager|cashier: owners are created
+// by onboarding from a verified login, so this endpoint can never be used to mint one.
+export const StaffCreate = z.object({
+  name: z.string().min(1).max(60),
+  pin: z.string().regex(/^\d{4,6}$/, "PIN must be 4-6 digits"),
+  role: z.enum(["manager", "cashier"]).default("cashier"),
+});
+export type StaffCreate = z.infer<typeof StaffCreate>;
+
+// Reset a counter PIN.
+export const StaffPinUpdate = z.object({
+  pin: z.string().regex(/^\d{4,6}$/, "PIN must be 4-6 digits"),
+});
+export type StaffPinUpdate = z.infer<typeof StaffPinUpdate>;
+
 export const ProgramUpdate = z.object({
   name: z.string().min(1).max(60).optional(),
   rewardText: z.string().min(1).max(60).optional(),
