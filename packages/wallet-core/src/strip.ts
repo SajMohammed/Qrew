@@ -1,4 +1,5 @@
 import { deflateSync } from "node:zlib";
+import { decodePng, type DecodedImage } from "./png-decode";
 
 /**
  * The stamp strip — the only way a wallet pass can show actual stamps.
@@ -25,6 +26,12 @@ export interface StripOptions {
   currentStamps: number;
   /** The shop's brand colour — the strip sits on it, so the marks are drawn to contrast. */
   brandColor: string;
+  /**
+   * The shop's own stamp artwork, already decoded. Given one, the strip draws THAT instead of
+   * discs — earned at full strength, still-to-earn faded — which is how a real stamp card reads:
+   * a row of the shop's cups filling up, not abstract circles.
+   */
+  icon?: DecodedImage;
   width?: number;
   height?: number;
 }
@@ -98,6 +105,13 @@ export function renderStampStrip(opts: StripOptions): Buffer {
     const y0 = Math.max(0, Math.floor(cy - radius - 2));
     const y1 = Math.min(height - 1, Math.ceil(cy + radius + 2));
 
+    if (opts.icon) {
+      // The shop's artwork. Unearned stamps are the same image held back, so the row reads as one
+      // set filling up rather than two unrelated pictures.
+      drawIcon(put, opts.icon, cx, cy, radius * 2, on ? 1 : 0.28);
+      continue;
+    }
+
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
@@ -115,6 +129,52 @@ export function renderStampStrip(opts: StripOptions): Buffer {
   }
 
   return encodePng(width, height, px);
+}
+
+/**
+ * Blit an icon centred on (cx, cy), scaled to fit `size` and sampled bilinearly so it doesn't go
+ * blocky when a small source is scaled up to strip resolution.
+ */
+function drawIcon(
+  put: (x: number, y: number, col: Rgba, coverage: number) => void,
+  icon: DecodedImage,
+  cx: number,
+  cy: number,
+  size: number,
+  opacity: number,
+): void {
+  // Preserve the artwork's aspect: a tall cup must not be squashed into a square.
+  const scale = size / Math.max(icon.width, icon.height);
+  const w = icon.width * scale;
+  const h = icon.height * scale;
+  const left = cx - w / 2;
+  const top = cy - h / 2;
+
+  for (let y = Math.floor(top); y < Math.ceil(top + h); y++) {
+    for (let x = Math.floor(left); x < Math.ceil(left + w); x++) {
+      const u = ((x + 0.5 - left) / w) * (icon.width - 1);
+      const v = ((y + 0.5 - top) / h) * (icon.height - 1);
+      if (u < 0 || v < 0 || u > icon.width - 1 || v > icon.height - 1) continue;
+
+      const x0 = Math.floor(u);
+      const y0 = Math.floor(v);
+      const x1 = Math.min(x0 + 1, icon.width - 1);
+      const y1 = Math.min(y0 + 1, icon.height - 1);
+      const fx = u - x0;
+      const fy = v - y0;
+
+      const at = (px: number, py: number, c: number) => icon.rgba[(py * icon.width + px) * 4 + c]!;
+      const mix = (c: number) =>
+        at(x0, y0, c) * (1 - fx) * (1 - fy) +
+        at(x1, y0, c) * fx * (1 - fy) +
+        at(x0, y1, c) * (1 - fx) * fy +
+        at(x1, y1, c) * fx * fy;
+
+      const alpha = mix(3) / 255;
+      if (alpha <= 0.004) continue;
+      put(x, y, { r: mix(0), g: mix(1), b: mix(2), a: 255 }, alpha * opacity);
+    }
+  }
 }
 
 // ── a minimal PNG encoder (8-bit RGBA, no interlace) ───────────────────────────────

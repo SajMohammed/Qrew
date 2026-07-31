@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderStampStrip, STRIP_WIDTH, STRIP_HEIGHT } from "../src/strip";
+import { renderStampStrip, encodePng, STRIP_WIDTH, STRIP_HEIGHT } from "../src/strip";
+import { decodePng } from "../src/png-decode";
 
 /** Decode just enough of the PNG header to prove we emit a real one. */
 function header(png: Buffer) {
@@ -50,5 +51,29 @@ describe("stamp strip", () => {
     const png = renderStampStrip({ stampsRequired: 10, currentStamps: 99, brandColor: "#146A2E" });
     expect(header(png).width).toBe(STRIP_WIDTH);
     expect(png.length).toBeGreaterThan(100);
+  });
+});
+
+describe("stamp strip with shop artwork", () => {
+  const icon = decodePng(
+    encodePng(
+      4,
+      4,
+      Buffer.from(Array.from({ length: 4 * 4 * 4 }, (_, i) => (i % 4 === 3 ? 255 : 200))),
+    ),
+  );
+
+  it("draws the shop's icon instead of discs when one is supplied", () => {
+    const opts = { stampsRequired: 6, currentStamps: 3, brandColor: "#6C2A4B" };
+    const discs = renderStampStrip(opts);
+    const artwork = renderStampStrip({ ...opts, icon });
+    expect(discs.equals(artwork)).toBe(false);
+  });
+
+  it("still distinguishes earned from unearned", () => {
+    const base = { stampsRequired: 6, brandColor: "#6C2A4B", icon };
+    const two = renderStampStrip({ ...base, currentStamps: 2 });
+    const five = renderStampStrip({ ...base, currentStamps: 5 });
+    expect(two.equals(five)).toBe(false);
   });
 });
