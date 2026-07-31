@@ -1,4 +1,4 @@
-import type { WalletProvider, PassContent, PassRef } from "./types";
+import type { WalletProvider, PassContent, PassRef, PassUpdate } from "./types";
 
 /**
  * Adapter for a flat-fee wallet vendor (PassKit). The vendor owns Apple pass signing +
@@ -37,9 +37,9 @@ export class PassKitProvider implements WalletProvider {
     };
   }
 
-  async updateStamps(ref: PassRef, currentStamps: number): Promise<void> {
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<void> {
     await this.request("PUT", `/members/member/${encodeURIComponent(ref.serial)}`, {
-      points: currentStamps,
+      points: update.currentStamps,
     });
   }
 

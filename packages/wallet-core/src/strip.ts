@@ -173,3 +173,21 @@ export function encodePng(width: number, height: number, rgba: Buffer): Buffer {
     chunk("IEND", Buffer.alloc(0)),
   ]);
 }
+
+/**
+ * Where a wallet fetches this card's strip.
+ *
+ * Lives beside the renderer so the URL format and the image can never drift apart, and so both the
+ * card read and the sync worker can build it without either depending on the other.
+ *
+ * Google downloads the image itself, so with no PUBLIC_API_URL configured (local dev) this returns
+ * undefined and the pass simply has no strip — better than pointing Google at an unreachable host.
+ *
+ * The count rides along purely as a cache-buster: the bytes change on every scan, and a CDN would
+ * otherwise keep serving the strip drawn before it.
+ */
+export function stripUrlFor(serial: string, currentStamps: number): string | undefined {
+  const base = process.env.PUBLIC_API_URL;
+  if (!base) return undefined;
+  return `${base.replace(/\/$/, "")}/card/${encodeURIComponent(serial)}/strip.png?s=${currentStamps}`;
+}

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments } from "@qrew/db";
-import { getWalletProvider } from "@qrew/wallet-core";
+import { getWalletProvider, stripUrlFor } from "@qrew/wallet-core";
 import type { WalletJobData } from "@qrew/queue";
 
 /**
@@ -44,7 +44,11 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
 
   // 1) reflect the current count on the pass, then 2) nudge the lock screen. With a real
   // provider these are the slow external calls we moved off the request path.
-  await provider.updateStamps(ref, enrollment.currentStamps);
+  await provider.updateStamps(ref, {
+    currentStamps: enrollment.currentStamps,
+    // The strip URL embeds the count, so this is what actually redraws the stamps on the pass.
+    stripUrl: stripUrlFor(enrollment.cardSerial, enrollment.currentStamps),
+  });
   const message = walletMessage(data.kind, enrollment.currentStamps, stampsRequired);
   await provider.pushUpdate(ref, message);
 

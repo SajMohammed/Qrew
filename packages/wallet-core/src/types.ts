@@ -47,6 +47,13 @@ export interface PassContent {
   locale?: "en" | "ar";
 }
 
+/** What changed on a card after a scan. */
+export interface PassUpdate {
+  currentStamps: number;
+  /** Public URL of the redrawn stamp strip, when one is configured. */
+  stripUrl?: string;
+}
+
 export interface WalletProvider {
   /**
    * A link that adds this card to the customer's wallet, or null when the provider has none.
@@ -61,8 +68,12 @@ export interface WalletProvider {
   syncTemplate(content: PassContent): Promise<void>;
   /** Create a pass for a new enrollment; returns platform ids to persist. */
   issuePass(content: PassContent): Promise<PassRef>;
-  /** Update the stamp count (and derived visual) on an existing pass. */
-  updateStamps(ref: PassRef, currentStamps: number): Promise<void>;
+  /**
+   * Update an existing pass after a scan. Takes the whole change, not just a number: the stamp
+   * strip is a URL carrying the count, so re-pointing it is part of what "the count changed"
+   * means — patch only the number and the pass keeps showing yesterday's stamps.
+   */
+  updateStamps(ref: PassRef, update: PassUpdate): Promise<void>;
   /** Send a lock-screen push (the changeMessage-style nudge). Rate-limited by the caller. */
   pushUpdate(ref: PassRef, message: string): Promise<void>;
   /** Void a pass (e.g. on PDPL erasure). */

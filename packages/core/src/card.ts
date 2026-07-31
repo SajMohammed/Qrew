@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { adminDb, merchants, loyaltyPrograms, enrollments, customers } from "@qrew/db";
-import { getWalletProvider, renderStampStrip } from "@qrew/wallet-core";
+import { getWalletProvider, renderStampStrip, stripUrlFor } from "@qrew/wallet-core";
 import { mintCardToken } from "./token";
 import { normalizeDesign } from "./program";
 
@@ -90,21 +90,6 @@ export async function getCard(serial: string): Promise<CardView | null> {
 }
 
 
-/**
- * Where the wallet fetches this card's stamp strip.
- *
- * Google downloads the image itself, so this must be a PUBLIC url — with no PUBLIC_API_URL
- * configured (local dev) we return undefined and the pass simply has no strip, rather than
- * pointing Google at a localhost it cannot reach.
- *
- * The stamp count rides along as a query parameter purely as a cache-buster: the bytes change
- * every time a stamp lands, and image CDNs would otherwise keep serving the old strip.
- */
-function stripUrlFor(serial: string, currentStamps: number): string | undefined {
-  const base = process.env.PUBLIC_API_URL;
-  if (!base) return undefined;
-  return `${base.replace(/\/$/, "")}/card/${encodeURIComponent(serial)}/strip.png?s=${currentStamps}`;
-}
 
 /** The stamp strip for a card, as PNG bytes. Public — the serial is the capability, as with getCard. */
 export async function getCardStrip(serial: string): Promise<Buffer | null> {

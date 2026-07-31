@@ -1,4 +1,4 @@
-import type { WalletProvider, PassContent, PassRef } from "./types";
+import type { WalletProvider, PassContent, PassRef, PassUpdate } from "./types";
 
 interface FakePass {
   content: PassContent;
@@ -32,9 +32,9 @@ export class FakeWalletProvider implements WalletProvider {
     };
   }
 
-  async updateStamps(ref: PassRef, currentStamps: number): Promise<void> {
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<void> {
     const pass = this.passes.get(ref.serial);
-    if (pass) pass.currentStamps = currentStamps;
+    if (pass) pass.currentStamps = update.currentStamps;
   }
 
   async pushUpdate(ref: PassRef, message: string): Promise<void> {

@@ -1,4 +1,4 @@
-import type { WalletProvider, PassContent, PassRef } from "../types";
+import type { WalletProvider, PassContent, PassRef, PassUpdate } from "../types";
 import {
   ServiceAccountTokens,
   serviceAccountFromEnv,
@@ -46,6 +46,19 @@ export class GoogleWalletProvider implements WalletProvider {
 
   objectId(serial: string): string {
     return `${this.issuerId}.${sanitiseId(serial)}`;
+  }
+
+  /**
+   * Which object a stored ref actually points at.
+   *
+   * An enrollment may carry an id written by a DIFFERENT provider — the in-memory fake stores
+   * `google_<serial>`, and a shop that switched vendors would have others. Those are meaningless
+   * here, so anything outside this issuer's namespace is ignored in favour of the deterministic id.
+   * Without this, every update silently 404s against an object that was never ours.
+   */
+  private resolveObjectId(ref: PassRef): string {
+    const stored = ref.googleObjectId;
+    return stored?.startsWith(`${this.issuerId}.`) ? stored : this.objectId(ref.serial);
   }
 
   /**
@@ -98,10 +111,13 @@ export class GoogleWalletProvider implements WalletProvider {
    * Reflect the current count. A 404 means the customer has not added this card to their wallet —
    * the overwhelmingly common case, and not an error worth failing a stamp over.
    */
-  async updateStamps(ref: PassRef, currentStamps: number): Promise<void> {
-    const id = ref.googleObjectId ?? this.objectId(ref.serial);
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<void> {
+    const id = this.resolveObjectId(ref);
     await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
-      loyaltyPoints: { balance: { int: currentStamps }, label: "Stamps" },
+      loyaltyPoints: { balance: { int: update.currentStamps }, label: "Stamps" },
+      // Re-point the strip as well. Its URL carries the count, so leaving it alone would keep the
+      // customer looking at the picture drawn before this scan.
+      ...(update.stripUrl ? { heroImage: { sourceUri: { uri: update.stripUrl } } } : {}),
     });
   }
 
@@ -110,7 +126,7 @@ export class GoogleWalletProvider implements WalletProvider {
    * added to the object, so this is the free push channel the wallet buys us.
    */
   async pushUpdate(ref: PassRef, message: string): Promise<void> {
-    const id = ref.googleObjectId ?? this.objectId(ref.serial);
+    const id = this.resolveObjectId(ref);
     await this.request("POST", `/loyaltyObject/${encodeURIComponent(id)}/addMessage`, {
       message: { header: "Qrew", body: message },
     });
@@ -118,7 +134,7 @@ export class GoogleWalletProvider implements WalletProvider {
 
   /** Expire rather than delete — Google has no delete, and an expired pass leaves the wallet. */
   async revoke(ref: PassRef): Promise<void> {
-    const id = ref.googleObjectId ?? this.objectId(ref.serial);
+    const id = this.resolveObjectId(ref);
     await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, { state: "EXPIRED" });
   }
 

@@ -4,7 +4,7 @@ import { PassKitProvider } from "./passkit-provider";
 import { GoogleWalletProvider } from "./google/provider";
 
 export * from "./types";
-export { renderStampStrip, encodePng, STRIP_WIDTH, STRIP_HEIGHT } from "./strip";
+export { renderStampStrip, encodePng, stripUrlFor, STRIP_WIDTH, STRIP_HEIGHT } from "./strip";
 export { FakeWalletProvider } from "./fake-provider";
 export { PassKitProvider } from "./passkit-provider";
 export { GoogleWalletProvider } from "./google/provider";

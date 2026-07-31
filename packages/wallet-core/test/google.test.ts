@@ -145,3 +145,13 @@ describe("GoogleWalletProvider", () => {
     expect(object.loyaltyPoints.balance.int).toBe(3);
   });
 });
+
+describe("stored pass ids from another provider", () => {
+  it("ignores an id outside this issuer's namespace", () => {
+    const p = withEnv();
+    // The in-memory fake writes `google_<serial>`; PATCHing that would 404 forever.
+    const derived = p.objectId(CONTENT.serial);
+    expect(derived).toBe(`3388000000022222222.${CONTENT.serial}`);
+    expect(derived.startsWith("google_")).toBe(false);
+  });
+});

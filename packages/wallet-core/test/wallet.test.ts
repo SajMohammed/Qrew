@@ -25,7 +25,7 @@ describe("WalletProvider contract (fake adapter)", () => {
   it("updates the stamp count on an existing pass", async () => {
     const provider = new FakeWalletProvider();
     const ref = await provider.issuePass(content);
-    await provider.updateStamps(ref, 5);
+    await provider.updateStamps(ref, { currentStamps: 5 });
     expect(provider.peek("card-1")?.currentStamps).toBe(5);
   });
 
