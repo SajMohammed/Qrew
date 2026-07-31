@@ -53,6 +53,11 @@ export interface PassUpdate {
   stampsRequired: number;
   /** The card serial — a wallet barcode is static, so it carries this rather than a token. */
   serial: string;
+  /**
+   * The programme this card belongs to. Supplying it re-points the pass at the correct template,
+   * which matters for passes issued before the template was keyed on the programme id.
+   */
+  programId?: string;
   /** Public URL of the redrawn stamp strip, when one is configured. */
   stripUrl?: string;
 }

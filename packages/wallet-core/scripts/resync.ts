@@ -37,6 +37,7 @@ async function main() {
       serial: enrollments.cardSerial,
       currentStamps: enrollments.currentStamps,
       googleObjectId: enrollments.googleObjectId,
+      programId: enrollments.programId,
       stampsRequired: loyaltyPrograms.stampsRequired,
       merchantName: merchants.name,
     })
@@ -55,6 +56,7 @@ async function main() {
         { serial: r.serial, googleObjectId: r.googleObjectId ?? undefined },
         {
           serial: r.serial,
+          programId: r.programId,
           currentStamps: r.currentStamps,
           stampsRequired: r.stampsRequired,
           stripUrl: stripUrlFor(r.serial, r.currentStamps),

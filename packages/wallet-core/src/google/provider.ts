@@ -115,6 +115,15 @@ export class GoogleWalletProvider implements WalletProvider {
     const id = this.resolveObjectId(ref);
     await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
       loyaltyPoints: { balance: { int: update.currentStamps }, label: "Stamps" },
+      /*
+       * Re-point the pass at its programme's class.
+       *
+       * A loyalty object carries a frozen snapshot of its class, so a pass issued against an older
+       * template keeps that template's branding forever — editing the design updates a class the
+       * pass no longer belongs to, and nothing the customer can see ever changes. Rewriting classId
+       * is what actually moves it.
+       */
+      ...(update.programId ? { classId: this.classId(update.programId) } : {}),
       // The caption under the barcode is part of the count too — left alone it sits there
       // contradicting the number directly above it. Sent whole, because a partial barcode object
       // would drop the value along with it.
