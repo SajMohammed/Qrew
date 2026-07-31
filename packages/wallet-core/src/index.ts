@@ -5,6 +5,7 @@ import { GoogleWalletProvider } from "./google/provider";
 
 export * from "./types";
 export { renderStampStrip, encodePng, stripUrlFor, STRIP_WIDTH, STRIP_HEIGHT } from "./strip";
+export { decodePng, loadIcon, type DecodedImage } from "./png-decode";
 export { FakeWalletProvider } from "./fake-provider";
 export { PassKitProvider } from "./passkit-provider";
 export { GoogleWalletProvider } from "./google/provider";

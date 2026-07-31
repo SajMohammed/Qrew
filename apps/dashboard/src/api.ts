@@ -33,6 +33,8 @@ export interface CardDesign {
   stampIcon: string;
   /** Public https image, shown on every surface. */
   logoUrl?: string;
+  /** Square transparent PNG drawn into the wallet stamp strip. */
+  stampImageUrl?: string;
   /** Extra rows on the wallet pass. Max 4. */
   details?: { label: string; value: string }[];
   /** Shop location, for the "you're nearby" lock-screen reminder. */

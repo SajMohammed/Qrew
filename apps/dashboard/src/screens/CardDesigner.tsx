@@ -233,6 +233,18 @@ export function CardDesigner({ merchantName }: { merchantName?: string }) {
                   </Labelled>
                 </div>
 
+                <Labelled
+                  label="Stamp artwork (wallet)"
+                  hint="A public https link to a square transparent PNG — your cup, pastry, whatever. Drawn into the wallet pass so it fills up as they visit. PNG only: the strip is composited on the server, which cannot read JPEG. Leave empty for plain circles."
+                >
+                  <input
+                    value={design.stampImageUrl ?? ""}
+                    onChange={(e) => patch({ stampImageUrl: e.target.value })}
+                    placeholder="https://…/stamp.png"
+                    className={FIELD}
+                  />
+                </Labelled>
+
                 <Labelled label="Reward" hint="What they get — shown on every surface">
                   <input
                     value={rewardText}
@@ -528,19 +540,30 @@ function WalletPass({
 
       {/* the generated strip / hero image */}
       <div className="mt-2.5 flex items-center justify-center gap-1.5 bg-white px-3 py-2.5">
-        {Array.from({ length: shown }, (_, i) => (
-          <span
-            key={i}
-            className="grid size-5 place-items-center rounded-full text-[9px]"
-            style={
-              i < filled
-                ? { background: design.brandColor, color: ink }
-                : { border: `1.5px dashed ${design.brandColor}66` }
-            }
-          >
-            {i < filled ? design.stampIcon : ""}
-          </span>
-        ))}
+        {Array.from({ length: shown }, (_, i) =>
+          design.stampImageUrl ? (
+            // Mirrors what the server draws: the same artwork, faded until earned.
+            <img
+              key={i}
+              src={design.stampImageUrl}
+              alt=""
+              className="size-6 object-contain"
+              style={{ opacity: i < filled ? 1 : 0.28 }}
+            />
+          ) : (
+            <span
+              key={i}
+              className="grid size-5 place-items-center rounded-full text-[9px]"
+              style={
+                i < filled
+                  ? { background: design.brandColor, color: ink }
+                  : { border: `1.5px dashed ${design.brandColor}66` }
+              }
+            >
+              {i < filled ? design.stampIcon : ""}
+            </span>
+          ),
+        )}
       </div>
 
       <div className="flex items-end justify-between gap-2 px-4 pt-2.5 pb-3.5">

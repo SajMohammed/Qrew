@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { adminDb, merchants, loyaltyPrograms, enrollments, customers } from "@qrew/db";
-import { getWalletProvider, renderStampStrip, stripUrlFor } from "@qrew/wallet-core";
+import { getWalletProvider, renderStampStrip, stripUrlFor, loadIcon } from "@qrew/wallet-core";
 import { mintCardToken } from "./token";
 import { normalizeDesign } from "./program";
 
@@ -109,5 +109,7 @@ export async function getCardStrip(serial: string): Promise<Buffer | null> {
     stampsRequired: row.stampsRequired,
     currentStamps: row.currentStamps,
     brandColor: design.brandColor,
+    // Undefined when unset or unreachable — the strip falls back to discs rather than failing.
+    icon: await loadIcon(design.stampImageUrl),
   });
 }

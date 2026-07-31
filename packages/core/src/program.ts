@@ -12,6 +12,11 @@ export interface CardDesign {
   stampIcon: string; // emoji, e.g. "☕"
   /** Public https image — the shop's mark on the card, the passes and the poster. */
   logoUrl?: string;
+  /**
+   * The shop's stamp artwork (square transparent PNG). Drawn into the wallet stamp strip so a pass
+   * shows their cup or pastry filling up rather than generic discs.
+   */
+  stampImageUrl?: string;
   /** Extra rows shown on the pass (Google text modules / Apple back fields). Max 4. */
   details?: { label: string; value: string }[];
   /** Shop location, for the "you're nearby" lock-screen reminder both wallets support. */
@@ -43,6 +48,7 @@ export function normalizeDesign(raw: unknown): CardDesign {
     stampIcon: typeof d.stampIcon === "string" ? d.stampIcon : DEFAULT_DESIGN.stampIcon,
     // An empty string means "cleared" — store it as absent so adapters fall back cleanly.
     ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
+    ...(d.stampImageUrl ? { stampImageUrl: d.stampImageUrl } : {}),
     ...(details && details.length ? { details } : {}),
     ...(d.location ? { location: d.location } : {}),
   };

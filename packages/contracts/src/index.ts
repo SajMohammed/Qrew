@@ -67,6 +67,11 @@ export const ProgramUpdate = z.object({
       stampIcon: z.string().min(1).max(8).optional(),
       /** Public https image. Google fetches this URL; Apple bundles the file into the pass. */
       logoUrl: z.string().url().max(500).optional().or(z.literal("")),
+      /**
+       * The shop's stamp artwork — a square transparent PNG, drawn into the wallet stamp strip.
+       * PNG specifically: the strip is composited server-side, and JPEG cannot be decoded there.
+       */
+      stampImageUrl: z.string().url().max(500).optional().or(z.literal("")),
       /** Extra rows on the pass — Google textModulesData, Apple back fields. */
       details: z
         .array(z.object({ label: z.string().min(1).max(30), value: z.string().min(1).max(120) }))

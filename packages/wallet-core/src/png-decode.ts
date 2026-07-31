@@ -143,3 +143,46 @@ export function decodePng(buf: Buffer): DecodedImage {
 
   return { width, height, rgba };
 }
+
+/**
+ * Fetch and decode a shop's stamp artwork, memoised by URL.
+ *
+ * The strip is redrawn on every wallet fetch, so without a cache each render would re-download the
+ * shop's icon. Keyed on the URL, so changing the artwork changes the key and the new image is
+ * picked up without any invalidation step.
+ *
+ * Never throws: artwork is decoration on top of a strip that already works. A broken link, a JPEG,
+ * or a slow host degrades to the plain discs rather than failing the customer's card.
+ */
+const iconCache = new Map<string, DecodedImage>();
+/** Failures are remembered only briefly — see below. */
+const failedUntil = new Map<string, number>();
+const FAILURE_COOLDOWN_MS = 60_000;
+
+export async function loadIcon(url: string | undefined): Promise<DecodedImage | undefined> {
+  if (!url) return undefined;
+
+  const hit = iconCache.get(url);
+  if (hit) return hit;
+
+  /*
+   * Failures are cached too, or a dead link would be re-fetched on every single strip render — but
+   * only for a minute. Caching them forever would let one blip in the shop's host disable their
+   * artwork until the process restarts.
+   */
+  const cooling = failedUntil.get(url);
+  if (cooling !== undefined && Date.now() < cooling) return undefined;
+
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`fetch ${res.status}`);
+    const decoded = decodePng(Buffer.from(await res.arrayBuffer()));
+    iconCache.set(url, decoded);
+    failedUntil.delete(url);
+    return decoded;
+  } catch (err) {
+    console.error(`[wallet] could not load stamp artwork ${url}:`, err instanceof Error ? err.message : err);
+    failedUntil.set(url, Date.now() + FAILURE_COOLDOWN_MS);
+    return undefined;
+  }
+}
