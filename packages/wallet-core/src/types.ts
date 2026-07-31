@@ -35,6 +35,11 @@ export interface PassContent {
   qrToken: string; // encoded into the pass barcode; the staff app scans it to stamp
   brandColor?: string; // hex; tempered for legibility per platform guidelines
   logoUrl?: string;
+  /**
+   * Public URL of the generated stamp strip. Google FETCHES this itself, so it must be reachable
+   * from the internet — a localhost URL silently yields no image.
+   */
+  stripUrl?: string;
   /** Extra rows the shop wants on the pass — Google text modules, Apple back fields. */
   details?: { label: string; value: string }[];
   /** Shop location, for the lock-screen "you're nearby" reminder both wallets support. */

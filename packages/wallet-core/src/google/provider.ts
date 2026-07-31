@@ -192,6 +192,9 @@ export class GoogleWalletProvider implements WalletProvider {
         },
       ],
       hexBackgroundColor: content.brandColor ?? "#146A2E",
+      // The stamp strip. It belongs on the OBJECT, not the class, because it is redrawn every time
+      // this customer's count changes — the class is shared by everyone on the programme.
+      ...(content.stripUrl ? { heroImage: { sourceUri: { uri: content.stripUrl } } } : {}),
     };
   }
 
