@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { adminDb, merchants, loyaltyPrograms, enrollments } from "@qrew/db";
+import { getWalletProvider } from "@qrew/wallet-core";
 import { mintCardToken } from "./token";
 
 export interface CardView {
@@ -44,10 +45,27 @@ export async function getCard(serial: string): Promise<CardView | null> {
   if (!row) return null;
 
   const design = (row.cardDesign ?? {}) as { brandColor?: string; stampIcon?: string };
+  const qrToken = mintCardToken(row.serial);
+
+  /*
+   * The save link embeds the card's CURRENT state, so it is built per read rather than stored — a
+   * customer who adds the card after earning three stamps gets a pass showing three, not zero.
+   * getSaveUrl answers null on any failure, so a wallet outage costs the button, never the card.
+   */
+  const google = await getWalletProvider().getSaveUrl({
+    serial: row.serial,
+    merchantName: row.merchantName,
+    programName: row.programName,
+    rewardText: row.rewardText,
+    currentStamps: row.currentStamps,
+    stampsRequired: row.stampsRequired,
+    qrToken,
+    brandColor: design.brandColor ?? "#146A2E",
+  });
 
   return {
     serial: row.serial,
-    qrToken: mintCardToken(row.serial),
+    qrToken,
     merchantName: row.merchantName,
     programName: row.programName,
     rewardText: row.rewardText,
@@ -57,6 +75,6 @@ export async function getCard(serial: string): Promise<CardView | null> {
     rewardReady: row.currentStamps >= row.stampsRequired,
     brandColor: design.brandColor ?? "#146A2E",
     stampIcon: design.stampIcon ?? "☕",
-    wallet: { apple: null, google: null }, // real provider fills these later
+    wallet: { apple: null, google }, // Apple needs the $99/yr programme — not wired yet
   };
 }

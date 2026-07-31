@@ -38,6 +38,7 @@ function withEnv(): GoogleWalletProvider {
   process.env.GOOGLE_WALLET_SA_EMAIL = "qrew-wallet@example.iam.gserviceaccount.com";
   process.env.GOOGLE_WALLET_SA_PRIVATE_KEY = privateKey.replace(/\n/g, "\\n");
   process.env.GOOGLE_WALLET_ORIGINS = "https://my.qrew.ae";
+  process.env.GOOGLE_WALLET_LOGO_URL = "https://cdn.example.com/qrew-mark-512.png";
   return new GoogleWalletProvider();
 }
 
@@ -46,6 +47,7 @@ afterEach(() => {
   delete process.env.GOOGLE_WALLET_SA_EMAIL;
   delete process.env.GOOGLE_WALLET_SA_PRIVATE_KEY;
   delete process.env.GOOGLE_WALLET_ORIGINS;
+  delete process.env.GOOGLE_WALLET_LOGO_URL;
 });
 
 describe("GoogleWalletProvider", () => {
@@ -80,6 +82,20 @@ describe("GoogleWalletProvider", () => {
     expect(cls.issuerName).toBe("Nadia's Coffee");
     expect(cls.programName).toBe("Loyalty Card");
     expect(cls.hexBackgroundColor).toBe("#6C2A4B");
+    // Google rejects a class with no program logo, so one is always present.
+    expect(cls.programLogo.sourceUri.uri).toBe("https://cdn.example.com/qrew-mark-512.png");
+  });
+
+  it("prefers the merchant's own logo over the Qrew fallback", () => {
+    const cls = withEnv().toClass({ ...CONTENT, logoUrl: "https://shop.example/logo.png" }) as any;
+    expect(cls.programLogo.sourceUri.uri).toBe("https://shop.example/logo.png");
+  });
+
+  it("explains itself when no logo is configured at all", () => {
+    const p = withEnv();
+    delete process.env.GOOGLE_WALLET_LOGO_URL;
+    // Failing here with a clear message beats a 400 from Google at class-creation time.
+    expect(() => p.toClass(CONTENT)).toThrow(/program logo/i);
   });
 
   it("signs a save JWT that Google can actually verify", () => {

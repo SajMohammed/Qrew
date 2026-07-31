@@ -158,6 +158,33 @@ export function StampCard({
         </div>
       </m.div>
 
+      {/*
+        Shown only when the provider actually produced a save link, so a wallet outage or an
+        unconfigured environment simply omits it rather than offering a dead button.
+
+        NOTE before launch: Google's brand guidelines require their official "Add to Google Wallet"
+        badge asset. This is a faithful stand-in; drop the downloaded asset into public/ and swap it
+        in when publishing access is requested.
+      */}
+      {card.wallet.google && (
+        <a
+          href={card.wallet.google}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => buzz(10)}
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-full bg-[#202124] px-5 text-[15px] font-semibold text-white transition active:scale-[0.98]"
+        >
+          <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
+            <path
+              fill="#4285F4"
+              d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5v-9Z"
+            />
+            <path fill="#fff" d="M14 10.5h6v3h-6a1.5 1.5 0 0 1 0-3Z" />
+          </svg>
+          Add to Google Wallet
+        </a>
+      )}
+
       {onStamp && onRedeem && (
         <div className="border-border bg-surface flex items-center gap-2 rounded-xl border p-2.5">
           <span className="text-faint font-mono text-[10px] tracking-[0.12em] uppercase">Dev</span>

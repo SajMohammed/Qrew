@@ -124,17 +124,30 @@ export class GoogleWalletProvider implements WalletProvider {
 
   // ── payload mapping ──────────────────────────────────────────────────────────
 
-  /** The template. Programme-scoped, so every card of one programme shares it. */
+  /**
+   * The template. Programme-scoped, so every card of one programme shares it.
+   *
+   * Google REJECTS a loyalty class with no program logo, and it fetches that image itself — so it
+   * has to be a publicly reachable HTTPS URL, not a localhost asset or a data URI. The merchant's
+   * own logo takes precedence once we store one; until then every class falls back to the Qrew mark
+   * configured in the environment.
+   */
   toClass(content: PassContent): Record<string, unknown> {
+    const logoUrl = content.logoUrl ?? process.env.GOOGLE_WALLET_LOGO_URL;
+    if (!logoUrl) {
+      throw new Error(
+        "Google requires a program logo on every loyalty class. Set GOOGLE_WALLET_LOGO_URL to a " +
+          "publicly reachable HTTPS image (PNG/JPEG, square, min 100x100) — Google fetches it, so " +
+          "a localhost URL will not work.",
+      );
+    }
     return {
       id: this.classId(content.programName || content.merchantName),
       issuerName: content.merchantName,
       programName: content.programName,
       reviewStatus: "UNDER_REVIEW", // becomes APPROVED automatically for loyalty classes
       hexBackgroundColor: content.brandColor ?? "#146A2E",
-      ...(content.logoUrl
-        ? { programLogo: { sourceUri: { uri: content.logoUrl } } }
-        : {}),
+      programLogo: { sourceUri: { uri: logoUrl } },
     };
   }
 

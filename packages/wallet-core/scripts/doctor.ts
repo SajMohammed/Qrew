@@ -103,6 +103,38 @@ async function main() {
     ok("WALLET_PROVIDER=google");
   }
 
+  if (!process.env.GOOGLE_WALLET_LOGO_URL) {
+    bad("GOOGLE_WALLET_LOGO_URL is not set");
+    info("Google rejects a loyalty class with no program logo, and it fetches the image itself,");
+    info("so this must be a PUBLIC https URL (PNG/JPEG, square, min 100x100).");
+    info("A localhost URL will not work — Google's servers cannot reach it.");
+    process.exit(1);
+  }
+  ok("program logo configured");
+
+  // 5 ─ end to end: can we actually mint a save link? This is what the card screen calls, so it
+  //     catches anything the earlier checks can't — a class that won't create, a bad origin, etc.
+  const { GoogleWalletProvider } = await import("../src/google/provider");
+  const provider = new GoogleWalletProvider();
+  const url = await provider.getSaveUrl({
+    serial: "doctor-probe-0000",
+    merchantName: "Qrew Doctor Probe",
+    programName: "Setup Check",
+    rewardText: "1 free item",
+    currentStamps: 0,
+    stampsRequired: 10,
+    qrToken: "doctor.probe",
+  });
+
+  if (!url) {
+    bad("could not mint a save link — see the error logged above");
+    process.exit(1);
+  }
+  ok(`save link minted (${url.length} chars)`);
+  if (!process.env.GOOGLE_WALLET_ORIGINS) {
+    info("GOOGLE_WALLET_ORIGINS is unset — set it to the card app's URL before shipping.");
+  }
+
   console.log("\nReady to issue passes.\n");
 }
 
