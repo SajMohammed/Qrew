@@ -2,9 +2,20 @@ import { and, asc, eq } from "drizzle-orm";
 import { withTenant, merchants, loyaltyPrograms } from "@qrew/db";
 import { getWalletProvider } from "@qrew/wallet-core";
 
+/**
+ * The shop's design INTENT. Deliberately platform-agnostic: every field here is expressible on the
+ * app card, a Google loyalty class, an Apple store card AND the printed poster. Adapters translate;
+ * this never mentions heroImage, strip.png or textModulesData.
+ */
 export interface CardDesign {
   brandColor: string; // hex, e.g. "#146A2E"
   stampIcon: string; // emoji, e.g. "☕"
+  /** Public https image — the shop's mark on the card, the passes and the poster. */
+  logoUrl?: string;
+  /** Extra rows shown on the pass (Google text modules / Apple back fields). Max 4. */
+  details?: { label: string; value: string }[];
+  /** Shop location, for the "you're nearby" lock-screen reminder both wallets support. */
+  location?: { lat: number; lng: number; label?: string } | null;
 }
 
 export interface ProgramView {
@@ -22,9 +33,18 @@ export const DEFAULT_DESIGN: CardDesign = { brandColor: "#146A2E", stampIcon: "�
 
 export function normalizeDesign(raw: unknown): CardDesign {
   const d = (raw ?? {}) as Partial<CardDesign>;
+  const details = Array.isArray(d.details)
+    ? d.details
+        .filter((r): r is { label: string; value: string } => Boolean(r?.label && r?.value))
+        .slice(0, 4)
+    : undefined;
   return {
     brandColor: typeof d.brandColor === "string" ? d.brandColor : DEFAULT_DESIGN.brandColor,
     stampIcon: typeof d.stampIcon === "string" ? d.stampIcon : DEFAULT_DESIGN.stampIcon,
+    // An empty string means "cleared" — store it as absent so adapters fall back cleanly.
+    ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
+    ...(details && details.length ? { details } : {}),
+    ...(d.location ? { location: d.location } : {}),
   };
 }
 
@@ -147,7 +167,9 @@ export async function updateProgram(
         stampsRequired: updated.stampsRequired,
         qrToken: "",
         brandColor: design.brandColor,
-        logoUrl: (updated.cardDesign as { logoUrl?: string } | null)?.logoUrl,
+        logoUrl: design.logoUrl,
+        details: design.details,
+        location: design.location,
       });
     } catch (err) {
       console.error("[wallet] could not sync the card design to the wallet template:", err);

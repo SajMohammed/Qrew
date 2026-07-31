@@ -8,7 +8,7 @@ import { Customers } from "@/screens/Customers";
 import { Team } from "@/screens/Team";
 import { CounterMode } from "@/screens/CounterMode";
 import { CounterQR } from "./CounterQR";
-import { Designer } from "./Designer";
+import { CardDesigner } from "@/screens/CardDesigner";
 import { Card } from "@/components/ui/card";
 import { isCounterMode, setCounterModeFlag } from "@/lib/counter-mode";
 
@@ -156,7 +156,7 @@ function ShopApp() {
         )}
         {view === "customers" && <Customers key={customerFilter} initialFilter={customerFilter} />}
         {view === "team" && <Team />}
-        {view === "designer" && <Designer merchantName={data?.merchantName} />}
+        {view === "designer" && <CardDesigner merchantName={data?.merchantName} />}
         {view === "counterqr" &&
           (data ? (
             <CounterQR merchantId={data.merchantId} merchantName={data.merchantName} />

@@ -148,6 +148,20 @@ export class GoogleWalletProvider implements WalletProvider {
       reviewStatus: "UNDER_REVIEW", // becomes APPROVED automatically for loyalty classes
       hexBackgroundColor: content.brandColor ?? "#146A2E",
       programLogo: { sourceUri: { uri: logoUrl } },
+      // Intent → platform: the shop's extra rows become Google text modules.
+      ...(content.details?.length
+        ? {
+            textModulesData: content.details.map((d, i) => ({
+              header: d.label,
+              body: d.value,
+              id: `detail_${i}`,
+            })),
+          }
+        : {}),
+      // …and their address becomes a geofenced lock-screen reminder.
+      ...(content.location
+        ? { locations: [{ latitude: content.location.lat, longitude: content.location.lng }] }
+        : {}),
     };
   }
 

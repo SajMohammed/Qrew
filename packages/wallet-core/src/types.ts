@@ -35,6 +35,10 @@ export interface PassContent {
   qrToken: string; // encoded into the pass barcode; the staff app scans it to stamp
   brandColor?: string; // hex; tempered for legibility per platform guidelines
   logoUrl?: string;
+  /** Extra rows the shop wants on the pass — Google text modules, Apple back fields. */
+  details?: { label: string; value: string }[];
+  /** Shop location, for the lock-screen "you're nearby" reminder both wallets support. */
+  location?: { lat: number; lng: number; label?: string } | null;
   locale?: "en" | "ar";
 }
 

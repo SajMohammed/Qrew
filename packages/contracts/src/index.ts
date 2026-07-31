@@ -56,10 +56,31 @@ export const ProgramUpdate = z.object({
   rewardText: z.string().min(1).max(60).optional(),
   stampsRequired: z.number().int().min(1).max(20).optional(),
   bonusStamps: z.number().int().min(0).max(10).optional(),
+  /**
+   * The shop's design INTENT — never platform field names. Each wallet adapter maps this onto its
+   * own template (Google class/object, Apple pass.json), so one design drives the app card, both
+   * passes and the printed poster. Everything here is expressible on BOTH platforms.
+   */
   cardDesign: z
     .object({
       brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "must be a #RRGGBB hex colour").optional(),
       stampIcon: z.string().min(1).max(8).optional(),
+      /** Public https image. Google fetches this URL; Apple bundles the file into the pass. */
+      logoUrl: z.string().url().max(500).optional().or(z.literal("")),
+      /** Extra rows on the pass — Google textModulesData, Apple back fields. */
+      details: z
+        .array(z.object({ label: z.string().min(1).max(30), value: z.string().min(1).max(120) }))
+        .max(4)
+        .optional(),
+      /** Drives the "you're nearby" lock-screen reminder on both platforms. */
+      location: z
+        .object({
+          lat: z.number().min(-90).max(90),
+          lng: z.number().min(-180).max(180),
+          label: z.string().max(60).optional(),
+        })
+        .nullable()
+        .optional(),
     })
     .optional(),
 });

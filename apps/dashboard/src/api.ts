@@ -24,6 +24,21 @@ export interface Dashboard {
   recent: RecentEnrollment[];
 }
 
+/**
+ * The shop's design INTENT — deliberately platform-agnostic. One design drives the app card, the
+ * Google pass, the Apple pass and the printed poster; each surface maps it onto its own template.
+ */
+export interface CardDesign {
+  brandColor: string;
+  stampIcon: string;
+  /** Public https image, shown on every surface. */
+  logoUrl?: string;
+  /** Extra rows on the wallet pass. Max 4. */
+  details?: { label: string; value: string }[];
+  /** Shop location, for the "you're nearby" lock-screen reminder. */
+  location?: { lat: number; lng: number; label?: string } | null;
+}
+
 export interface Program {
   id: string;
   name: string;
@@ -31,7 +46,7 @@ export interface Program {
   stampsRequired: number;
   bonusStamps: number;
   active: boolean;
-  cardDesign: { brandColor: string; stampIcon: string };
+  cardDesign: CardDesign;
 }
 
 export type ProgramPatch = Partial<{
@@ -39,7 +54,7 @@ export type ProgramPatch = Partial<{
   rewardText: string;
   stampsRequired: number;
   bonusStamps: number;
-  cardDesign: { brandColor?: string; stampIcon?: string };
+  cardDesign: Partial<CardDesign>;
 }>;
 
 // ── Scan tab (the counter) ────────────────────────────────────────────────────────

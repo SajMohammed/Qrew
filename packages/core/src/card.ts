@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { adminDb, merchants, loyaltyPrograms, enrollments, customers } from "@qrew/db";
 import { getWalletProvider } from "@qrew/wallet-core";
 import { mintCardToken } from "./token";
+import { normalizeDesign } from "./program";
 
 export interface CardView {
   serial: string;
@@ -47,11 +48,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
 
   if (!row) return null;
 
-  const design = (row.cardDesign ?? {}) as {
-    brandColor?: string;
-    stampIcon?: string;
-    logoUrl?: string;
-  };
+  const design = normalizeDesign(row.cardDesign);
   const qrToken = mintCardToken(row.serial);
 
   /*
@@ -69,8 +66,10 @@ export async function getCard(serial: string): Promise<CardView | null> {
     currentStamps: row.currentStamps,
     stampsRequired: row.stampsRequired,
     qrToken,
-    brandColor: design.brandColor ?? "#146A2E",
+    brandColor: design.brandColor,
     logoUrl: design.logoUrl, // the shop's own mark, when they've set one
+    details: design.details,
+    location: design.location,
   });
 
   return {
@@ -83,8 +82,8 @@ export async function getCard(serial: string): Promise<CardView | null> {
     stampsRequired: row.stampsRequired,
     bonusStamps: row.bonusStamps,
     rewardReady: row.currentStamps >= row.stampsRequired,
-    brandColor: design.brandColor ?? "#146A2E",
-    stampIcon: design.stampIcon ?? "☕",
+    brandColor: design.brandColor,
+    stampIcon: design.stampIcon,
     wallet: { apple: null, google }, // Apple needs the $99/yr programme — not wired yet
   };
 }
