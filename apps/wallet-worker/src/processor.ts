@@ -23,15 +23,18 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
       .where(eq(enrollments.id, data.enrollmentId));
     if (!enrollment) return null;
     const [program] = await db
-      .select({ stampsRequired: loyaltyPrograms.stampsRequired })
+      .select({
+        stampsRequired: loyaltyPrograms.stampsRequired,
+        rewardText: loyaltyPrograms.rewardText,
+      })
       .from(loyaltyPrograms)
       .where(eq(loyaltyPrograms.id, enrollment.programId));
-    return { enrollment, stampsRequired: program?.stampsRequired ?? 0 };
+    return { enrollment, stampsRequired: program?.stampsRequired ?? 0, rewardText: program?.rewardText };
   });
 
   if (!ctx) return `enrollment ${data.enrollmentId} gone — skipped`;
 
-  const { enrollment, stampsRequired } = ctx;
+  const { enrollment, stampsRequired, rewardText } = ctx;
   if (!enrollment.applePassId && !enrollment.googleObjectId) {
     return `${enrollment.cardSerial} has no wallet pass — skipped`;
   }
@@ -47,6 +50,7 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
   await provider.updateStamps(ref, {
     serial: enrollment.cardSerial,
     stampsRequired,
+    rewardText,
     currentStamps: enrollment.currentStamps,
     // The strip URL embeds the count, so this is what actually redraws the stamps on the pass.
     stripUrl: stripUrlFor(enrollment.cardSerial, enrollment.currentStamps),

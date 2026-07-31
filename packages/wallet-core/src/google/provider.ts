@@ -124,14 +124,15 @@ export class GoogleWalletProvider implements WalletProvider {
        * is what actually moves it.
        */
       ...(update.programId ? { classId: this.classId(update.programId) } : {}),
-      // The caption under the barcode is part of the count too — left alone it sits there
-      // contradicting the number directly above it. Sent whole, because a partial barcode object
-      // would drop the value along with it.
-      barcode: {
-        type: "QR_CODE",
-        value: update.serial,
-        alternateText: `${update.currentStamps}/${update.stampsRequired}`,
-      },
+      /*
+       * PATCH MERGES nested objects rather than replacing them, so a field left out simply survives
+       * — an old caption or a stale row will sit on the pass forever unless it is explicitly
+       * nulled. That is why alternateText is cleared by name rather than by omission.
+       */
+      barcode: { type: "QR_CODE", value: update.serial, alternateText: null },
+      ...(update.rewardText
+        ? { textModulesData: [{ header: "Reward", body: update.rewardText, id: "reward" }] }
+        : {}),
       // Re-point the strip as well. Its URL carries the count, so leaving it alone would keep the
       // customer looking at the picture drawn before this scan.
       ...(update.stripUrl ? { heroImage: { sourceUri: { uri: update.stripUrl } } } : {}),
@@ -181,6 +182,21 @@ export class GoogleWalletProvider implements WalletProvider {
       reviewStatus: "UNDER_REVIEW", // becomes APPROVED automatically for loyalty classes
       hexBackgroundColor: content.brandColor ?? "#146A2E",
       programLogo: { sourceUri: { uri: logoUrl } },
+      /*
+       * Say where things go, rather than accepting Google's default arrangement.
+       *
+       * Left to itself the pass repeats one number in three places — the points field, the barcode
+       * caption and a progress row — while the reward, the thing the customer is actually working
+       * towards, is buried in the details list below the fold. This puts the reward under the
+       * barcode and lets the points field and the stamp strip carry the count between them.
+       */
+      classTemplateInfo: {
+        cardBarcodeSectionDetails: {
+          firstTopDetail: {
+            fieldSelector: { fields: [{ fieldPath: "object.textModulesData['reward']" }] },
+          },
+        },
+      },
       // Intent → platform: the shop's extra rows become Google text modules.
       ...(content.details?.length
         ? {
@@ -219,19 +235,15 @@ export class GoogleWalletProvider implements WalletProvider {
        * and then tells the customer "card not found" at the till. The serial is already the card's
        * capability — the same value the app's QR falls back to — so this loses nothing.
        */
+      // No alternateText: it is meant as a fallback for manual entry, and a UUID serial is not
+      // something a cashier can type. Filling it with the count just repeated the points field.
       barcode: {
         type: "QR_CODE",
         value: content.serial,
-        alternateText: `${content.currentStamps}/${content.stampsRequired}`,
       },
-      textModulesData: [
-        { header: "Reward", body: content.rewardText, id: "reward" },
-        {
-          header: "Progress",
-          body: `${content.currentStamps} of ${content.stampsRequired} stamps`,
-          id: "progress",
-        },
-      ],
+      // The count already appears as the points field AND on the stamp strip. A third copy in a
+      // "Progress" row is what made the pass feel cluttered, so only the reward lives here.
+      textModulesData: [{ header: "Reward", body: content.rewardText, id: "reward" }],
       /*
        * NO hexBackgroundColor here on purpose.
        *

@@ -39,6 +39,7 @@ async function main() {
       googleObjectId: enrollments.googleObjectId,
       programId: enrollments.programId,
       stampsRequired: loyaltyPrograms.stampsRequired,
+      rewardText: loyaltyPrograms.rewardText,
       merchantName: merchants.name,
     })
     .from(enrollments)
@@ -59,6 +60,7 @@ async function main() {
           programId: r.programId,
           currentStamps: r.currentStamps,
           stampsRequired: r.stampsRequired,
+          rewardText: r.rewardText,
           stripUrl: stripUrlFor(r.serial, r.currentStamps),
         },
       );

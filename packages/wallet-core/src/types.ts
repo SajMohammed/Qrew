@@ -60,6 +60,8 @@ export interface PassUpdate {
   programId?: string;
   /** Public URL of the redrawn stamp strip, when one is configured. */
   stripUrl?: string;
+  /** What the customer is working towards — the one text row the pass keeps. */
+  rewardText?: string;
 }
 
 export interface WalletProvider {
