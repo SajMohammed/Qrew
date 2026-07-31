@@ -4,24 +4,25 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "dev": "node --watch -r @swc-node/register src/main.ts",
+    "dev": "pnpm build && concurrently -n swc,run -c blue,green \"swc src -d dist --strip-leading-paths -w -q\" \"node --watch dist/main.js\"",
     "build": "swc src -d dist --strip-leading-paths",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "bullmq": "^5.0.0",
-    "drizzle-orm": "^0.44.0",
-    "dotenv": "^16.4.5",
     "@qrew/db": "workspace:*",
     "@qrew/queue": "workspace:*",
-    "@qrew/wallet-core": "workspace:*"
+    "@qrew/wallet-core": "workspace:*",
+    "bullmq": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.44.0"
   },
   "devDependencies": {
-    "@swc/core": "^1.7.0",
     "@swc/cli": "^0.4.0",
-    "@swc-node/register": "^1.10.0",
-    "typescript": "^7.0.0",
-    "@types/node": "^22.15.0"
+    "@swc/core": "^1.7.0",
+    "@types/node": "^22.15.0",
+    "chokidar": "^5.0.0",
+    "concurrently": "^10.0.4",
+    "typescript": "^7.0.0"
   }
 }
