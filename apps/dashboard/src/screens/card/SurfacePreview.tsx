@@ -45,6 +45,12 @@ export interface PreviewInput {
    * hundred-point balance would say something untrue about how the card works.
    */
   showsStamps: boolean;
+  /**
+   * Whether a wallet pass can be issued for this product at all. A discount card maps to a Google
+   * offer and has no adapter yet, so previewing a pass for it would promise something the customer
+   * will never be offered.
+   */
+  issuable: boolean;
 }
 
 export function SurfacePreview(props: PreviewInput) {
@@ -186,6 +192,8 @@ function WalletPass({
   stampsRequired,
   progressLabel,
   showsProgress,
+  showsStamps,
+  issuable,
   platform,
 }: PreviewInput & { platform: "google" | "apple" }) {
   const api = useApi();
@@ -196,7 +204,9 @@ function WalletPass({
   const key = JSON.stringify([design, stampsRequired, platform]);
 
   useEffect(() => {
-    if (!showsProgress) return;
+    // Gated on showsStamps, not showsProgress: a points card accrues but renders its balance as a
+    // number, and asking for a strip here would preview stamps the real pass will never carry.
+    if (!showsStamps) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
@@ -223,10 +233,23 @@ function WalletPass({
       window.clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, showsProgress]);
+  }, [key, showsStamps]);
 
   // Revoke the last URL when the preview unmounts, not just when it is replaced.
   useEffect(() => () => { if (current.current) URL.revokeObjectURL(current.current); }, []);
+
+  if (!issuable) {
+    return (
+      <figure className="border-border bg-card m-0 rounded-2xl border border-dashed p-5 text-center">
+        <p className="text-[13px] font-semibold">No pass for this card yet</p>
+        <p className="text-muted-foreground mt-1 text-[12px] leading-snug">
+          {platform === "google" ? "Google" : "Apple"} files this kind of card under offers, which we
+          have not built an adapter for. The card still works — customers just cannot add it to their
+          wallet, so no button is shown.
+        </p>
+      </figure>
+    );
+  }
 
   return (
     <figure className="m-0">
@@ -249,7 +272,7 @@ function WalletPass({
         </div>
         <div className="px-4 pt-1 pb-3 text-[17px] font-bold">{title || "Loyalty Card"}</div>
 
-        {showsProgress &&
+        {showsStamps &&
           (failed ? (
             <div className="px-4 pb-3 text-[12px] opacity-80">
               Could not render the strip just now — the card itself is unaffected.
@@ -271,13 +294,29 @@ function WalletPass({
               {rewardText || "reward"}
             </b>
           </span>
-          <span className="text-[14px] font-extrabold">{progressLabel}</span>
+          {showsProgress && <span className="text-[14px] font-extrabold">{progressLabel}</span>}
         </div>
+
+        {/* The extra rows, where they actually land: Google text modules, Apple back fields. */}
+        {(design.details ?? []).filter((d) => d.label || d.value).length > 0 && (
+          <div className="border-t px-4 py-3" style={{ borderColor: `${ink}22` }}>
+            {(design.details ?? [])
+              .filter((d) => d.label || d.value)
+              .map((d, i) => (
+                <div key={i} className="flex justify-between gap-3 py-0.5 text-[11px]">
+                  <span className="opacity-70">{d.label}</span>
+                  <span className="truncate font-semibold">{d.value}</span>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
       <figcaption className="text-muted-foreground mt-2 text-[12px]">
-        {platform === "google"
-          ? "The real image Google downloads — 1032×812."
-          : "The real image Apple bundles — 1125×369."}
+        {showsStamps
+          ? platform === "google"
+            ? "The real image Google downloads — 1032×812."
+            : "The real image Apple bundles — 1125×369."
+          : "This card carries its balance as a number, so there is no strip image."}
       </figcaption>
     </figure>
   );

@@ -6,7 +6,7 @@ import { Card as Panel } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { SurfacePreview, textOn } from "./card/SurfacePreview";
-import { FIELD, ImageField, Labelled, NumberField } from "./card/controls";
+import { FIELD, Group, ImageField, Labelled, NumberField } from "./card/controls";
 import { PROGRESS_EDITORS } from "./card/progress";
 
 /**
@@ -27,6 +27,8 @@ interface CardTypeOption {
   label: string;
   blurb: string;
   accrues: boolean;
+  drawsStampStrip: boolean;
+  issuable: boolean;
 }
 
 export function CardScreen({ merchantName }: { merchantName?: string }) {
@@ -107,7 +109,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
   return (
     <div className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Card</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Cards</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-[15px]">
           One design, everywhere your customers meet it.
         </p>
@@ -131,7 +133,8 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
             stampsRequired={target}
             progressLabel={previewLabel(type, target, mechanics)}
             showsProgress={chosen?.accrues ?? true}
-            showsStamps={type === "stamp"}
+            showsStamps={chosen?.drawsStampStrip ?? true}
+            issuable={chosen?.issuable ?? true}
           />
         </div>
 
@@ -191,7 +194,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
           </Section>
 
           <Section icon={Palette} title="Colour">
-            <Labelled label="Brand colour" hint="Backs the app card and both passes.">
+            <Group label="Brand colour" hint="Backs the app card and both passes.">
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 {PRESET_COLORS.map((c) => (
                   <button
@@ -217,7 +220,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
                   className="border-border size-11 cursor-pointer rounded-xl border bg-transparent"
                 />
               </div>
-            </Labelled>
+            </Group>
             <p className="text-muted-foreground text-[12px]">
               Text and stamps are drawn in{" "}
               {textOn(design.brandColor) === "#fbfbf7" ? "white" : "near-black"} against this, picked
@@ -290,35 +293,42 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
             title="Nearby reminder"
             hint="Both wallets can surface the card on the lock screen when a customer is near your shop."
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Labelled label="Latitude">
-                <NumberField
-                  value={design.location?.lat ?? 25.2048}
-                  onChange={(n) =>
-                    patch({ location: { lat: n, lng: design.location?.lng ?? 55.2708 } })
-                  }
-                  min={-90}
-                  max={90}
-                />
-              </Labelled>
-              <Labelled label="Longitude">
-                <NumberField
-                  value={design.location?.lng ?? 55.2708}
-                  onChange={(n) =>
-                    patch({ location: { lat: design.location?.lat ?? 25.2048, lng: n } })
-                  }
-                  min={-180}
-                  max={180}
-                />
-              </Labelled>
-            </div>
-            {design.location && (
+            {design.location ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Labelled label="Latitude">
+                    <NumberField
+                      value={design.location.lat}
+                      onChange={(n) => patch({ location: { ...design.location!, lat: n } })}
+                      min={-90}
+                      max={90}
+                    />
+                  </Labelled>
+                  <Labelled label="Longitude">
+                    <NumberField
+                      value={design.location.lng}
+                      onChange={(n) => patch({ location: { ...design.location!, lng: n } })}
+                      min={-180}
+                      max={180}
+                    />
+                  </Labelled>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => patch({ location: null })}
+                  className="text-muted-foreground hover:text-foreground w-fit cursor-pointer text-[12px] underline"
+                >
+                  Turn the reminder off
+                </button>
+              </>
+            ) : (
+              // Prefilled coordinates would read as a location already set. Nothing is, until asked.
               <button
                 type="button"
-                onClick={() => patch({ location: null })}
-                className="text-muted-foreground hover:text-foreground w-fit cursor-pointer text-[12px] underline"
+                onClick={() => patch({ location: { lat: 25.2048, lng: 55.2708 } })}
+                className="border-border bg-card hover:bg-accent inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-[13px] font-semibold"
               >
-                Turn the reminder off
+                <MapPin className="size-3.5" aria-hidden /> Set your shop's location
               </button>
             )}
           </Section>

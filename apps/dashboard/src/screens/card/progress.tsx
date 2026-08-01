@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { CardDesign, CardType } from "@/api";
 import { cn } from "@/lib/utils";
-import { FIELD, ImageField, Labelled, NumberField, Segmented, Slider } from "./controls";
+import { FIELD, Group, ImageField, Labelled, NumberField, Segmented, Slider } from "./controls";
 
 /**
  * The Progress section, one editor per card type.
@@ -43,10 +44,19 @@ const LAYOUTS = [
 ];
 
 function StampEditor({ target, setTarget, bonus, setBonus, design, patch, upload }: ProgressEditorProps) {
-  const custom = design.customStripUrl !== undefined;
+  /*
+   * The mode is UI state, seeded from whether a custom strip is stored.
+   *
+   * It cannot be derived from the URL alone: switching to "use my own image" has to show the
+   * upload control BEFORE there is anything to show, and an empty URL would flip the mode straight
+   * back. Switching to "draw the stamps for me" clears the stored URL explicitly rather than by
+   * omission, because the server merges a patch over the current design — an absent key means
+   * "unchanged", so leaving it out would keep serving the old image while the UI claimed otherwise.
+   */
+  const [custom, setCustom] = useState(Boolean(design.customStripUrl));
   return (
     <>
-      <Labelled
+      <Group
         label="Your mark"
         hint={
           design.stampImageUrl
@@ -72,7 +82,7 @@ function StampEditor({ target, setTarget, bonus, setBonus, design, patch, upload
             </button>
           ))}
         </div>
-      </Labelled>
+      </Group>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Labelled label="Stamps to reward">
@@ -85,7 +95,10 @@ function StampEditor({ target, setTarget, bonus, setBonus, design, patch, upload
 
       <Segmented
         value={custom ? "custom" : "auto"}
-        onChange={(v) => patch({ customStripUrl: v === "custom" ? "" : undefined })}
+        onChange={(v) => {
+          setCustom(v === "custom");
+          if (v === "auto") patch({ customStripUrl: "" });
+        }}
         options={[
           { id: "auto", label: "Draw the stamps for me" },
           { id: "custom", label: "Use my own image" },
@@ -119,13 +132,13 @@ function StampEditor({ target, setTarget, bonus, setBonus, design, patch, upload
             />
           </div>
 
-          <Labelled label="Arrangement">
+          <Group label="Arrangement">
             <Segmented
               value={design.stampLayout ?? "grid"}
               onChange={(v) => patch({ stampLayout: v })}
               options={LAYOUTS}
             />
-          </Labelled>
+          </Group>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Slider
@@ -217,7 +230,7 @@ function DiscountEditor({ mechanics, setMechanics }: ProgressEditorProps) {
 
   return (
     <>
-      <Labelled label="Discount">
+      <Group label="Discount">
         <Segmented
           value={unit as "percent" | "currency"}
           onChange={(v) => set({ unit: v })}
@@ -226,7 +239,7 @@ function DiscountEditor({ mechanics, setMechanics }: ProgressEditorProps) {
             { id: "currency", label: "Fixed amount off" },
           ]}
         />
-      </Labelled>
+      </Group>
 
       <Labelled label={unit === "percent" ? "Percent off" : "Amount off"}>
         <NumberField

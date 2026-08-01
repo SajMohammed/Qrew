@@ -61,3 +61,49 @@ describe("program (card designer)", () => {
     expect(await getShopPreview(merchantId, "00000000-0000-4000-8000-000000000000")).toBeNull();
   });
 });
+
+/*
+ * Its own programme, deliberately. These mutate the design, and sharing the fixture with the
+ * defaults test made that one fail depending on which ran first — an order-dependent suite hides
+ * real failures behind whichever test happened to run last.
+ */
+describe("clearing part of a design", () => {
+  let ownProgramId: string;
+
+  beforeAll(async () => {
+    const [p] = await adminDb
+      .insert(loyaltyPrograms)
+      .values({ merchantId, name: "Clearing", stampsRequired: 5 })
+      .returning();
+    ownProgramId = p!.id;
+  });
+
+  /*
+   * A patch merges over the current design so the console can send one field, which means clearing
+   * has to be explicit. Omitting a key reads as "leave it alone" — the console once sent undefined
+   * for a removed image, JSON.stringify dropped the key, and the old image kept being served while
+   * the UI showed it gone.
+   */
+  it("clears an image when sent an empty string, and keeps it when the key is absent", async () => {
+    await updateProgram(merchantId, ownProgramId, {
+      cardDesign: { customStripUrl: "https://shop.test/strip.png", logoUrl: "https://shop.test/logo.png" },
+    });
+
+    const untouched = await updateProgram(merchantId, ownProgramId, { cardDesign: { brandColor: "#111111" } });
+    expect(untouched?.cardDesign.customStripUrl).toBe("https://shop.test/strip.png");
+
+    const cleared = await updateProgram(merchantId, ownProgramId, { cardDesign: { customStripUrl: "" } });
+    expect(cleared?.cardDesign.customStripUrl).toBeUndefined();
+    // Clearing one image must not take the others with it.
+    expect(cleared?.cardDesign.logoUrl).toBe("https://shop.test/logo.png");
+  });
+
+  it("does not leave emptied fields behind in the stored design", async () => {
+    const saved = await updateProgram(merchantId, ownProgramId, {
+      cardDesign: { stampImageUrl: "", emptyStampImageUrl: "" },
+    });
+    // Normalised on write, so the row stays canonical instead of accumulating empty strings.
+    expect(Object.keys(saved!.cardDesign)).not.toContain("stampImageUrl");
+    expect(Object.keys(saved!.cardDesign)).not.toContain("emptyStampImageUrl");
+  });
+});

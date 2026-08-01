@@ -209,7 +209,16 @@ export async function updateProgram(
     // Validated against the type being saved, not the one it had — so a type change and its
     // settings can land together.
     const mechanics = normalizeMechanics(type, patch.mechanics ?? (type === current.type ? current.mechanics : {}));
-    const cardDesign = { ...normalizeDesign(current.cardDesign), ...(patch.cardDesign ?? {}) };
+    /*
+     * A patch is merged over the current design, so an absent key means "leave it alone" — that is
+     * what lets the console send one field. Clearing therefore has to be explicit: an empty string,
+     * never an omitted key. Normalising the RESULT keeps those empty strings out of the stored row
+     * rather than letting them accumulate in the jsonb.
+     */
+    const cardDesign = normalizeDesign({
+      ...normalizeDesign(current.cardDesign),
+      ...(patch.cardDesign ?? {}),
+    });
     const [updated] = await db
       .update(loyaltyPrograms)
       .set({

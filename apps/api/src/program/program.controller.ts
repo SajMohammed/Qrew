@@ -19,6 +19,13 @@ export class ProgramController {
       label: t.label,
       blurb: t.blurb,
       accrues: t.accrues,
+      /** Whether the pass shows a picture of stamps, so the designer previews what a wallet gets. */
+      drawsStampStrip: t.drawsStampStrip,
+      /**
+       * Whether a pass can be issued for this type at all. Discount cards map to a Google offer and
+       * there is no adapter yet, so the console must not preview a wallet pass it cannot produce.
+       */
+      issuable: t.wallet.google === "loyalty",
     }));
   }
 

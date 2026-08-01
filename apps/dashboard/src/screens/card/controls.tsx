@@ -25,6 +25,23 @@ export function Labelled({
   );
 }
 
+/**
+ * The same heading and hint as Labelled, but a plain container.
+ *
+ * For a group of buttons — colours, layouts, emoji. A <label> is an association with one control;
+ * wrapping several interactive elements in one makes clicks ambiguous and tells a screen reader
+ * the whole group is a single field.
+ */
+export function Group({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label}>
+      <span className="text-[13px] font-semibold">{label}</span>
+      {children}
+      {hint && <span className="text-muted-foreground mt-1 block text-[12px] leading-snug">{hint}</span>}
+    </div>
+  );
+}
+
 export function NumberField({
   value,
   onChange,

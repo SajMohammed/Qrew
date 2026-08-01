@@ -108,7 +108,16 @@ export function useApi() {
         return res.json();
       },
       /** The card types this deployment can issue — the picker must not offer any others. */
-      async getCardTypes(): Promise<{ type: CardType; label: string; blurb: string; accrues: boolean }[]> {
+      async getCardTypes(): Promise<
+        {
+          type: CardType;
+          label: string;
+          blurb: string;
+          accrues: boolean;
+          drawsStampStrip: boolean;
+          issuable: boolean;
+        }[]
+      > {
         const res = await call("/program/types");
         if (!res.ok) throw new Error(`Card types failed (${res.status})`);
         return res.json();

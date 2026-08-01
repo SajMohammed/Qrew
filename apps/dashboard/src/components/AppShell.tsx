@@ -22,7 +22,7 @@ export type ManageView = "dashboard" | "customers" | "card" | "counterqr" | "tea
 const NAV: { id: ManageView; label: string; short: string; icon: typeof LayoutGrid }[] = [
   { id: "dashboard", label: "Dashboard", short: "Home", icon: LayoutGrid },
   { id: "customers", label: "Customers", short: "People", icon: Users },
-  { id: "card", label: "Card", short: "Card", icon: CreditCard },
+  { id: "card", label: "Cards", short: "Cards", icon: CreditCard },
   { id: "counterqr", label: "Counter QR", short: "QR", icon: QrCode },
   { id: "team", label: "Team", short: "Team", icon: UsersRound },
 ];
