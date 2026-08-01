@@ -91,9 +91,9 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
     return err ? (
       <p className="text-destructive text-sm">{err}</p>
     ) : (
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        <Skeleton className="h-80 rounded-2xl" />
-        <Skeleton className="h-96 rounded-2xl" />
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+        <Skeleton className="h-96 rounded-2xl lg:order-1" />
+        <Skeleton className="h-80 rounded-2xl lg:order-2" />
       </div>
     );
   }
@@ -114,11 +114,12 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
       </header>
 
       {/*
-        Preview first in the DOM so it is what a phone shows before any editing — and sticky beside
-        the editor from the width where a sticky column has somewhere to stick.
+        Preview first in the DOM, so a phone shows the card before the controls that change it —
+        then ordered to the right column on a wide screen, where it sticks as the editor scrolls.
+        Reordering with CSS rather than markup keeps both arrangements right from one source.
       */}
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        <div className="lg:sticky lg:top-4">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+        <div className="lg:order-2 lg:sticky lg:top-4">
           <p className="text-faint mb-2 text-[11px] font-semibold tracking-[0.12em] uppercase">
             Everywhere it appears
           </p>
@@ -134,7 +135,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
           />
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:order-1">
           <Section icon={LayoutGrid} title="What kind of card" hint={typeHint(program)}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {types.map((t) => {
