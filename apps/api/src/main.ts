@@ -1,6 +1,7 @@
 import "./load-env"; // must be first: populates env before @qrew/db loads
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import { raw } from "express";
 import { assertTokenSecretsConfigured } from "@qrew/core";
 import { AppModule } from "./app.module";
 import { ZodExceptionFilter } from "./common/zod-exception.filter";
@@ -11,6 +12,13 @@ async function bootstrap(): Promise<void> {
   if (process.env.NODE_ENV === "production") assertTokenSecretsConfigured();
 
   const app = await NestFactory.create(AppModule);
+  /*
+   * Design images are uploaded as the raw request body rather than multipart — one file, one field,
+   * so a multipart parser would be a dependency earning nothing. The limit sits above the domain's
+   * own cap so an oversized file is rejected by storeAsset, which can say how big it was, instead
+   * of by the body parser, which can only say "too large".
+   */
+  app.use("/asset", raw({ type: "image/png", limit: "1mb" }));
   // Dev is same-origin via the Vite proxy, so CORS is a no-op there; set CORS_ORIGINS in a
   // non-proxied deploy (the Authorization header makes requests preflighted).
   app.enableCors({

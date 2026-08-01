@@ -9,6 +9,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { CustomersModule } from "./customers/customers.module";
 import { ProgramModule } from "./program/program.module";
+import { AssetModule } from "./asset/asset.module";
 import { LeadsModule } from "./leads/leads.module";
 import { OnboardingModule } from "./onboarding/onboarding.module";
 import { StaffModule } from "./staff/staff.module";
@@ -25,6 +26,7 @@ import { CustomerAuthModule } from "./customer-auth/customer-auth.module";
     AnalyticsModule,
     CustomersModule,
     ProgramModule,
+    AssetModule,
     LeadsModule,
     OnboardingModule,
     StaffModule,

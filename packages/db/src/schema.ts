@@ -10,6 +10,7 @@ import {
   index,
   uniqueIndex,
   check,
+  customType,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -188,6 +189,31 @@ export const redemptions = pgTable(
   ],
 );
 
+/** Postgres `bytea`. Drizzle has no built-in for it; postgres.js hands us a Buffer either way. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/**
+ * Images a shop uploads for their card design — stamp artwork, logo.
+ *
+ * Tenant-scoped like everything else they own. The public read (Google downloading the image for a
+ * wallet pass) goes through the admin connection keyed by the asset's random id: the id IS the
+ * capability, exactly as the card serial is. See migration 0009 for why the bytes live here.
+ */
+export const merchantAssets = pgTable(
+  "merchant_assets",
+  {
+    id: id(),
+    merchantId: merchantId(),
+    kind: text("kind").notNull(), // 'stamp' | 'logo'
+    contentType: text("content_type").notNull().default("image/png"),
+    bytes: bytea("bytes").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("merchant_assets_merchant_idx").on(t.merchantId)],
+);
+
 /**
  * Marketing waitlist / early-access leads. NOT tenant-scoped — a prospective merchant with
  * no account yet, so no `merchant_id`. Written only via the admin connection; RLS with no
@@ -271,6 +297,7 @@ export const schema = {
   enrollments,
   stampEvents,
   redemptions,
+  merchantAssets,
   leads,
   customerAccounts,
   customerIdentities,

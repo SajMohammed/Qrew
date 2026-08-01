@@ -1,5 +1,6 @@
 /**
- * A public-facing server that serves ONE thing: a card's stamp strip.
+ * A public-facing server that serves images and nothing else: a card's stamp strip, and the
+ * design images a shop has uploaded.
  *
  * Google downloads the strip itself, so the image has to be reachable from the internet — but the
  * main API runs with AUTH_DEV_BYPASS in development, where an `x-merchant-id` header is accepted as
@@ -19,16 +20,41 @@ const PORT = Number(process.env.STRIP_PORT ?? 4100);
 
 async function main() {
   const { getCardStrip } = await import("../src/card");
+  const { getAsset } = await import("../src/asset");
 
   const server = createServer(async (req, res) => {
-    // The serial is the capability, exactly as it is for the card read itself.
-    const match = req.url?.match(/^\/card\/([^/?]+)\/strip\.png(?:\?|$)/);
-    if (req.method !== "GET" || !match) {
+    if (req.method !== "GET") {
       res.writeHead(404, { "content-type": "text/plain" }).end("not found");
       return;
     }
+
+    // Both ids are unguessable and ARE the capability — the card serial, the asset id.
+    const strip = req.url?.match(/^\/card\/([^/?]+)\/strip\.png(?:\?|$)/);
+    const asset = req.url?.match(/^\/asset\/([^/?]+)\.png(?:\?|$)/);
+    if (!strip && !asset) {
+      res.writeHead(404, { "content-type": "text/plain" }).end("not found");
+      return;
+    }
+
     try {
-      const png = await getCardStrip(decodeURIComponent(match[1]!));
+      if (asset) {
+        const found = await getAsset(decodeURIComponent(asset[1]!));
+        if (!found) {
+          res.writeHead(404, { "content-type": "text/plain" }).end("asset not found");
+          return;
+        }
+        res
+          .writeHead(200, {
+            "content-type": found.contentType,
+            // Immutable: an edited image is a new upload with a new id.
+            "cache-control": "public, max-age=31536000, immutable",
+            "content-length": found.bytes.length,
+          })
+          .end(found.bytes);
+        return;
+      }
+
+      const png = await getCardStrip(decodeURIComponent(strip![1]!));
       if (!png) {
         res.writeHead(404, { "content-type": "text/plain" }).end("card not found");
         return;
@@ -49,7 +75,7 @@ async function main() {
 
   server.listen(PORT, () => {
     console.log(`\n  stamp-strip server on http://localhost:${PORT}`);
-    console.log(`  only route: GET /card/:serial/strip.png\n`);
+    console.log(`  routes: GET /card/:serial/strip.png, GET /asset/:id.png\n`);
     console.log(`  Tunnel THIS port — never 4000, which accepts the dev auth bypass.\n`);
   });
 }

@@ -1,13 +1,15 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpStatus } from "@nestjs/common";
-import { NotFoundError } from "@qrew/core";
+import { NotFoundError, InvalidInputError } from "@qrew/core";
 import type { Response } from "express";
 
-// Maps domain not-found errors (thrown by the core layer, e.g. an unknown enrollment/program) to a
-// clean 404 — otherwise they'd bypass the filters and hit Nest's default handler as a 500.
-@Catch(NotFoundError)
+// Maps domain errors (thrown by the core layer, e.g. an unknown enrollment or an unreadable upload)
+// to a clean 4xx — otherwise they'd bypass the filters and hit Nest's default handler as a 500.
+@Catch(NotFoundError, InvalidInputError)
 export class DomainExceptionFilter implements ExceptionFilter {
-  catch(error: NotFoundError, host: ArgumentsHost): void {
+  catch(error: NotFoundError | InvalidInputError, host: ArgumentsHost): void {
     const res = host.switchToHttp().getResponse<Response>();
-    res.status(HttpStatus.NOT_FOUND).json({ statusCode: 404, error: "Not Found", message: error.message });
+    const status = error instanceof NotFoundError ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
+    const label = error instanceof NotFoundError ? "Not Found" : "Bad Request";
+    res.status(status).json({ statusCode: status, error: label, message: error.message });
   }
 }

@@ -91,6 +91,12 @@ export const ProgramUpdate = z.object({
 });
 export type ProgramUpdate = z.infer<typeof ProgramUpdate>;
 
+// Uploading a design image. The file itself is the raw request body; this is the query string.
+export const AssetUploadQuery = z.object({
+  kind: z.enum(["stamp", "logo"]),
+});
+export type AssetUploadQuery = z.infer<typeof AssetUploadQuery>;
+
 export const EnrollRequest = z.object({
   merchantId: z.string().uuid(), // from the merchant's counter QR (public routing, not auth)
   programId: z.string().uuid(),
