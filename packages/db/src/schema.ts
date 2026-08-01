@@ -16,8 +16,8 @@ import {
 /**
  * Qrew schema. Two shapes of data:
  *   • STATE (small, mutable, cached): merchants, locations, staff, programs, customers, enrollments
- *   • LEDGER (append-only truth):     stamp_events, redemptions
- * `enrollments.current_stamps` is a cached PROJECTION derived from stamp_events.
+ *   • LEDGER (append-only truth):     loyalty_progress_events, redemptions
+ * `enrollments.current_progress` is a cached PROJECTION derived from loyalty_progress_events.
  * Every tenant table carries `merchant_id` and is guarded by RLS (see migrations/0000_init.sql).
  */
 
@@ -123,7 +123,7 @@ export const enrollments = pgTable(
       .notNull()
       .references(() => customers.id, { onDelete: "cascade" }),
     cardSerial: text("card_serial").notNull(),
-    currentStamps: integer("current_stamps").notNull().default(0), // projection — trigger-maintained (migration 0001)
+    currentProgress: integer("current_progress").notNull().default(0), // projection — trigger-maintained (migration 0001)
     applePassId: text("apple_pass_id"),
     googleObjectId: text("google_object_id"),
     status: text("status").notNull().default("active"),
@@ -135,13 +135,13 @@ export const enrollments = pgTable(
     // one card per customer per program (blocks the duplicate-enrollment / double-bonus race)
     uniqueIndex("enrollments_customer_program_uq").on(t.customerId, t.programId),
     // the projection can never go negative — backstop behind the redeem FOR UPDATE fix
-    check("enrollments_current_stamps_nonneg", sql`${t.currentStamps} >= 0`),
+    check("enrollments_current_progress_nonneg", sql`${t.currentProgress} >= 0`),
   ],
 );
 
 /** LEDGER — append-only. One row per stamp earned. Never updated. */
-export const stampEvents = pgTable(
-  "stamp_events",
+export const loyaltyProgressEvents = pgTable(
+  "loyalty_progress_events",
   {
     id: id(),
     merchantId: merchantId(),
@@ -156,12 +156,12 @@ export const stampEvents = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    index("stamp_events_merchant_idx").on(t.merchantId),
-    index("stamp_events_enrollment_idx").on(t.enrollmentId),
+    index("loyalty_progress_events_merchant_idx").on(t.merchantId),
+    index("loyalty_progress_events_enrollment_idx").on(t.enrollmentId),
     // the analytics dashboard reads this ledger by time within a tenant (stamps per day, period totals)
-    index("stamp_events_merchant_created_idx").on(t.merchantId, t.createdAt),
+    index("loyalty_progress_events_merchant_created_idx").on(t.merchantId, t.createdAt),
     // a retried / double-tapped stamp with the same key is a no-op, not a double
-    uniqueIndex("stamp_events_idem_uq").on(t.merchantId, t.idempotencyKey),
+    uniqueIndex("loyalty_progress_events_idem_uq").on(t.merchantId, t.idempotencyKey),
   ],
 );
 
@@ -295,7 +295,7 @@ export const schema = {
   loyaltyPrograms,
   customers,
   enrollments,
-  stampEvents,
+  loyaltyProgressEvents,
   redemptions,
   merchantAssets,
   leads,

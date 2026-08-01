@@ -7,7 +7,7 @@ import {
   loyaltyPrograms,
   customers,
   enrollments,
-  stampEvents,
+  loyaltyProgressEvents,
   customerAccounts,
 } from "@qrew/db";
 import { enroll, signInWithProvider, NotFoundError } from "../src/index";
@@ -56,8 +56,8 @@ describe("enroll", () => {
 
     const bonuses = await adminDb
       .select()
-      .from(stampEvents)
-      .where(and(eq(stampEvents.merchantId, merchantId), eq(stampEvents.source, "signup_bonus")));
+      .from(loyaltyProgressEvents)
+      .where(and(eq(loyaltyProgressEvents.merchantId, merchantId), eq(loyaltyProgressEvents.source, "signup_bonus")));
     expect(bonuses).toHaveLength(1);
   });
 

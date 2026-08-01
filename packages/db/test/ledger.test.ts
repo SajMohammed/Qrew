@@ -7,11 +7,11 @@ import {
   loyaltyPrograms,
   customers,
   enrollments,
-  stampEvents,
+  loyaltyProgressEvents,
 } from "../src/index";
 
 /**
- * The projection (`enrollments.current_stamps`) is maintained by a DB trigger, so it is
+ * The projection (`enrollments.current_progress`) is maintained by a DB trigger, so it is
  * correct by construction — no reconciliation job needed. Setup uses the admin connection
  * (bypasses RLS); the trigger fires regardless of RLS.
  */
@@ -38,24 +38,24 @@ afterAll(async () => {
 
 async function currentStamps(): Promise<number> {
   const [e] = await adminDb
-    .select({ n: enrollments.currentStamps })
+    .select({ n: enrollments.currentProgress })
     .from(enrollments)
     .where(eq(enrollments.id, enrollmentId));
   return e!.n;
 }
 async function ledgerSum(): Promise<number> {
   const [r] = await adminDb
-    .select({ total: sql<number>`coalesce(sum(${stampEvents.delta}), 0)` })
-    .from(stampEvents)
-    .where(eq(stampEvents.enrollmentId, enrollmentId));
+    .select({ total: sql<number>`coalesce(sum(${loyaltyProgressEvents.delta}), 0)` })
+    .from(loyaltyProgressEvents)
+    .where(eq(loyaltyProgressEvents.enrollmentId, enrollmentId));
   return Number(r!.total);
 }
 
 describe("ledger-maintained projection", () => {
-  it("the trigger keeps current_stamps == sum(delta)", async () => {
-    await adminDb.insert(stampEvents).values({ merchantId, enrollmentId, delta: 2, source: "signup_bonus", idempotencyKey: "bonus" });
-    await adminDb.insert(stampEvents).values({ merchantId, enrollmentId, delta: 1, idempotencyKey: "s1" });
-    await adminDb.insert(stampEvents).values({ merchantId, enrollmentId, delta: 1, idempotencyKey: "s2" });
+  it("the trigger keeps current_progress == sum(delta)", async () => {
+    await adminDb.insert(loyaltyProgressEvents).values({ merchantId, enrollmentId, delta: 2, source: "signup_bonus", idempotencyKey: "bonus" });
+    await adminDb.insert(loyaltyProgressEvents).values({ merchantId, enrollmentId, delta: 1, idempotencyKey: "s1" });
+    await adminDb.insert(loyaltyProgressEvents).values({ merchantId, enrollmentId, delta: 1, idempotencyKey: "s2" });
     expect(await currentStamps()).toBe(4);
     expect(await currentStamps()).toBe(await ledgerSum());
   });
@@ -63,21 +63,21 @@ describe("ledger-maintained projection", () => {
   it("a duplicate idempotency key does not double-apply", async () => {
     const before = await currentStamps();
     await adminDb
-      .insert(stampEvents)
+      .insert(loyaltyProgressEvents)
       .values({ merchantId, enrollmentId, delta: 1, idempotencyKey: "s1" })
-      .onConflictDoNothing({ target: [stampEvents.merchantId, stampEvents.idempotencyKey] });
+      .onConflictDoNothing({ target: [loyaltyProgressEvents.merchantId, loyaltyProgressEvents.idempotencyKey] });
     expect(await currentStamps()).toBe(before);
   });
 
   it("a negative delta (redemption) decrements the balance", async () => {
     const before = await currentStamps();
-    await adminDb.insert(stampEvents).values({ merchantId, enrollmentId, delta: -before, source: "redemption", idempotencyKey: "r1" });
+    await adminDb.insert(loyaltyProgressEvents).values({ merchantId, enrollmentId, delta: -before, source: "redemption", idempotencyKey: "r1" });
     expect(await currentStamps()).toBe(0);
   });
 
   it("the ledger is append-only — UPDATE throws", async () => {
     await expect(
-      adminDb.update(stampEvents).set({ delta: 99 }).where(eq(stampEvents.enrollmentId, enrollmentId)),
+      adminDb.update(loyaltyProgressEvents).set({ delta: 99 }).where(eq(loyaltyProgressEvents.enrollmentId, enrollmentId)),
     ).rejects.toThrow();
   });
 });

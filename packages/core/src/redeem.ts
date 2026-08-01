@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { withTenant, loyaltyPrograms, enrollments, stampEvents, redemptions } from "@qrew/db";
+import { withTenant, loyaltyPrograms, enrollments, loyaltyProgressEvents, redemptions } from "@qrew/db";
 import { enqueueWalletSync } from "@qrew/queue";
 import { NotFoundError } from "./errors";
 
@@ -25,7 +25,7 @@ export interface RedeemResult {
  *   1. idempotent: a repeat with the same key returns the prior result, never double-spends.
  *   2. VERIFY eligibility by recomputing sum(delta) FROM THE LEDGER (source of truth).
  *   3. append a `redemptions` record + a compensating negative stamp_event; the trigger
- *      resets current_stamps.
+ *      resets current_progress.
  *   4. enqueue a wallet-sync job — the wallet-worker resets the pass off the request path.
  */
 export async function redeem(input: RedeemInput): Promise<RedeemResult> {
@@ -51,14 +51,14 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
       .from(redemptions)
       .where(and(eq(redemptions.merchantId, input.merchantId), eq(redemptions.idempotencyKey, input.idempotencyKey)));
     if (existing) {
-      return { redeemed: true, reason: "duplicate" as RedeemReason, enrollment, currentStamps: enrollment.currentStamps, rewardText: existing.rewardText };
+      return { redeemed: true, reason: "duplicate" as RedeemReason, enrollment, currentStamps: enrollment.currentProgress, rewardText: existing.rewardText };
     }
 
     // verify at the money moment: recompute the balance from the ledger, don't trust the cache
     const [sumRow] = await db
-      .select({ total: sql<number>`coalesce(sum(${stampEvents.delta}), 0)` })
-      .from(stampEvents)
-      .where(eq(stampEvents.enrollmentId, input.enrollmentId));
+      .select({ total: sql<number>`coalesce(sum(${loyaltyProgressEvents.delta}), 0)` })
+      .from(loyaltyProgressEvents)
+      .where(eq(loyaltyProgressEvents.enrollmentId, input.enrollmentId));
     const balance = Number(sumRow?.total ?? 0);
     if (balance < program.stampsRequired) {
       return { redeemed: false, reason: "insufficient" as RedeemReason, enrollment, currentStamps: balance, rewardText: undefined };
@@ -73,7 +73,7 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
       stampsSpent: program.stampsRequired,
       idempotencyKey: input.idempotencyKey,
     });
-    await db.insert(stampEvents).values({
+    await db.insert(loyaltyProgressEvents).values({
       merchantId: input.merchantId,
       enrollmentId: input.enrollmentId,
       staffId: input.staffId,
@@ -83,7 +83,7 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
     });
 
     const [after] = await db
-      .select({ currentStamps: enrollments.currentStamps })
+      .select({ currentStamps: enrollments.currentProgress })
       .from(enrollments)
       .where(eq(enrollments.id, input.enrollmentId));
 

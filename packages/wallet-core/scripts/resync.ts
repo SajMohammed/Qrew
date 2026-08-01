@@ -35,7 +35,7 @@ async function main() {
   const rows = await adminDb
     .select({
       serial: enrollments.cardSerial,
-      currentStamps: enrollments.currentStamps,
+      currentStamps: enrollments.currentProgress,
       googleObjectId: enrollments.googleObjectId,
       programId: enrollments.programId,
       stampsRequired: loyaltyPrograms.stampsRequired,

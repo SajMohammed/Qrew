@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
-import { withTenant, loyaltyPrograms, enrollments, stampEvents } from "@qrew/db";
+import { withTenant, loyaltyPrograms, enrollments, loyaltyProgressEvents } from "@qrew/db";
 import { enqueueWalletSync } from "@qrew/queue";
 import { NotFoundError } from "./errors";
 
@@ -30,14 +30,14 @@ function cooldownMs(): number {
  *   0. reject if the card is already at the reward threshold — redeem before earning more.
  *   1. cooldown guard — a re-scan of the same card within the window is ignored
  *      (belt-and-suspenders alongside the idempotency key).
- *   2. append to the ledger (idempotent); the DB trigger updates current_stamps.
+ *   2. append to the ledger (idempotent); the DB trigger updates current_progress.
  *   3. enqueue a wallet-sync job — the wallet-worker updates the pass off the request path,
  *      so the cashier never waits on Apple/Google.
  */
 export async function addStamp(input: AddStampInput): Promise<StampResult> {
   const outcome = await withTenant(input.merchantId, async (db) => {
     // Lock the card row so two simultaneous scans serialize — otherwise both read a stale count and
-    // both stamp, pushing current_stamps past the cap (and past the cooldown).
+    // both stamp, pushing current_progress past the cap (and past the cooldown).
     const [enrollment] = await db
       .select()
       .from(enrollments)
@@ -51,29 +51,29 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
     if (!program) throw new NotFoundError("program not found");
 
     // Don't stamp past the reward threshold — the card is full; the customer must redeem first.
-    if (enrollment.currentStamps >= program.stampsRequired) {
+    if (enrollment.currentProgress >= program.stampsRequired) {
       return {
         applied: false,
         reason: "reward_ready" as StampReason,
         enrollment,
         program,
-        currentStamps: enrollment.currentStamps,
+        currentStamps: enrollment.currentProgress,
       };
     }
 
     // cooldown: ignore a rapid re-scan of the same card
     const [last] = await db
-      .select({ at: stampEvents.createdAt })
-      .from(stampEvents)
-      .where(and(eq(stampEvents.enrollmentId, input.enrollmentId), eq(stampEvents.source, "staff_scan")))
-      .orderBy(desc(stampEvents.createdAt))
+      .select({ at: loyaltyProgressEvents.createdAt })
+      .from(loyaltyProgressEvents)
+      .where(and(eq(loyaltyProgressEvents.enrollmentId, input.enrollmentId), eq(loyaltyProgressEvents.source, "staff_scan")))
+      .orderBy(desc(loyaltyProgressEvents.createdAt))
       .limit(1);
     if (last && Date.now() - last.at.getTime() < cooldownMs()) {
-      return { applied: false, reason: "cooldown" as StampReason, enrollment, program, currentStamps: enrollment.currentStamps };
+      return { applied: false, reason: "cooldown" as StampReason, enrollment, program, currentStamps: enrollment.currentProgress };
     }
 
     const inserted = await db
-      .insert(stampEvents)
+      .insert(loyaltyProgressEvents)
       .values({
         merchantId: input.merchantId,
         enrollmentId: input.enrollmentId,
@@ -83,11 +83,11 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
         delta: 1,
         source: "staff_scan",
       })
-      .onConflictDoNothing({ target: [stampEvents.merchantId, stampEvents.idempotencyKey] })
+      .onConflictDoNothing({ target: [loyaltyProgressEvents.merchantId, loyaltyProgressEvents.idempotencyKey] })
       .returning();
 
     const [after] = await db
-      .select({ currentStamps: enrollments.currentStamps })
+      .select({ currentStamps: enrollments.currentProgress })
       .from(enrollments)
       .where(eq(enrollments.id, input.enrollmentId));
 
@@ -96,7 +96,7 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
       reason: (inserted.length > 0 ? "applied" : "duplicate") as StampReason,
       enrollment,
       program,
-      currentStamps: after?.currentStamps ?? enrollment.currentStamps,
+      currentStamps: after?.currentStamps ?? enrollment.currentProgress,
     };
   });
 

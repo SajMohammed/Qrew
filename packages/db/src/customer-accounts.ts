@@ -175,7 +175,7 @@ export async function getMyCards(accountId: string): Promise<MyCard[]> {
       merchantName: merchants.name,
       programName: loyaltyPrograms.name,
       rewardText: loyaltyPrograms.rewardText,
-      currentStamps: enrollments.currentStamps,
+      currentStamps: enrollments.currentProgress,
       stampsRequired: loyaltyPrograms.stampsRequired,
       cardDesign: loyaltyPrograms.cardDesign,
       status: enrollments.status,

@@ -32,7 +32,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
       serial: enrollments.cardSerial,
       programId: enrollments.programId,
       customerName: customers.name,
-      currentStamps: enrollments.currentStamps,
+      currentStamps: enrollments.currentProgress,
       merchantName: merchants.name,
       programName: loyaltyPrograms.name,
       rewardText: loyaltyPrograms.rewardText,
@@ -95,7 +95,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
 export async function getCardStrip(serial: string): Promise<Buffer | null> {
   const [row] = await adminDb
     .select({
-      currentStamps: enrollments.currentStamps,
+      currentStamps: enrollments.currentProgress,
       stampsRequired: loyaltyPrograms.stampsRequired,
       cardDesign: loyaltyPrograms.cardDesign,
     })

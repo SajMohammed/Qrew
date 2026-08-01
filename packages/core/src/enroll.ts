@@ -7,7 +7,7 @@ import {
   loyaltyPrograms,
   customers,
   enrollments,
-  stampEvents,
+  loyaltyProgressEvents,
 } from "@qrew/db";
 import { getWalletProvider } from "@qrew/wallet-core";
 import { NotFoundError } from "./errors";
@@ -174,9 +174,9 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
       return { alreadyEnrolled: true as const, enrollment: raced!, program, merchantName: merchant.name };
     }
 
-    // endowed-progress bonus — ledger append; the trigger updates current_stamps
+    // endowed-progress bonus — ledger append; the trigger updates current_progress
     if (program.bonusStamps > 0) {
-      await db.insert(stampEvents).values({
+      await db.insert(loyaltyProgressEvents).values({
         merchantId: input.merchantId,
         enrollmentId: enrollment.id,
         delta: program.bonusStamps,
@@ -192,7 +192,7 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
     return {
       enrollmentId: e.id,
       serial: e.cardSerial,
-      currentStamps: e.currentStamps,
+      currentStamps: e.currentProgress,
       applePassId: e.applePassId ?? undefined,
       googleObjectId: e.googleObjectId ?? undefined,
       alreadyEnrolled: true,

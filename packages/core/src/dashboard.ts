@@ -5,7 +5,7 @@ import {
   loyaltyPrograms,
   customers,
   enrollments,
-  stampEvents,
+  loyaltyProgressEvents,
   redemptions,
 } from "@qrew/db";
 
@@ -47,8 +47,8 @@ export async function getDashboard(merchantId: string): Promise<Dashboard> {
       .select({ n })
       .from(enrollments)
       .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
-      .where(sql`${enrollments.currentStamps} >= ${loyaltyPrograms.stampsRequired}`);
-    const [iss] = await db.select({ n }).from(stampEvents).where(gt(stampEvents.delta, 0));
+      .where(sql`${enrollments.currentProgress} >= ${loyaltyPrograms.stampsRequired}`);
+    const [iss] = await db.select({ n }).from(loyaltyProgressEvents).where(gt(loyaltyProgressEvents.delta, 0));
     const [red] = await db.select({ n }).from(redemptions);
 
     const recent = await db
@@ -58,7 +58,7 @@ export async function getDashboard(merchantId: string): Promise<Dashboard> {
         customerEmail: customers.email,
         customerPhone: customers.phone,
         programName: loyaltyPrograms.name,
-        currentStamps: enrollments.currentStamps,
+        currentStamps: enrollments.currentProgress,
         stampsRequired: loyaltyPrograms.stampsRequired,
         createdAt: enrollments.createdAt,
       })

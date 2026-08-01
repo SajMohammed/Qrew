@@ -51,14 +51,14 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
     serial: enrollment.cardSerial,
     stampsRequired,
     rewardText,
-    currentStamps: enrollment.currentStamps,
+    currentStamps: enrollment.currentProgress,
     // The strip URL embeds the count, so this is what actually redraws the stamps on the pass.
-    stripUrl: stripUrlFor(enrollment.cardSerial, enrollment.currentStamps),
+    stripUrl: stripUrlFor(enrollment.cardSerial, enrollment.currentProgress),
   });
-  const message = walletMessage(data.kind, enrollment.currentStamps, stampsRequired);
+  const message = walletMessage(data.kind, enrollment.currentProgress, stampsRequired);
   await provider.pushUpdate(ref, message);
 
-  return `synced ${enrollment.cardSerial} → ${enrollment.currentStamps}/${stampsRequired} (${message})`;
+  return `synced ${enrollment.cardSerial} → ${enrollment.currentProgress}/${stampsRequired} (${message})`;
 }
 
 /** The lock-screen nudge. Moved here from the domain layer — it's a wallet-presentation concern. */

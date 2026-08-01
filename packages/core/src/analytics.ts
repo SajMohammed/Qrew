@@ -5,7 +5,7 @@ import {
   loyaltyPrograms,
   customers,
   enrollments,
-  stampEvents,
+  loyaltyProgressEvents,
   redemptions,
 } from "@qrew/db";
 
@@ -109,15 +109,15 @@ export async function getShopAnalytics(
     // (merchant_id, created_at) index does the work instead of scanning all history.
     const [stamps] = await db
       .select({
-        value: sql<number>`coalesce(sum(${stampEvents.delta}) filter (
-          where ${stampEvents.delta} > 0
-            and ${stampEvents.createdAt} >= now() - make_interval(days => ${days})), 0)::int`,
-        previous: sql<number>`coalesce(sum(${stampEvents.delta}) filter (
-          where ${stampEvents.delta} > 0
-            and ${stampEvents.createdAt} <  now() - make_interval(days => ${days})), 0)::int`,
+        value: sql<number>`coalesce(sum(${loyaltyProgressEvents.delta}) filter (
+          where ${loyaltyProgressEvents.delta} > 0
+            and ${loyaltyProgressEvents.createdAt} >= now() - make_interval(days => ${days})), 0)::int`,
+        previous: sql<number>`coalesce(sum(${loyaltyProgressEvents.delta}) filter (
+          where ${loyaltyProgressEvents.delta} > 0
+            and ${loyaltyProgressEvents.createdAt} <  now() - make_interval(days => ${days})), 0)::int`,
       })
-      .from(stampEvents)
-      .where(sql`${stampEvents.createdAt} >= now() - make_interval(days => ${days * 2})`);
+      .from(loyaltyProgressEvents)
+      .where(sql`${loyaltyProgressEvents.createdAt} >= now() - make_interval(days => ${days * 2})`);
 
     const [redeemed] = await db
       .select({
@@ -145,7 +145,7 @@ export async function getShopAnalytics(
       .select({ n: sql<number>`count(*)::int` })
       .from(enrollments)
       .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
-      .where(sql`${enrollments.currentStamps} >= ${loyaltyPrograms.stampsRequired}`);
+      .where(sql`${enrollments.currentProgress} >= ${loyaltyPrograms.stampsRequired}`);
 
     // ── the cohort aggregate ──────────────────────────────────────────────────────
     // One pass over (enrollments ⨝ ledger) grouped per customer answers the retention ladder, both
@@ -161,7 +161,7 @@ export async function getShopAnalytics(
                                  and se.created_at < now() - make_interval(days => ${days})) as prev_visits,
           max(se.created_at) filter (where se.source = 'staff_scan')           as last_visit
         from ${enrollments} e
-        left join ${stampEvents} se on se.enrollment_id = e.id
+        left join ${loyaltyProgressEvents} se on se.enrollment_id = e.id
         group by e.customer_id
       ),
       rewarded as (
@@ -193,11 +193,11 @@ export async function getShopAnalytics(
               date_trunc('week', (now() at time zone ${SHOP_TZ})),
               interval '1 week') as d
             left join (
-              select date_trunc('week', (${stampEvents.createdAt} at time zone ${SHOP_TZ})) as bucket,
-                     sum(${stampEvents.delta}) as total
-              from ${stampEvents}
-              where ${stampEvents.delta} > 0
-                and ${stampEvents.createdAt} >= now() - make_interval(weeks => ${WEEKLY_BUCKETS})
+              select date_trunc('week', (${loyaltyProgressEvents.createdAt} at time zone ${SHOP_TZ})) as bucket,
+                     sum(${loyaltyProgressEvents.delta}) as total
+              from ${loyaltyProgressEvents}
+              where ${loyaltyProgressEvents.delta} > 0
+                and ${loyaltyProgressEvents.createdAt} >= now() - make_interval(weeks => ${WEEKLY_BUCKETS})
               group by 1
             ) s on s.bucket = d
             order by d`
@@ -208,11 +208,11 @@ export async function getShopAnalytics(
               date_trunc('day', (now() at time zone ${SHOP_TZ})),
               interval '1 day') as d
             left join (
-              select date_trunc('day', (${stampEvents.createdAt} at time zone ${SHOP_TZ})) as bucket,
-                     sum(${stampEvents.delta}) as total
-              from ${stampEvents}
-              where ${stampEvents.delta} > 0
-                and ${stampEvents.createdAt} >= now() - make_interval(days => ${days})
+              select date_trunc('day', (${loyaltyProgressEvents.createdAt} at time zone ${SHOP_TZ})) as bucket,
+                     sum(${loyaltyProgressEvents.delta}) as total
+              from ${loyaltyProgressEvents}
+              where ${loyaltyProgressEvents.delta} > 0
+                and ${loyaltyProgressEvents.createdAt} >= now() - make_interval(days => ${days})
               group by 1
             ) s on s.bucket = d
             order by d`,
@@ -222,19 +222,19 @@ export async function getShopAnalytics(
     // Three small indexed reads merged in memory beats one UNION the planner can't index well.
     const recentStamps = await db
       .select({
-        id: stampEvents.id,
-        at: stampEvents.createdAt,
+        id: loyaltyProgressEvents.id,
+        at: loyaltyProgressEvents.createdAt,
         customerName: customers.name,
         customerEmail: customers.email,
-        currentStamps: enrollments.currentStamps,
+        currentStamps: enrollments.currentProgress,
         stampsRequired: loyaltyPrograms.stampsRequired,
       })
-      .from(stampEvents)
-      .innerJoin(enrollments, eq(enrollments.id, stampEvents.enrollmentId))
+      .from(loyaltyProgressEvents)
+      .innerJoin(enrollments, eq(enrollments.id, loyaltyProgressEvents.enrollmentId))
       .innerJoin(customers, eq(customers.id, enrollments.customerId))
       .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
-      .where(eq(stampEvents.source, "staff_scan"))
-      .orderBy(desc(stampEvents.createdAt))
+      .where(eq(loyaltyProgressEvents.source, "staff_scan"))
+      .orderBy(desc(loyaltyProgressEvents.createdAt))
       .limit(FEED_LIMIT);
 
     const recentRedeems = await db
@@ -257,7 +257,7 @@ export async function getShopAnalytics(
         at: enrollments.createdAt,
         customerName: customers.name,
         customerEmail: customers.email,
-        currentStamps: enrollments.currentStamps,
+        currentStamps: enrollments.currentProgress,
         stampsRequired: loyaltyPrograms.stampsRequired,
       })
       .from(enrollments)
@@ -306,16 +306,16 @@ export async function getShopAnalytics(
         customerId: customers.id,
         name: customers.name,
         email: customers.email,
-        visits: sql<number>`count(${stampEvents.id})::int`,
+        visits: sql<number>`count(${loyaltyProgressEvents.id})::int`,
       })
       .from(customers)
       .innerJoin(enrollments, eq(enrollments.customerId, customers.id))
       .innerJoin(
-        stampEvents,
-        and(eq(stampEvents.enrollmentId, enrollments.id), eq(stampEvents.source, "staff_scan")),
+        loyaltyProgressEvents,
+        and(eq(loyaltyProgressEvents.enrollmentId, enrollments.id), eq(loyaltyProgressEvents.source, "staff_scan")),
       )
       .groupBy(customers.id, customers.name, customers.email)
-      .orderBy(desc(sql`count(${stampEvents.id})`))
+      .orderBy(desc(sql`count(${loyaltyProgressEvents.id})`))
       .limit(TOP_REGULARS);
 
     return {

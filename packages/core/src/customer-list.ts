@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { withTenant, customers, enrollments, stampEvents, redemptions, loyaltyPrograms } from "@qrew/db";
+import { withTenant, customers, enrollments, loyaltyProgressEvents, redemptions, loyaltyPrograms } from "@qrew/db";
 import { AT_RISK_DAYS, REGULAR_VISITS } from "./analytics";
 
 /**
@@ -58,7 +58,7 @@ interface RawRow {
   last_visit: Date | string | null;
   visits: number;
   redemptions: number;
-  current_stamps: number | null;
+  current_progress: number | null;
   stamps_required: number | null;
   reward_ready: boolean | null;
   at_risk: boolean;
@@ -99,16 +99,16 @@ export async function listCustomers(
         select
           c.id, c.name, c.email, c.phone,
           c.created_at as joined_at,
-          card.current_stamps,
+          card.current_progress,
           card.stamps_required,
-          coalesce(card.current_stamps >= card.stamps_required, false) as reward_ready,
+          coalesce(card.current_progress >= card.stamps_required, false) as reward_ready,
           coalesce(v.visits, 0)::int      as visits,
           v.last_visit,
           coalesce(r.redemptions, 0)::int as redemptions,
           coalesce(v.last_visit, c.created_at) < now() - make_interval(days => ${AT_RISK_DAYS}) as at_risk
         from ${customers} c
         left join lateral (
-          select e.current_stamps, lp.stamps_required
+          select e.current_progress, lp.stamps_required
           from ${enrollments} e
           join ${loyaltyPrograms} lp on lp.id = e.program_id
           where e.customer_id = c.id
@@ -118,7 +118,7 @@ export async function listCustomers(
         left join lateral (
           select count(se.id) as visits, max(se.created_at) as last_visit
           from ${enrollments} e
-          join ${stampEvents} se on se.enrollment_id = e.id and se.source = 'staff_scan'
+          join ${loyaltyProgressEvents} se on se.enrollment_id = e.id and se.source = 'staff_scan'
           where e.customer_id = c.id
         ) v on true
         left join lateral (
@@ -147,7 +147,7 @@ export async function listCustomers(
           lastVisit: r.last_visit === null ? null : toIso(r.last_visit),
           visits: Number(r.visits),
           redemptions: Number(r.redemptions),
-          currentStamps: r.current_stamps === null ? null : Number(r.current_stamps),
+          currentStamps: r.current_progress === null ? null : Number(r.current_progress),
           stampsRequired: r.stamps_required === null ? null : Number(r.stamps_required),
           rewardReady,
           status: statusOf(rewardReady, r.at_risk, Number(r.visits)),
