@@ -46,6 +46,8 @@ export const discountCard: CardTypeModule<DiscountMechanics> = {
   // Nothing accumulates, so there is no threshold to reach.
   maxTarget: 1,
 
+  drawsStampStrip: false,
+
   accrues: false,
 
   earn: () => 0,
@@ -55,6 +57,9 @@ export const discountCard: CardTypeModule<DiscountMechanics> = {
   // Not redeemable in the ledger sense: there is no balance to spend down. Using the discount is a
   // till-side event, and inventing a redemption row for it would misreport every other metric.
   redeemable: () => false,
+
+  // Never shown: nothing is counted on a discount card.
+  unitLabel: () => "",
 
   describe: (_progress, _target, m) =>
     m.unit === "percent" ? `${m.amount}% off` : `${m.currency} ${m.amount} off`,

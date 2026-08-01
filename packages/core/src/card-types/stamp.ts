@@ -29,6 +29,8 @@ export const stampCard: CardTypeModule<StampMechanics> = {
   // The strip renderer draws at most 20, and twenty stamps is already a long card.
   maxTarget: 20,
 
+  drawsStampStrip: true,
+
   accrues: true,
 
   earn: () => 1,
@@ -37,6 +39,8 @@ export const stampCard: CardTypeModule<StampMechanics> = {
   acceptsMore: (progress, target) => progress < target,
 
   redeemable: (progress, target) => progress >= target,
+
+  unitLabel: () => "Stamps",
 
   describe: (progress, target) => `${progress} of ${target}`,
 };

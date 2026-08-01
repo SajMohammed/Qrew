@@ -69,6 +69,8 @@ export const membershipCard: CardTypeModule<MembershipMechanics> = {
   // Tier thresholds live in mechanics; this only bounds the shared column.
   maxTarget: 1_000_000,
 
+  drawsStampStrip: false,
+
   accrues: true,
 
   earn: () => 1,
@@ -78,6 +80,8 @@ export const membershipCard: CardTypeModule<MembershipMechanics> = {
   // Status is not spent. Nothing is deducted when a member reaches a tier, so there is nothing to
   // redeem — a redemption row here would misreport the shop's reward metrics.
   redeemable: () => false,
+
+  unitLabel: () => "Visits",
 
   describe: (progress, _target, m) => {
     const tier = m.tiers.reduce<string>((best, t) => (progress >= t.at ? t.name : best), m.tiers[0]?.name ?? "Member");

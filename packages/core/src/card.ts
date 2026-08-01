@@ -11,6 +11,7 @@ import {
 } from "@qrew/wallet-core";
 import { mintCardToken } from "./token";
 import { normalizeDesign, type CardDesign } from "./program";
+import { cardTypeModule, isCardType } from "./card-types";
 
 /** Which wallet the strip is being drawn for — they want different aspect ratios. */
 export type StripPlatform = "google" | "apple";
@@ -50,6 +51,8 @@ export async function getCard(serial: string): Promise<CardView | null> {
       stampsRequired: loyaltyPrograms.stampsRequired,
       bonusStamps: loyaltyPrograms.bonusStamps,
       cardDesign: loyaltyPrograms.cardDesign,
+      type: loyaltyPrograms.type,
+      mechanics: loyaltyPrograms.mechanics,
     })
     .from(enrollments)
     .innerJoin(merchants, eq(merchants.id, enrollments.merchantId))
@@ -61,28 +64,44 @@ export async function getCard(serial: string): Promise<CardView | null> {
 
   const design = normalizeDesign(row.cardDesign);
   const qrToken = mintCardToken(row.serial);
+  const card = cardTypeModule(isCardType(row.type) ? row.type : "stamp");
+  const mechanics = card.normalize(row.mechanics) as never;
+
+  /*
+   * Only a loyalty-mapped product can be issued today. A discount card maps to a Google OFFER, a
+   * different resource with its own class shape, and there is no adapter for it yet. Issuing it as
+   * a loyalty pass instead would put a stamp counter on a card that has nothing to count — and an
+   * object cannot be moved between class types afterwards, so every customer would have to re-save.
+   * No button is better than the wrong pass.
+   */
+  const issuable = card.wallet.google === "loyalty";
 
   /*
    * The save link embeds the card's CURRENT state, so it is built per read rather than stored — a
    * customer who adds the card after earning three stamps gets a pass showing three, not zero.
    * getSaveUrl answers null on any failure, so a wallet outage costs the button, never the card.
    */
-  const google = await getWalletProvider().getSaveUrl({
-    serial: row.serial,
-    programId: row.programId,
-    customerName: row.customerName,
-    merchantName: row.merchantName,
-    programName: row.programName,
-    rewardText: row.rewardText,
-    currentStamps: row.currentStamps,
-    stampsRequired: row.stampsRequired,
-    qrToken,
-    brandColor: design.brandColor,
-    logoUrl: design.logoUrl, // the shop's own mark, when they've set one
-    stripUrl: stripUrlFor(row.serial, row.currentStamps),
-    details: design.details,
-    location: design.location,
-  });
+  const google = issuable
+    ? await getWalletProvider().getSaveUrl({
+        serial: row.serial,
+        programId: row.programId,
+        customerName: row.customerName,
+        merchantName: row.merchantName,
+        programName: row.programName,
+        rewardText: row.rewardText,
+        currentStamps: row.currentStamps,
+        stampsRequired: row.stampsRequired,
+        qrToken,
+        brandColor: design.brandColor,
+        logoUrl: design.logoUrl, // the shop's own mark, when they've set one
+        // Omitted unless this product is drawn as stamps — a points balance renders natively, so a
+        // strip would put a row of stamps on a card that does not work that way.
+        stripUrl: card.drawsStampStrip ? stripUrlFor(row.serial, row.currentStamps) : undefined,
+        pointsLabel: card.unitLabel(mechanics),
+        details: design.details,
+        location: design.location,
+      })
+    : null;
 
   return {
     serial: row.serial,
@@ -112,11 +131,16 @@ export async function getCardStrip(
       currentStamps: enrollments.currentProgress,
       stampsRequired: loyaltyPrograms.stampsRequired,
       cardDesign: loyaltyPrograms.cardDesign,
+      type: loyaltyPrograms.type,
     })
     .from(enrollments)
     .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
     .where(eq(enrollments.cardSerial, serial));
   if (!row) return null;
+
+  // A card that is not drawn as stamps has no strip. Answering with one anyway would let a URL
+  // saved onto an older pass keep serving a picture that contradicts the product.
+  if (!cardTypeModule(isCardType(row.type) ? row.type : "stamp").drawsStampStrip) return null;
 
   return stripFor(normalizeDesign(row.cardDesign), row.stampsRequired, row.currentStamps, platform);
 }

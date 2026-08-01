@@ -40,6 +40,11 @@ export interface PassContent {
    * from the internet — a localhost URL silently yields no image.
    */
   stripUrl?: string;
+  /**
+   * What the balance on the pass is called — "Stamps", "Points", the shop's own word. Google shows
+   * this beside the number, so calling a points balance "Stamps" would contradict the card.
+   */
+  pointsLabel?: string;
   /** Extra rows the shop wants on the pass — Google text modules, Apple back fields. */
   details?: { label: string; value: string }[];
   /** Shop location, for the lock-screen "you're nearby" reminder both wallets support. */
@@ -58,8 +63,10 @@ export interface PassUpdate {
    * which matters for passes issued before the template was keyed on the programme id.
    */
   programId?: string;
-  /** Public URL of the redrawn stamp strip, when one is configured. */
+  /** Public URL of the redrawn stamp strip, when this product draws one. */
   stripUrl?: string;
+  /** What the balance is called on the pass. */
+  pointsLabel?: string;
   /** What the customer is working towards — the one text row the pass keeps. */
   rewardText?: string;
 }

@@ -213,6 +213,9 @@ importers:
 
   apps/wallet-worker:
     dependencies:
+      '@qrew/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@qrew/db':
         specifier: workspace:*
         version: link:../../packages/db

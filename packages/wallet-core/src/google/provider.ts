@@ -114,7 +114,7 @@ export class GoogleWalletProvider implements WalletProvider {
   async updateStamps(ref: PassRef, update: PassUpdate): Promise<void> {
     const id = this.resolveObjectId(ref);
     await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
-      loyaltyPoints: { balance: { int: update.currentStamps }, label: "Stamps" },
+      loyaltyPoints: { balance: { int: update.currentStamps }, label: update.pointsLabel ?? "Stamps" },
       /*
        * Re-point the pass at its programme's class.
        *
@@ -224,7 +224,7 @@ export class GoogleWalletProvider implements WalletProvider {
       // The member is the CUSTOMER. The shop is already the issuer/title above.
       ...(content.customerName ? { accountName: content.customerName } : {}),
       loyaltyPoints: {
-        label: "Stamps",
+        label: content.pointsLabel ?? "Stamps",
         balance: { int: content.currentStamps },
       },
       /*

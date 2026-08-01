@@ -73,6 +73,15 @@ export interface CardTypeModule<M = unknown> {
   maxTarget: number;
 
   /**
+   * Whether the pass shows progress as a picture of stamps.
+   *
+   * Only a stamp card does. Google renders a points balance natively and a discount has no
+   * progress at all, so sending either a strip would put a row of stamps on a card that does not
+   * work that way — and the customer would read it as one that does.
+   */
+  drawsStampStrip: boolean;
+
+  /**
    * Whether progress accumulates at the counter at all. False for a card that is an entitlement
    * rather than a journey — a discount is valid from the moment it is issued.
    */
@@ -93,6 +102,14 @@ export interface CardTypeModule<M = unknown> {
 
   /** Whether a card holding this much progress can be redeemed. */
   redeemable(progress: number, target: number, mechanics: M): boolean;
+
+  /**
+   * What the running total is called on a wallet pass — "Stamps", "Beans", "Visits".
+   *
+   * Google prints this beside the number, so it has to be the product's own word: a points balance
+   * labelled "Stamps" contradicts the card it sits on.
+   */
+  unitLabel(mechanics: M): string;
 
   /** How the customer's position reads — "7 of 10", "1,240 points", "20% off". */
   describe(progress: number, target: number, mechanics: M): string;

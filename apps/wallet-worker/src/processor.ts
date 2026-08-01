@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments } from "@qrew/db";
 import { getWalletProvider, stripUrlFor } from "@qrew/wallet-core";
+import { cardTypeModule, isCardType } from "@qrew/core";
 import type { WalletJobData } from "@qrew/queue";
 
 /**
@@ -26,15 +27,23 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
       .select({
         stampsRequired: loyaltyPrograms.stampsRequired,
         rewardText: loyaltyPrograms.rewardText,
+        type: loyaltyPrograms.type,
+        mechanics: loyaltyPrograms.mechanics,
       })
       .from(loyaltyPrograms)
       .where(eq(loyaltyPrograms.id, enrollment.programId));
-    return { enrollment, stampsRequired: program?.stampsRequired ?? 0, rewardText: program?.rewardText };
+    return {
+      enrollment,
+      stampsRequired: program?.stampsRequired ?? 0,
+      rewardText: program?.rewardText,
+      card: cardTypeModule(isCardType(program?.type) ? program!.type : "stamp"),
+      mechanics: program?.mechanics,
+    };
   });
 
   if (!ctx) return `enrollment ${data.enrollmentId} gone — skipped`;
 
-  const { enrollment, stampsRequired, rewardText } = ctx;
+  const { enrollment, stampsRequired, rewardText, card, mechanics } = ctx;
   if (!enrollment.applePassId && !enrollment.googleObjectId) {
     return `${enrollment.cardSerial} has no wallet pass — skipped`;
   }
@@ -52,8 +61,12 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
     stampsRequired,
     rewardText,
     currentStamps: enrollment.currentProgress,
-    // The strip URL embeds the count, so this is what actually redraws the stamps on the pass.
-    stripUrl: stripUrlFor(enrollment.cardSerial, enrollment.currentProgress),
+    // The strip URL embeds the count, so this is what actually redraws the stamps on the pass —
+    // for the one product that is drawn as stamps. The rest carry a balance and no image.
+    stripUrl: card.drawsStampStrip
+      ? stripUrlFor(enrollment.cardSerial, enrollment.currentProgress)
+      : undefined,
+    pointsLabel: card.unitLabel(card.normalize(mechanics) as never),
   });
   const message = walletMessage(data.kind, enrollment.currentProgress, stampsRequired);
   await provider.pushUpdate(ref, message);

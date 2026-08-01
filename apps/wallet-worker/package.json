@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@qrew/core": "workspace:*",
     "@qrew/db": "workspace:*",
     "@qrew/queue": "workspace:*",
     "@qrew/wallet-core": "workspace:*",

@@ -45,6 +45,8 @@ export const pointsCard: CardTypeModule<PointsMechanics> = {
   // A balance has no natural ceiling — shops set rewards in the hundreds or thousands.
   maxTarget: 1_000_000,
 
+  drawsStampStrip: false,
+
   accrues: true,
 
   earn: (m, ctx) =>
@@ -55,6 +57,9 @@ export const pointsCard: CardTypeModule<PointsMechanics> = {
   acceptsMore: () => true,
 
   redeemable: (progress, target) => progress >= target,
+
+  // The shop's own word, capitalised for the pass where it sits as a field label.
+  unitLabel: (m) => m.unitLabel.charAt(0).toUpperCase() + m.unitLabel.slice(1),
 
   describe: (progress, _target, m) => `${progress.toLocaleString("en-AE")} ${m.unitLabel}`,
 };

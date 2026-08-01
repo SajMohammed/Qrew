@@ -54,6 +54,28 @@ describe("the reward threshold each type allows", () => {
   });
 });
 
+/*
+ * What actually reaches the pass. A wrong answer here is not a cosmetic bug: it puts a row of
+ * stamps on a card that has nothing to stamp, or labels a points balance "Stamps", and the
+ * customer reads the pass as the truth about how the card works.
+ */
+describe("what each type puts on a wallet pass", () => {
+  it("draws a stamp strip for a stamp card and nothing else", () => {
+    expect(stampCard.drawsStampStrip).toBe(true);
+    // Google renders a balance natively, so a strip would be a picture contradicting the number.
+    expect(pointsCard.drawsStampStrip).toBe(false);
+    expect(membershipCard.drawsStampStrip).toBe(false);
+    // Nothing accumulates at all here.
+    expect(discountCard.drawsStampStrip).toBe(false);
+  });
+
+  it("labels the balance with the product's own word", () => {
+    expect(stampCard.unitLabel({})).toBe("Stamps");
+    expect(pointsCard.unitLabel(pointsCard.normalize({ unitLabel: "beans" }))).toBe("Beans");
+    expect(membershipCard.unitLabel(membershipCard.normalize({}))).toBe("Visits");
+  });
+});
+
 describe("stamp card", () => {
   it("stops taking stamps when the card is full", () => {
     expect(stampCard.acceptsMore(9, 10, {})).toBe(true);
