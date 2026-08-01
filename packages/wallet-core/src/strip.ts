@@ -17,9 +17,27 @@ import { decodePng, type DecodedImage } from "./png-decode";
  * anyway; the shop's chosen icon lives on the app card, where a browser does the work.
  */
 
-/** Google's heroImage guidance; Apple's strip is smaller and scales down cleanly from this. */
-export const STRIP_WIDTH = 1032;
-export const STRIP_HEIGHT = 336;
+/**
+ * The two wallets want different shapes, so there is no single strip that serves both.
+ *
+ * Google's loyalty brand guidance gives heroImage as 1032x812, "approximately 5:4". Apple's
+ * storeCard strip is 375x123pt, which at @3x is 1125x369 — roughly 3:1. A 3:1 image sent to Google
+ * is letterboxed into a 5:4 slot with dead bands above and below, which is exactly what a wrongly
+ * sized strip looks like on a real pass. Render per platform instead of scaling one to fit both.
+ */
+export const GOOGLE_STRIP = { width: 1032, height: 812 } as const;
+export const APPLE_STRIP = { width: 1125, height: 369 } as const;
+
+/** Default geometry. Google is the platform we actually issue on today. */
+export const STRIP_WIDTH = GOOGLE_STRIP.width;
+export const STRIP_HEIGHT = GOOGLE_STRIP.height;
+
+/**
+ * How the stamps are arranged. A near-square Google canvas affords a real grid; a letterbox Apple
+ * strip suits a single row. The shop picks the shape they want and each platform renders it into
+ * its own geometry.
+ */
+export type StampLayout = "row" | "grid" | "top-heavy" | "diamond";
 
 export interface StripOptions {
   stampsRequired: number;
@@ -28,12 +46,58 @@ export interface StripOptions {
   brandColor: string;
   /**
    * The shop's own stamp artwork, already decoded. Given one, the strip draws THAT instead of
-   * discs — earned at full strength, still-to-earn faded — which is how a real stamp card reads:
-   * a row of the shop's cups filling up, not abstract circles.
+   * discs — which is how a real stamp card reads: a row of the shop's cups filling up, not
+   * abstract circles.
    */
   icon?: DecodedImage;
+  /**
+   * Artwork for a stamp not yet earned. Without one, the earned artwork is drawn faded, which
+   * keeps the row reading as one set filling up. With one, a shop can supply a proper outline.
+   */
+  emptyIcon?: DecodedImage;
+  layout?: StampLayout;
+  /** Stamp size within its cell. 1 is the default; below 1 is smaller, above 1 is larger. */
+  scale?: number;
+  /** Share of each cell left empty, horizontally and vertically. 0 to 0.6. */
+  gapX?: number;
+  gapY?: number;
+  /** How strongly a not-yet-earned stamp shows. Ignored when emptyIcon is supplied. */
+  unearnedOpacity?: number;
   width?: number;
   height?: number;
+}
+
+/** Stamps per row, top to bottom. Rows are centred, so a short row sits under a long one. */
+function rowsFor(total: number, layout: StampLayout): number[] {
+  switch (layout) {
+    case "row":
+      return [total];
+    case "top-heavy": {
+      // The +1 matters: plain ceil(total/2) splits an even count evenly, which is just the grid.
+      const top = Math.ceil((total + 1) / 2);
+      return [top, total - top].filter((n) => n > 0);
+    }
+    case "diamond": {
+      if (total <= 3) return [total];
+      // Three rows with the surplus going to the middle first, so 10 reads 3-4-3.
+      const base = Math.floor(total / 3);
+      const rows = [base, base, base];
+      const extra = total % 3;
+      if (extra >= 1) rows[1]! += 1;
+      if (extra >= 2) rows[0]! += 1;
+      return rows.filter((n) => n > 0);
+    }
+    default: {
+      const perRow = total <= 5 ? total : Math.ceil(total / 2);
+      const rows: number[] = [];
+      for (let left = total; left > 0; left -= perRow) rows.push(Math.min(perRow, left));
+      return rows;
+    }
+  }
+}
+
+function clamp(n: number | undefined, lo: number, hi: number, fallback: number): number {
+  return n === undefined || !Number.isFinite(n) ? fallback : Math.max(lo, Math.min(hi, n));
 }
 
 interface Rgba {
@@ -69,13 +133,34 @@ export function renderStampStrip(opts: StripOptions): Buffer {
   const brand = parseHex(opts.brandColor);
   const ink: Rgba = isPale(brand) ? { r: 28, g: 26, b: 21, a: 255 } : { r: 255, g: 255, b: 255, a: 255 };
 
-  // Lay the stamps out in one or two rows, whichever keeps them largest.
-  const perRow = total <= 5 ? total : Math.ceil(total / 2);
-  const rows = Math.ceil(total / perRow);
-  const cellW = width / perRow;
-  const cellH = height / rows;
-  const radius = Math.min(cellW, cellH) * 0.34;
+  const rows = rowsFor(total, opts.layout ?? "grid");
+  const scale = clamp(opts.scale, 0.5, 1.4, 1);
+  const gapX = clamp(opts.gapX, 0, 0.6, 0.18);
+  const gapY = clamp(opts.gapY, 0, 0.6, 0.18);
+  const unearned = clamp(opts.unearnedOpacity, 0.05, 1, 0.28);
+
+  /*
+   * Square cells sized to whichever axis runs out first, then the whole block centred.
+   *
+   * Spreading the rows over the full canvas height instead looks fine on a 3:1 strip and badly
+   * wrong on Google's near-square one: two rows of five end up at the very top and very bottom
+   * with a dead band between them. Sizing each row to its own width is the other trap — a
+   * three-stamp row would draw bigger stamps than a four-stamp row and the diamond would come
+   * out as a lumpy grid.
+   */
+  const pad = Math.min(width, height) * 0.05;
+  const widest = Math.max(...rows);
+  const box =
+    Math.min((width - pad * 2) / (widest * (1 + gapX)), (height - pad * 2) / (rows.length * (1 + gapY))) *
+    scale;
+  const pitchX = box * (1 + gapX);
+  const pitchY = box * (1 + gapY);
+  const top = (height - pitchY * rows.length) / 2;
+  const radius = box / 2;
   const ring = Math.max(3, radius * 0.13);
+  // A ring reads fainter than a solid disc at the same alpha, so it is lifted above the artwork
+  // fade — 0.28 lands on the 150 this drew before the control existed.
+  const ringAlpha = Math.round(255 * Math.min(1, unearned * 2.1));
 
   const px = Buffer.alloc(width * height * 4); // transparent — the card colour shows through
 
@@ -93,36 +178,42 @@ export function renderStampStrip(opts: StripOptions): Buffer {
     px[i + 3] = Math.round(outA * 255);
   };
 
-  for (let n = 0; n < total; n++) {
-    const row = Math.floor(n / perRow);
-    const col = n % perRow;
-    const cx = cellW * col + cellW / 2;
-    const cy = cellH * row + cellH / 2;
-    const on = n < filled;
+  let n = 0;
+  for (let r = 0; r < rows.length; r++) {
+    const count = rows[r]!;
+    const rowLeft = (width - count * pitchX) / 2; // centred, so short rows sit under long ones
+    const cy = top + pitchY * r + pitchY / 2;
 
-    const x0 = Math.max(0, Math.floor(cx - radius - 2));
-    const x1 = Math.min(width - 1, Math.ceil(cx + radius + 2));
-    const y0 = Math.max(0, Math.floor(cy - radius - 2));
-    const y1 = Math.min(height - 1, Math.ceil(cy + radius + 2));
+    for (let c = 0; c < count; c++, n++) {
+      const cx = rowLeft + pitchX * c + pitchX / 2;
+      const on = n < filled;
 
-    if (opts.icon) {
-      // The shop's artwork. Unearned stamps are the same image held back, so the row reads as one
-      // set filling up rather than two unrelated pictures.
-      drawIcon(put, opts.icon, cx, cy, radius * 2, on ? 1 : 0.28);
-      continue;
-    }
+      if (opts.icon) {
+        // A shop that supplies distinct empty artwork gets it drawn solid; otherwise the earned
+        // artwork is held back, so the row still reads as one set filling up.
+        const art = on ? opts.icon : (opts.emptyIcon ?? opts.icon);
+        const strength = on || opts.emptyIcon ? 1 : unearned;
+        drawIcon(put, art, cx, cy, radius * 2, strength);
+        continue;
+      }
 
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
-        if (on) {
-          // solid disc, feathered over the final pixel
-          put(x, y, ink, radius - d);
-        } else {
-          // ring: inside the outer edge but outside the inner one
-          const outer = radius - d;
-          const inner = d - (radius - ring);
-          put(x, y, { ...ink, a: 150 }, Math.min(outer, inner));
+      const x0 = Math.max(0, Math.floor(cx - radius - 2));
+      const x1 = Math.min(width - 1, Math.ceil(cx + radius + 2));
+      const y0 = Math.max(0, Math.floor(cy - radius - 2));
+      const y1 = Math.min(height - 1, Math.ceil(cy + radius + 2));
+
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+          if (on) {
+            // solid disc, feathered over the final pixel
+            put(x, y, ink, radius - d);
+          } else {
+            // ring: inside the outer edge but outside the inner one
+            const outer = radius - d;
+            const inner = d - (radius - ring);
+            put(x, y, { ...ink, a: ringAlpha }, Math.min(outer, inner));
+          }
         }
       }
     }
