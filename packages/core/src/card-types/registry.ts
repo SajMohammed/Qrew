@@ -2,6 +2,9 @@ import { InvalidInputError } from "../errors";
 import type { CardType, CardTypeModule } from "./types";
 import { CARD_TYPES } from "./types";
 import { stampCard } from "./stamp";
+import { pointsCard } from "./points";
+import { discountCard } from "./discount";
+import { membershipCard } from "./membership";
 
 /**
  * Every card type the system knows, keyed by its discriminator.
@@ -11,6 +14,9 @@ import { stampCard } from "./stamp";
  */
 const MODULES: Partial<Record<CardType, CardTypeModule<never>>> = {
   stamp: stampCard as CardTypeModule<never>,
+  points: pointsCard as unknown as CardTypeModule<never>,
+  discount: discountCard as unknown as CardTypeModule<never>,
+  membership: membershipCard as unknown as CardTypeModule<never>,
 };
 
 /** The types a shop can actually pick today — not every type the column will accept. */

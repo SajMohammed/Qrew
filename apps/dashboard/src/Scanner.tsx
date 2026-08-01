@@ -224,6 +224,8 @@ function ResultBanner({ result }: { result: ScanResult }) {
   if (!result.found) return <Banner tone="bad">✗ Card not found for this store</Banner>;
   if (result.reason === "cooldown") return <Banner tone="warn">⏳ Just stamped — wait a moment</Banner>;
   if (result.reason === "duplicate") return <Banner tone="warn">↺ Already counted</Banner>;
+  // Nothing to collect on this kind of card — scanning it is how staff check it is genuine.
+  if (result.reason === "no_accrual") return <Banner tone="ok">✓ Valid card — apply the offer</Banner>;
   if (result.reason === "reward_ready")
     return (
       <Banner tone="ready">

@@ -55,7 +55,7 @@ describe("the card type registry", () => {
   it("refuses a type it has no module for, rather than falling back to stamps", () => {
     // Silently treating an unknown type as a stamp card would issue passes against the wrong
     // wallet class, and that cannot be undone without every customer re-saving.
-    expect(() => cardTypeModule("membership")).toThrow(InvalidInputError);
+    expect(() => cardTypeModule("nonsense")).toThrow(InvalidInputError);
     expect(() => cardTypeModule("nonsense")).toThrow(/unsupported card type/);
     expect(isCardType("nonsense")).toBe(false);
   });

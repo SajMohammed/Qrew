@@ -81,7 +81,7 @@ export interface ScanResult {
   found: boolean;
   enrollmentId?: string; // present when found — lets us redeem this exact card
   applied?: boolean;
-  reason?: "applied" | "duplicate" | "cooldown" | "reward_ready";
+  reason?: "applied" | "duplicate" | "cooldown" | "reward_ready" | "no_accrual";
   currentStamps?: number;
   stampsRequired?: number;
   rewardReady?: boolean;

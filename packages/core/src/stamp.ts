@@ -12,7 +12,13 @@ export interface AddStampInput {
   staffId?: string;
 }
 
-export type StampReason = "applied" | "duplicate" | "cooldown" | "reward_ready";
+export type StampReason =
+  | "applied"
+  | "duplicate"
+  | "cooldown"
+  | "reward_ready"
+  /** This kind of card does not collect anything — a discount is valid the day it is issued. */
+  | "no_accrual";
 
 export interface StampResult {
   applied: boolean;
@@ -51,11 +57,29 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
       .where(eq(loyaltyPrograms.id, enrollment.programId));
     if (!program) throw new NotFoundError("program not found");
 
-    // Don't stamp past the reward threshold — the card is full; the customer must redeem first.
     const card = cardTypeModule(program.type);
+    const mechanics = card.normalize(program.mechanics) as never;
 
-    // Full cards stop accruing whatever the product: the customer must redeem first.
-    if (card.redeemable(enrollment.currentProgress, program.stampsRequired, {} as never)) {
+    /*
+     * A card that never collects anything cannot be stamped. Scanning a discount card is how staff
+     * check it is real, so this is an ordinary outcome and not an error.
+     */
+    if (!card.accrues) {
+      return {
+        applied: false,
+        reason: "no_accrual" as StampReason,
+        enrollment,
+        program,
+        currentStamps: enrollment.currentProgress,
+      };
+    }
+
+    /*
+     * Whether this card will take more — which is NOT the same as whether it can be redeemed. A
+     * full stamp card stops until the reward is taken; a points balance keeps climbing past the
+     * threshold. Asking `redeemable` here would silently cap every points card at its first reward.
+     */
+    if (!card.acceptsMore(enrollment.currentProgress, program.stampsRequired, mechanics)) {
       return {
         applied: false,
         reason: "reward_ready" as StampReason,
@@ -86,7 +110,7 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
         staffId: input.staffId,
         // What one scan is worth. A stamp card says 1; a points card will say whatever its earn
         // rate works out to. The ledger has always held a signed delta, so nothing else changes.
-        delta: card.earn({} as never),
+        delta: card.earn(mechanics, {}),
         source: "staff_scan",
       })
       .onConflictDoNothing({ target: [loyaltyProgressEvents.merchantId, loyaltyProgressEvents.idempotencyKey] })

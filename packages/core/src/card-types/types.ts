@@ -18,6 +18,15 @@ export type CardType = (typeof CARD_TYPES)[number];
  * has a native points balance; only Apple's storeCard and coupon have a strip image, which is the
  * only way to draw stamps at all.
  */
+/** What the counter knew at the moment of the scan. */
+export interface EarnContext {
+  /**
+   * What the customer spent. The counter does not capture an amount today, so this is always
+   * absent — a points card falls back to its per-visit rate until it does.
+   */
+  amount?: number;
+}
+
 export interface WalletMapping {
   google: "loyalty" | "offer" | "generic";
   apple: "storeCard" | "coupon" | "generic";
@@ -60,7 +69,17 @@ export interface CardTypeModule<M = unknown> {
   accrues: boolean;
 
   /** What one scan at the counter is worth, in progress units. */
-  earn(mechanics: M): number;
+  earn(mechanics: M, ctx: EarnContext): number;
+
+  /**
+   * Whether the card should keep taking progress.
+   *
+   * NOT the same question as `redeemable`, though a stamp card answers them from the same number.
+   * A full stamp card stops until the customer redeems; a points balance keeps climbing past the
+   * reward threshold and always has. Conflating the two would silently cap every points card at
+   * its first reward.
+   */
+  acceptsMore(progress: number, target: number, mechanics: M): boolean;
 
   /** Whether a card holding this much progress can be redeemed. */
   redeemable(progress: number, target: number, mechanics: M): boolean;

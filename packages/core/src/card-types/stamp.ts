@@ -30,6 +30,9 @@ export const stampCard: CardTypeModule<StampMechanics> = {
 
   earn: () => 1,
 
+  // A full card stops until the reward is taken — that is what makes it a card rather than a tally.
+  acceptsMore: (progress, target) => progress < target,
+
   redeemable: (progress, target) => progress >= target,
 
   describe: (progress, target) => `${progress} of ${target}`,

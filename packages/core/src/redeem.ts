@@ -61,7 +61,8 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
       .from(loyaltyProgressEvents)
       .where(eq(loyaltyProgressEvents.enrollmentId, input.enrollmentId));
     const balance = Number(sumRow?.total ?? 0);
-    if (!cardTypeModule(program.type).redeemable(balance, program.stampsRequired, {} as never)) {
+    const card = cardTypeModule(program.type);
+    if (!card.redeemable(balance, program.stampsRequired, card.normalize(program.mechanics) as never)) {
       return { redeemed: false, reason: "insufficient" as RedeemReason, enrollment, currentStamps: balance, rewardText: undefined };
     }
 
