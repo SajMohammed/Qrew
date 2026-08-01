@@ -35,6 +35,15 @@ export interface CardDesign {
   logoUrl?: string;
   /** Square transparent PNG drawn into the wallet stamp strip. */
   stampImageUrl?: string;
+  /** Artwork for a stamp not yet earned; without one the earned artwork is drawn faded. */
+  emptyStampImageUrl?: string;
+  /** A finished strip the shop drew themselves, used verbatim. Costs them the live stamp count. */
+  customStripUrl?: string;
+  stampLayout?: "row" | "grid" | "top-heavy" | "diamond";
+  stampScale?: number;
+  stampGapX?: number;
+  stampGapY?: number;
+  unearnedOpacity?: number;
   /** Extra rows on the wallet pass. Max 4. */
   details?: { label: string; value: string }[];
   /** Shop location, for the "you're nearby" lock-screen reminder. */

@@ -72,6 +72,18 @@ export const ProgramUpdate = z.object({
        * PNG specifically: the strip is composited server-side, and JPEG cannot be decoded there.
        */
       stampImageUrl: z.string().url().max(500).optional().or(z.literal("")),
+      /** Artwork for a stamp not yet earned. Without one, the earned artwork is drawn faded. */
+      emptyStampImageUrl: z.string().url().max(500).optional().or(z.literal("")),
+      /**
+       * A finished strip the shop drew themselves, passed through untouched. Costs them the live
+       * stamp count — the image cannot change as they earn — so it is opt-in, never the default.
+       */
+      customStripUrl: z.string().url().max(500).optional().or(z.literal("")),
+      stampLayout: z.enum(["row", "grid", "top-heavy", "diamond"]).optional(),
+      stampScale: z.number().min(0.5).max(1.4).optional(),
+      stampGapX: z.number().min(0).max(0.6).optional(),
+      stampGapY: z.number().min(0).max(0.6).optional(),
+      unearnedOpacity: z.number().min(0.05).max(1).optional(),
       /** Extra rows on the pass — Google textModulesData, Apple back fields. */
       details: z
         .array(z.object({ label: z.string().min(1).max(30), value: z.string().min(1).max(120) }))
@@ -90,6 +102,19 @@ export const ProgramUpdate = z.object({
     .optional(),
 });
 export type ProgramUpdate = z.infer<typeof ProgramUpdate>;
+
+/**
+ * Render a design that has not been saved, so the card designer can show the real strip a wallet
+ * will fetch rather than a mock of it. Stamp counts come in because the preview shows a part-filled
+ * card; they are display state, not anything this writes.
+ */
+export const StripPreviewRequest = z.object({
+  cardDesign: z.record(z.string(), z.unknown()),
+  stampsRequired: z.number().int().min(1).max(20),
+  currentStamps: z.number().int().min(0).max(20),
+  platform: z.enum(["google", "apple"]).default("google"),
+});
+export type StripPreviewRequest = z.infer<typeof StripPreviewRequest>;
 
 // Uploading a design image. The file itself is the raw request body; this is the query string.
 export const AssetUploadQuery = z.object({

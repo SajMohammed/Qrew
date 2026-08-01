@@ -154,15 +154,20 @@ export function decodePng(buf: Buffer): DecodedImage {
  * Never throws: artwork is decoration on top of a strip that already works. A broken link, a JPEG,
  * or a slow host degrades to the plain discs rather than failing the customer's card.
  */
-const iconCache = new Map<string, DecodedImage>();
+interface CachedImage {
+  bytes: Buffer;
+  decoded: DecodedImage;
+}
+
+const imageCache = new Map<string, CachedImage>();
 /** Failures are remembered only briefly — see below. */
 const failedUntil = new Map<string, number>();
 const FAILURE_COOLDOWN_MS = 60_000;
 
-export async function loadIcon(url: string | undefined): Promise<DecodedImage | undefined> {
+async function load(url: string | undefined): Promise<CachedImage | undefined> {
   if (!url) return undefined;
 
-  const hit = iconCache.get(url);
+  const hit = imageCache.get(url);
   if (hit) return hit;
 
   /*
@@ -176,13 +181,25 @@ export async function loadIcon(url: string | undefined): Promise<DecodedImage | 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`fetch ${res.status}`);
-    const decoded = decodePng(Buffer.from(await res.arrayBuffer()));
-    iconCache.set(url, decoded);
+    const bytes = Buffer.from(await res.arrayBuffer());
+    // Decoded even when only the bytes are wanted: it is the proof this really is a PNG we can
+    // serve as one, and it is what makes a broken image fail here rather than on someone's phone.
+    const entry: CachedImage = { bytes, decoded: decodePng(bytes) };
+    imageCache.set(url, entry);
     failedUntil.delete(url);
-    return decoded;
+    return entry;
   } catch (err) {
-    console.error(`[wallet] could not load stamp artwork ${url}:`, err instanceof Error ? err.message : err);
+    console.error(`[wallet] could not load artwork ${url}:`, err instanceof Error ? err.message : err);
     failedUntil.set(url, Date.now() + FAILURE_COOLDOWN_MS);
     return undefined;
   }
+}
+
+export async function loadIcon(url: string | undefined): Promise<DecodedImage | undefined> {
+  return (await load(url))?.decoded;
+}
+
+/** The original PNG bytes, for a strip a shop drew themselves and we pass through untouched. */
+export async function loadRawImage(url: string | undefined): Promise<Buffer | undefined> {
+  return (await load(url))?.bytes;
 }

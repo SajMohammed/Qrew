@@ -15,7 +15,7 @@ export {
   type StampLayout,
   type StripOptions,
 } from "./strip";
-export { decodePng, loadIcon, type DecodedImage } from "./png-decode";
+export { decodePng, loadIcon, loadRawImage, type DecodedImage } from "./png-decode";
 export { FakeWalletProvider } from "./fake-provider";
 export { PassKitProvider } from "./passkit-provider";
 export { GoogleWalletProvider } from "./google/provider";

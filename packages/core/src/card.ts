@@ -1,8 +1,19 @@
 import { eq } from "drizzle-orm";
 import { adminDb, merchants, loyaltyPrograms, enrollments, customers } from "@qrew/db";
-import { getWalletProvider, renderStampStrip, stripUrlFor, loadIcon } from "@qrew/wallet-core";
+import {
+  getWalletProvider,
+  renderStampStrip,
+  stripUrlFor,
+  loadIcon,
+  loadRawImage,
+  GOOGLE_STRIP,
+  APPLE_STRIP,
+} from "@qrew/wallet-core";
 import { mintCardToken } from "./token";
-import { normalizeDesign } from "./program";
+import { normalizeDesign, type CardDesign } from "./program";
+
+/** Which wallet the strip is being drawn for — they want different aspect ratios. */
+export type StripPlatform = "google" | "apple";
 
 export interface CardView {
   serial: string;
@@ -92,7 +103,10 @@ export async function getCard(serial: string): Promise<CardView | null> {
 
 
 /** The stamp strip for a card, as PNG bytes. Public — the serial is the capability, as with getCard. */
-export async function getCardStrip(serial: string): Promise<Buffer | null> {
+export async function getCardStrip(
+  serial: string,
+  platform: StripPlatform = "google",
+): Promise<Buffer | null> {
   const [row] = await adminDb
     .select({
       currentStamps: enrollments.currentProgress,
@@ -104,12 +118,46 @@ export async function getCardStrip(serial: string): Promise<Buffer | null> {
     .where(eq(enrollments.cardSerial, serial));
   if (!row) return null;
 
-  const design = normalizeDesign(row.cardDesign);
+  return stripFor(normalizeDesign(row.cardDesign), row.stampsRequired, row.currentStamps, platform);
+}
+
+/**
+ * Draw a design's strip. Shared by the live card and the designer's preview, so what a shop sees
+ * while editing is the same code path the wallet fetches — not a mock that can drift from it.
+ */
+export async function stripFor(
+  design: CardDesign,
+  stampsRequired: number,
+  currentStamps: number,
+  platform: StripPlatform = "google",
+): Promise<Buffer | null> {
+  /*
+   * A shop that supplied a finished strip gets it back untouched. They have traded the live stamp
+   * count for full control of the artwork, so compositing on top would defeat the choice.
+   */
+  if (design.customStripUrl) {
+    const custom = await loadRawImage(design.customStripUrl);
+    if (custom) return custom;
+    // Unreachable artwork falls through to a generated strip rather than leaving the pass blank.
+  }
+
+  const [icon, emptyIcon] = await Promise.all([
+    loadIcon(design.stampImageUrl),
+    loadIcon(design.emptyStampImageUrl),
+  ]);
+
   return renderStampStrip({
-    stampsRequired: row.stampsRequired,
-    currentStamps: row.currentStamps,
+    ...(platform === "apple" ? APPLE_STRIP : GOOGLE_STRIP),
+    stampsRequired,
+    currentStamps,
     brandColor: design.brandColor,
     // Undefined when unset or unreachable — the strip falls back to discs rather than failing.
-    icon: await loadIcon(design.stampImageUrl),
+    icon,
+    emptyIcon,
+    layout: design.stampLayout,
+    scale: design.stampScale,
+    gapX: design.stampGapX,
+    gapY: design.stampGapY,
+    unearnedOpacity: design.unearnedOpacity,
   });
 }
