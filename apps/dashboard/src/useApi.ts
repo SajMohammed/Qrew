@@ -12,6 +12,7 @@ import type {
   CustomerList,
   CustomersParams,
   StaffMember,
+  CardType,
 } from "./api";
 
 const rnd = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -106,6 +107,12 @@ export function useApi() {
         if (!res.ok) throw new Error(`Customers failed (${res.status})`);
         return res.json();
       },
+      /** The card types this deployment can issue — the picker must not offer any others. */
+      async getCardTypes(): Promise<{ type: CardType; label: string; blurb: string; accrues: boolean }[]> {
+        const res = await call("/program/types");
+        if (!res.ok) throw new Error(`Card types failed (${res.status})`);
+        return res.json();
+      },
       async getProgram(): Promise<Program> {
         const res = await call("/program");
         if (!res.ok) throw new Error(`Program failed (${res.status})`);
@@ -113,8 +120,43 @@ export function useApi() {
       },
       async updateProgram(id: string, patch: ProgramPatch): Promise<Program> {
         const res = await call(`/program/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
-        if (!res.ok) throw new Error(`Save failed (${res.status})`);
+        // The domain refuses a type change on a programme customers already hold passes for, and
+        // says why. Surfacing its message beats "Save failed (400)".
+        if (!res.ok) throw new Error(await describe(res, "Save failed"));
         return res.json();
+      },
+
+      /**
+       * Upload a design image and get back the public URL a wallet can fetch.
+       *
+       * The file goes as the raw body — the API takes one file per request, so multipart would be
+       * ceremony. Content-type is set explicitly because `call` assumes JSON for anything with one.
+       */
+      async uploadAsset(kind: "stamp" | "logo", file: File): Promise<{ url: string; width: number; height: number }> {
+        const token = await getToken();
+        const headers = new Headers({ "content-type": "image/png" });
+        if (token) headers.set("authorization", `Bearer ${token}`);
+        const res = await fetch(`${BASE}/asset?kind=${kind}`, { method: "POST", headers, body: file });
+        if (!res.ok) throw new Error(await describe(res, "Upload failed"));
+        return res.json();
+      },
+
+      /**
+       * Render an unsaved design, exactly as a wallet will fetch it.
+       *
+       * Returns an object URL the caller must revoke. Drawing the pass in CSS instead would be a
+       * guess at what the wallet does, and the two drifted before — light artwork looked blank in
+       * the old preview and correct on the phone.
+       */
+      async previewStrip(body: {
+        cardDesign: unknown;
+        stampsRequired: number;
+        currentStamps: number;
+        platform: "google" | "apple";
+      }): Promise<string> {
+        const res = await call("/card/strip/preview", { method: "POST", body: JSON.stringify(body) });
+        if (!res.ok) throw new Error(await describe(res, "Preview failed"));
+        return URL.createObjectURL(await res.blob());
       },
       // ── Scan tab ──
       async scan(serial: string, staffToken?: string): Promise<ScanResult> {

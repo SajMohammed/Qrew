@@ -17,12 +17,12 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 
 /** The management surface. Counter mode is deliberately not one of these — it replaces the shell. */
-export type ManageView = "dashboard" | "customers" | "designer" | "counterqr" | "team";
+export type ManageView = "dashboard" | "customers" | "card" | "counterqr" | "team";
 
 const NAV: { id: ManageView; label: string; short: string; icon: typeof LayoutGrid }[] = [
   { id: "dashboard", label: "Dashboard", short: "Home", icon: LayoutGrid },
   { id: "customers", label: "Customers", short: "People", icon: Users },
-  { id: "designer", label: "Card designer", short: "Card", icon: CreditCard },
+  { id: "card", label: "Card", short: "Card", icon: CreditCard },
   { id: "counterqr", label: "Counter QR", short: "QR", icon: QrCode },
   { id: "team", label: "Team", short: "Team", icon: UsersRound },
 ];
