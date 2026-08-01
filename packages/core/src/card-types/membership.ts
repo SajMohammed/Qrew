@@ -66,6 +66,9 @@ export const membershipCard: CardTypeModule<MembershipMechanics> = {
 
   wallet: { google: "loyalty", apple: "storeCard" },
 
+  // Tier thresholds live in mechanics; this only bounds the shared column.
+  maxTarget: 1_000_000,
+
   accrues: true,
 
   earn: () => 1,

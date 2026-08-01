@@ -43,6 +43,9 @@ export const discountCard: CardTypeModule<DiscountMechanics> = {
 
   wallet: { google: "offer", apple: "coupon" },
 
+  // Nothing accumulates, so there is no threshold to reach.
+  maxTarget: 1,
+
   accrues: false,
 
   earn: () => 0,

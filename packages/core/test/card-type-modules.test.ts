@@ -40,6 +40,20 @@ describe("the registry now covers every card type", () => {
   });
 });
 
+describe("the reward threshold each type allows", () => {
+  it("bounds a stamp card by what a strip can legibly draw", () => {
+    // The renderer clamps at 20, so accepting more would let the saved number and the drawn card
+    // disagree — a shop setting 50 would see 20 and be told they had 50.
+    expect(stampCard.maxTarget).toBe(20);
+  });
+
+  it("does not impose a stamp card's ceiling on a points card", () => {
+    // A reward at 500 points is ordinary; capping every type at 20 made it unconfigurable.
+    expect(pointsCard.maxTarget).toBeGreaterThan(1000);
+    expect(membershipCard.maxTarget).toBeGreaterThan(1000);
+  });
+});
+
 describe("stamp card", () => {
   it("stops taking stamps when the card is full", () => {
     expect(stampCard.acceptsMore(9, 10, {})).toBe(true);

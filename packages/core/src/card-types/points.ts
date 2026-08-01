@@ -42,6 +42,9 @@ export const pointsCard: CardTypeModule<PointsMechanics> = {
 
   wallet: { google: "loyalty", apple: "storeCard" },
 
+  // A balance has no natural ceiling — shops set rewards in the hundreds or thousands.
+  maxTarget: 1_000_000,
+
   accrues: true,
 
   earn: (m, ctx) =>

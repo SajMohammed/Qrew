@@ -215,7 +215,7 @@ export async function updateProgram(
       .set({
         name: patch.name ?? current.name,
         rewardText: patch.rewardText ?? current.rewardText,
-        stampsRequired: patch.stampsRequired ?? current.stampsRequired,
+        stampsRequired: Math.min(patch.stampsRequired ?? current.stampsRequired, cardTypeModule(type).maxTarget),
         bonusStamps: patch.bonusStamps ?? current.bonusStamps,
         type,
         mechanics,

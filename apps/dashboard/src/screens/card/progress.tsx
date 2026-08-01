@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import type { CardDesign, CardType } from "@/api";
+import { cn } from "@/lib/utils";
 import { FIELD, ImageField, Labelled, NumberField, Segmented, Slider } from "./controls";
 
 /**
@@ -24,6 +25,16 @@ export interface ProgressEditorProps {
   upload: (kind: "stamp" | "logo", file: File) => Promise<string>;
 }
 
+/**
+ * The shop's mark, for the surfaces that can draw a glyph.
+ *
+ * The wallet strip cannot: it is composited on the server with no font engine, and colour-emoji
+ * fonts are the case those handle worst. So an emoji reaches the app card and the poster, and only
+ * uploaded artwork reaches the pass. Both are offered because most shops want the app card to look
+ * like something on day one, before they have a designer make them a PNG.
+ */
+const STAMP_ICONS = ["☕", "✦", "★", "♥", "🍩", "🥐", "🍕", "🌮", "🍺", "💇", "🛍️", "🎁"];
+
 const LAYOUTS = [
   { id: "grid" as const, label: "Grid" },
   { id: "row" as const, label: "Row" },
@@ -35,6 +46,34 @@ function StampEditor({ target, setTarget, bonus, setBonus, design, patch, upload
   const custom = design.customStripUrl !== undefined;
   return (
     <>
+      <Labelled
+        label="Your mark"
+        hint={
+          design.stampImageUrl
+            ? "Your artwork is used everywhere it can be, so this shows only where the artwork is missing."
+            : "Shown on the app card and the printed poster. Wallet passes need artwork instead — neither wallet can draw an emoji."
+        }
+      >
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {STAMP_ICONS.map((i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => patch({ stampIcon: i })}
+              aria-pressed={i === design.stampIcon}
+              className={cn(
+                "grid size-11 cursor-pointer place-items-center rounded-xl border text-lg transition",
+                i === design.stampIcon
+                  ? "border-primary bg-primary/12"
+                  : "border-border bg-card hover:bg-accent",
+              )}
+            >
+              {i}
+            </button>
+          ))}
+        </div>
+      </Labelled>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <Labelled label="Stamps to reward">
           <NumberField value={target} onChange={setTarget} min={1} max={20} />
@@ -152,7 +191,7 @@ function PointsEditor({ mechanics, setMechanics, target, setTarget, bonus, setBo
           <NumberField value={perVisit} onChange={(n) => set({ perVisit: n })} min={0} max={10000} />
         </Labelled>
         <Labelled label={`${unitLabel} to earn the reward`}>
-          <NumberField value={target} onChange={setTarget} min={1} max={20} />
+          <NumberField value={target} onChange={setTarget} min={1} max={1_000_000} />
         </Labelled>
       </div>
 

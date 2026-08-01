@@ -38,8 +38,13 @@ export interface PreviewInput {
   stampsRequired: number;
   /** What the card reads as at this progress — the card type decides the wording. */
   progressLabel: string;
-  /** Whether this product shows a filling-up strip at all. */
+  /** Whether this product accumulates anything at all. */
   showsProgress: boolean;
+  /**
+   * Whether progress reads as a row of marks. Only a stamp card does: drawing ten discs for a
+   * hundred-point balance would say something untrue about how the card works.
+   */
+  showsStamps: boolean;
 }
 
 export function SurfacePreview(props: PreviewInput) {
@@ -75,7 +80,16 @@ export function SurfacePreview(props: PreviewInput) {
   );
 }
 
-function AppCard({ design, shopName, title, rewardText, progressLabel, showsProgress, stampsRequired }: PreviewInput) {
+function AppCard({
+  design,
+  shopName,
+  title,
+  rewardText,
+  progressLabel,
+  showsProgress,
+  showsStamps,
+  stampsRequired,
+}: PreviewInput) {
   const ink = textOn(design.brandColor);
   const shown = Math.min(stampsRequired, 10);
   const filled = Math.ceil(shown * 0.7);
@@ -102,32 +116,43 @@ function AppCard({ design, shopName, title, rewardText, progressLabel, showsProg
 
         <div className="mt-1 text-[15px] font-bold">{title || "Loyalty Card"}</div>
 
-        {showsProgress && (
+        {showsStamps ? (
           <div className="mt-3 flex flex-wrap justify-center gap-2">
-            {Array.from({ length: shown }, (_, i) =>
-              design.stampImageUrl ? (
-                <img
-                  key={i}
-                  src={i < filled ? design.stampImageUrl : (design.emptyStampImageUrl ?? design.stampImageUrl)}
-                  alt=""
-                  className="size-8 object-contain"
-                  style={{
-                    opacity: i < filled || design.emptyStampImageUrl ? 1 : (design.unearnedOpacity ?? 0.28),
-                  }}
-                />
-              ) : (
+            {Array.from({ length: shown }, (_, i) => {
+              const on = i < filled;
+              const faded = on || design.emptyStampImageUrl ? 1 : (design.unearnedOpacity ?? 0.28);
+              // Artwork wins where a shop has supplied it; their emoji is the fallback, and a plain
+              // disc the fallback to that. The wallet strip can only ever use the artwork.
+              if (design.stampImageUrl) {
+                return (
+                  <img
+                    key={i}
+                    src={on ? design.stampImageUrl : (design.emptyStampImageUrl ?? design.stampImageUrl)}
+                    alt=""
+                    className="size-8 object-contain"
+                    style={{ opacity: faded }}
+                  />
+                );
+              }
+              return (
                 <span
                   key={i}
-                  className="size-7 rounded-full"
+                  className="grid size-8 place-items-center rounded-full text-[15px]"
                   style={
-                    i < filled
-                      ? { background: ink }
+                    on
+                      ? { background: `${ink}22` }
                       : { border: `2px solid ${ink}`, opacity: design.unearnedOpacity ?? 0.28 }
                   }
-                />
-              ),
-            )}
+                >
+                  {on ? design.stampIcon : ""}
+                </span>
+              );
+            })}
           </div>
+        ) : (
+          showsProgress && (
+            <div className="mt-3 text-center text-2xl font-extrabold">{progressLabel}</div>
+          )
         )}
 
         <div className="mt-3 flex items-end justify-between gap-2">

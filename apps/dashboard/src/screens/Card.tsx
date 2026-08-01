@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Lock, Palette, Signature, LayoutGrid, ListPlus, MapPin, Plus, Trash2, Check } from "lucide-react";
+import { Palette, Signature, LayoutGrid, ListPlus, MapPin, Plus, Trash2, Check } from "lucide-react";
 import { useApi } from "@/useApi";
 import type { CardDesign, CardType, Program } from "@/api";
 import { Card as Panel } from "@/components/ui/card";
@@ -130,6 +130,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
             stampsRequired={target}
             progressLabel={previewLabel(type, target, mechanics)}
             showsProgress={chosen?.accrues ?? true}
+            showsStamps={type === "stamp"}
           />
         </div>
 

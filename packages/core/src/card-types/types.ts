@@ -63,6 +63,16 @@ export interface CardTypeModule<M = unknown> {
   wallet: WalletMapping;
 
   /**
+   * The largest reward threshold this type makes sense with.
+   *
+   * A stamp card is bounded by what a strip can legibly draw; a points card is not bounded by
+   * anything like it, and capping both at the same number would make a points reward of 500
+   * impossible to configure. Enforced in the domain so a direct API call cannot set a stamp card
+   * to a target the strip would silently clamp away.
+   */
+  maxTarget: number;
+
+  /**
    * Whether progress accumulates at the counter at all. False for a card that is an entitlement
    * rather than a journey — a discount is valid from the moment it is issued.
    */

@@ -62,7 +62,9 @@ export const ProgramUpdate = z.object({
   /** Settings only the chosen type has. Shape is validated per type in the domain. */
   mechanics: z.record(z.string(), z.unknown()).optional(),
   rewardText: z.string().min(1).max(60).optional(),
-  stampsRequired: z.number().int().min(1).max(20).optional(),
+  // The real ceiling is per card type and enforced in the domain — a points card is not
+  // bounded by what a stamp strip can legibly draw.
+  stampsRequired: z.number().int().min(1).max(1_000_000).optional(),
   bonusStamps: z.number().int().min(0).max(10).optional(),
   /**
    * The shop's design INTENT — never platform field names. Each wallet adapter maps this onto its

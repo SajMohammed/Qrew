@@ -26,6 +26,9 @@ export const stampCard: CardTypeModule<StampMechanics> = {
   // can draw one — which on Apple means storeCard or coupon, never generic.
   wallet: { google: "loyalty", apple: "storeCard" },
 
+  // The strip renderer draws at most 20, and twenty stamps is already a long card.
+  maxTarget: 20,
+
   accrues: true,
 
   earn: () => 1,
