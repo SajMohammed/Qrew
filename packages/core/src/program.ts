@@ -1,6 +1,8 @@
-import { and, asc, eq } from "drizzle-orm";
-import { withTenant, merchants, loyaltyPrograms } from "@qrew/db";
+import { and, asc, count, eq } from "drizzle-orm";
+import { withTenant, merchants, loyaltyPrograms, enrollments } from "@qrew/db";
 import { getWalletProvider, type StampLayout } from "@qrew/wallet-core";
+import { cardTypeModule, normalizeMechanics, isCardType, type CardType } from "./card-types";
+import { InvalidInputError } from "./errors";
 
 /**
  * The shop's design INTENT. Deliberately platform-agnostic: every field here is expressible on the
@@ -48,6 +50,10 @@ export interface CardDesign {
 export interface ProgramView {
   id: string;
   name: string;
+  /** What kind of card this is. Fixed once customers hold passes — see updateProgram. */
+  type: CardType;
+  /** Settings only this card type has, validated by its module. */
+  mechanics: unknown;
   rewardText: string;
   stampsRequired: number;
   bonusStamps: number;
@@ -131,9 +137,12 @@ export async function getShopPreview(merchantId: string, programId: string): Pro
 }
 
 function toView(p: typeof loyaltyPrograms.$inferSelect): ProgramView {
+  const type = isCardType(p.type) ? p.type : "stamp";
   return {
     id: p.id,
     name: p.name,
+    type,
+    mechanics: normalizeMechanics(type, p.mechanics),
     rewardText: p.rewardText,
     stampsRequired: p.stampsRequired,
     bonusStamps: p.bonusStamps,
@@ -157,6 +166,8 @@ export async function getProgram(merchantId: string, programId?: string): Promis
 
 export interface ProgramPatch {
   name?: string;
+  type?: CardType;
+  mechanics?: unknown;
   rewardText?: string;
   stampsRequired?: number;
   bonusStamps?: number;
@@ -172,6 +183,32 @@ export async function updateProgram(
     const [current] = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.id, programId));
     if (!current) return null;
 
+    /*
+     * Changing the card type is only an edit while nobody holds a pass.
+     *
+     * Google welds an object to its class type, with no conversion endpoint, so a stamp card that
+     * becomes a points card needs a new class, new objects, and every customer to save the pass
+     * again. Once even one card exists, silently accepting the change would leave those people
+     * holding a pass the shop no longer runs. Refuse it here, where the count is known, rather
+     * than trusting the UI to hide the control.
+     */
+    const type = patch.type ?? (isCardType(current.type) ? current.type : "stamp");
+    if (patch.type && patch.type !== current.type) {
+      const [held] = await db
+        .select({ n: count() })
+        .from(enrollments)
+        .where(eq(enrollments.programId, programId));
+      if ((held?.n ?? 0) > 0) {
+        throw new InvalidInputError(
+          `this programme already has ${held!.n} card${held!.n === 1 ? "" : "s"} in customers' wallets, ` +
+            `so its type cannot change. A different card type has to be issued as a new programme.`,
+        );
+      }
+    }
+
+    // Validated against the type being saved, not the one it had — so a type change and its
+    // settings can land together.
+    const mechanics = normalizeMechanics(type, patch.mechanics ?? (type === current.type ? current.mechanics : {}));
     const cardDesign = { ...normalizeDesign(current.cardDesign), ...(patch.cardDesign ?? {}) };
     const [updated] = await db
       .update(loyaltyPrograms)
@@ -180,6 +217,8 @@ export async function updateProgram(
         rewardText: patch.rewardText ?? current.rewardText,
         stampsRequired: patch.stampsRequired ?? current.stampsRequired,
         bonusStamps: patch.bonusStamps ?? current.bonusStamps,
+        type,
+        mechanics,
         cardDesign,
       })
       .where(eq(loyaltyPrograms.id, programId))

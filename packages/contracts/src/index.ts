@@ -53,6 +53,14 @@ export type StaffPinUpdate = z.infer<typeof StaffPinUpdate>;
 
 export const ProgramUpdate = z.object({
   name: z.string().min(1).max(60).optional(),
+  /**
+   * What kind of card this is. The API accepts a change; the domain refuses one on a programme
+   * whose passes are already in customers' wallets, because a wallet object cannot move between
+   * class types — see packages/core/src/card-types/types.ts.
+   */
+  type: z.enum(["stamp", "points", "discount", "membership"]).optional(),
+  /** Settings only the chosen type has. Shape is validated per type in the domain. */
+  mechanics: z.record(z.string(), z.unknown()).optional(),
   rewardText: z.string().min(1).max(60).optional(),
   stampsRequired: z.number().int().min(1).max(20).optional(),
   bonusStamps: z.number().int().min(0).max(10).optional(),

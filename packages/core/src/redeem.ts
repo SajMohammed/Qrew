@@ -1,5 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments, loyaltyProgressEvents, redemptions } from "@qrew/db";
+import { cardTypeModule } from "./card-types";
 import { enqueueWalletSync } from "@qrew/queue";
 import { NotFoundError } from "./errors";
 
@@ -60,7 +61,7 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
       .from(loyaltyProgressEvents)
       .where(eq(loyaltyProgressEvents.enrollmentId, input.enrollmentId));
     const balance = Number(sumRow?.total ?? 0);
-    if (balance < program.stampsRequired) {
+    if (!cardTypeModule(program.type).redeemable(balance, program.stampsRequired, {} as never)) {
       return { redeemed: false, reason: "insufficient" as RedeemReason, enrollment, currentStamps: balance, rewardText: undefined };
     }
 

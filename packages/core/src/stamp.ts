@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments, loyaltyProgressEvents } from "@qrew/db";
+import { cardTypeModule } from "./card-types";
 import { enqueueWalletSync } from "@qrew/queue";
 import { NotFoundError } from "./errors";
 
@@ -51,7 +52,10 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
     if (!program) throw new NotFoundError("program not found");
 
     // Don't stamp past the reward threshold — the card is full; the customer must redeem first.
-    if (enrollment.currentProgress >= program.stampsRequired) {
+    const card = cardTypeModule(program.type);
+
+    // Full cards stop accruing whatever the product: the customer must redeem first.
+    if (card.redeemable(enrollment.currentProgress, program.stampsRequired, {} as never)) {
       return {
         applied: false,
         reason: "reward_ready" as StampReason,
@@ -80,7 +84,9 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
         idempotencyKey: input.idempotencyKey,
         locationId: input.locationId,
         staffId: input.staffId,
-        delta: 1,
+        // What one scan is worth. A stamp card says 1; a points card will say whatever its earn
+        // rate works out to. The ledger has always held a signed delta, so nothing else changes.
+        delta: card.earn({} as never),
         source: "staff_scan",
       })
       .onConflictDoNothing({ target: [loyaltyProgressEvents.merchantId, loyaltyProgressEvents.idempotencyKey] })

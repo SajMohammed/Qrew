@@ -79,10 +79,19 @@ export const loyaltyPrograms = pgTable(
     bonusStamps: integer("bonus_stamps").notNull().default(2),
     rewardText: text("reward_text").notNull().default("1 free item"),
     cardDesign: jsonb("card_design").notNull().default(sql`'{}'::jsonb`),
+    // What kind of card this is: stamp | points | discount | membership. See migration 0011.
+    type: text("type").notNull().default("stamp"),
+    // Settings only this type has — a points earn rate, a discount's terms, a membership's tiers.
+    // Validated in the domain by a zod schema per type (packages/core/src/card-types).
+    mechanics: jsonb("mechanics").notNull().default(sql`'{}'::jsonb`),
     active: boolean("active").notNull().default(true),
     createdAt: createdAt(),
   },
-  (t) => [index("programs_merchant_idx").on(t.merchantId)],
+  (t) => [
+    index("programs_merchant_idx").on(t.merchantId),
+    index("loyalty_programs_merchant_type_idx").on(t.merchantId, t.type),
+    check("loyalty_programs_type_known", sql`${t.type} in ('stamp', 'points', 'discount', 'membership')`),
+  ],
 );
 
 export const customers = pgTable(

@@ -50,9 +50,15 @@ export interface CardDesign {
   location?: { lat: number; lng: number; label?: string } | null;
 }
 
+export type CardType = "stamp" | "points" | "discount" | "membership";
+
 export interface Program {
   id: string;
   name: string;
+  /** Fixed once customers hold passes — a wallet object cannot move between class types. */
+  type: CardType;
+  /** Settings only this card type has. */
+  mechanics: unknown;
   rewardText: string;
   stampsRequired: number;
   bonusStamps: number;
@@ -62,6 +68,8 @@ export interface Program {
 
 export type ProgramPatch = Partial<{
   name: string;
+  type: CardType;
+  mechanics: unknown;
   rewardText: string;
   stampsRequired: number;
   bonusStamps: number;
