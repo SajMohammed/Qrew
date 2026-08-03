@@ -29,6 +29,9 @@ export interface CardView {
   rewardReady: boolean;
   brandColor: string; // per-merchant theming (from the card designer)
   stampIcon: string;
+  /** The shop's artwork, when they have supplied it. Takes precedence over the emoji. */
+  stampImageUrl?: string;
+  emptyStampImageUrl?: string;
   /** Add-to-Wallet links — null under the fake provider; a real save URL once wired. */
   wallet: { apple: string | null; google: string | null };
 }
@@ -115,6 +118,8 @@ export async function getCard(serial: string): Promise<CardView | null> {
     rewardReady: row.currentStamps >= row.stampsRequired,
     brandColor: design.brandColor,
     stampIcon: design.stampIcon,
+    ...(design.stampImageUrl ? { stampImageUrl: design.stampImageUrl } : {}),
+    ...(design.emptyStampImageUrl ? { emptyStampImageUrl: design.emptyStampImageUrl } : {}),
     wallet: { apple: null, google }, // Apple needs the $99/yr programme — not wired yet
   };
 }

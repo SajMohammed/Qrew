@@ -114,6 +114,7 @@ export function useApi() {
           label: string;
           blurb: string;
           accrues: boolean;
+          defaultTarget: number;
           drawsStampStrip: boolean;
           issuable: boolean;
         }[]

@@ -73,6 +73,14 @@ export interface CardTypeModule<M = unknown> {
   maxTarget: number;
 
   /**
+   * A sensible reward threshold when a shop first picks this type.
+   *
+   * Carrying the previous type's number over is worse than a guess: a stamp card's 10 becomes a
+   * points card where a single visit earns the reward.
+   */
+  defaultTarget: number;
+
+  /**
    * Whether the pass shows progress as a picture of stamps.
    *
    * Only a stamp card does. Google renders a points balance natively and a discount has no

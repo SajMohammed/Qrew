@@ -12,6 +12,9 @@ export interface CardView {
   rewardReady: boolean;
   brandColor: string;
   stampIcon: string;
+  /** The shop's artwork, when set. Drawn instead of the emoji. */
+  stampImageUrl?: string;
+  emptyStampImageUrl?: string;
   wallet: { apple: string | null; google: string | null };
 }
 

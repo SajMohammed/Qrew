@@ -27,6 +27,7 @@ interface CardTypeOption {
   label: string;
   blurb: string;
   accrues: boolean;
+  defaultTarget: number;
   drawsStampStrip: boolean;
   issuable: boolean;
 }
@@ -63,6 +64,22 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
   }, []);
 
   const patch = (next: Partial<CardDesign>) => setDesign((d) => ({ ...d, ...next }));
+
+  /*
+   * Switching type carries nothing over, because nothing is comparable: a stamp card's threshold of
+   * 10 would become a points card where a single visit earns the reward. Each type brings its own
+   * sensible starting point instead.
+   *
+   * Coming back to the type the programme is actually saved as restores what was saved, so a shop
+   * that clicks through the options to read them has not quietly rewritten their own settings.
+   */
+  function selectType(t: CardTypeOption) {
+    if (!program) return;
+    setType(t.type);
+    const returning = t.type === program.type;
+    setMechanics(returning ? ((program.mechanics ?? {}) as Record<string, unknown>) : {});
+    setTarget(returning ? program.stampsRequired : t.defaultTarget);
+  }
 
   async function save() {
     if (!program) return;
@@ -147,10 +164,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
                   <button
                     key={t.type}
                     type="button"
-                    onClick={() => {
-                      setType(t.type);
-                      setMechanics({}); // let the server fill in that type's defaults
-                    }}
+                    onClick={() => selectType(t)}
                     aria-pressed={active}
                     className={cn(
                       "cursor-pointer rounded-xl border p-3 text-left transition",

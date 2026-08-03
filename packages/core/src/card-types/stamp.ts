@@ -29,6 +29,8 @@ export const stampCard: CardTypeModule<StampMechanics> = {
   // The strip renderer draws at most 20, and twenty stamps is already a long card.
   maxTarget: 20,
 
+  defaultTarget: 10,
+
   drawsStampStrip: true,
 
   accrues: true,

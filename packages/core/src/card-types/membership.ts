@@ -69,6 +69,8 @@ export const membershipCard: CardTypeModule<MembershipMechanics> = {
   // Tier thresholds live in mechanics; this only bounds the shared column.
   maxTarget: 1_000_000,
 
+  defaultTarget: 50,
+
   drawsStampStrip: false,
 
   accrues: true,

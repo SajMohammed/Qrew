@@ -19,6 +19,7 @@ export class ProgramController {
       label: t.label,
       blurb: t.blurb,
       accrues: t.accrues,
+      defaultTarget: t.defaultTarget,
       /** Whether the pass shows a picture of stamps, so the designer previews what a wallet gets. */
       drawsStampStrip: t.drawsStampStrip,
       /**

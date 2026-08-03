@@ -122,7 +122,19 @@ export function StampCard({
                     : "on-card-line border-[1.5px] border-dashed",
                 )}
               >
-                {on ? card.stampIcon : ""}
+                {/* Artwork where the shop has it, their emoji otherwise — the same order the
+                    wallet strip and the designer preview use. */}
+                {card.stampImageUrl ? (
+                  <img
+                    src={on ? card.stampImageUrl : (card.emptyStampImageUrl ?? card.stampImageUrl)}
+                    alt=""
+                    className="size-[72%] object-contain"
+                  />
+                ) : on ? (
+                  card.stampIcon
+                ) : (
+                  ""
+                )}
               </m.span>
             );
           })}

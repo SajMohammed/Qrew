@@ -45,6 +45,8 @@ export const pointsCard: CardTypeModule<PointsMechanics> = {
   // A balance has no natural ceiling — shops set rewards in the hundreds or thousands.
   maxTarget: 1_000_000,
 
+  defaultTarget: 500,
+
   drawsStampStrip: false,
 
   accrues: true,

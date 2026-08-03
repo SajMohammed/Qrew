@@ -47,6 +47,17 @@ describe("the reward threshold each type allows", () => {
     expect(stampCard.maxTarget).toBe(20);
   });
 
+  it("starts each type at a threshold that makes sense for it", () => {
+    // Carrying the previous type's number over is worse than a guess: a stamp card's 10 would
+    // become a points card where a single visit earns the reward.
+    expect(stampCard.defaultTarget).toBe(10);
+    expect(pointsCard.defaultTarget).toBeGreaterThan(100);
+    expect(membershipCard.defaultTarget).toBeGreaterThan(10);
+    for (const m of [stampCard, pointsCard, membershipCard, discountCard]) {
+      expect(m.defaultTarget, `${m.type} default exceeds its own ceiling`).toBeLessThanOrEqual(m.maxTarget);
+    }
+  });
+
   it("does not impose a stamp card's ceiling on a points card", () => {
     // A reward at 500 points is ordinary; capping every type at 20 made it unconfigurable.
     expect(pointsCard.maxTarget).toBeGreaterThan(1000);

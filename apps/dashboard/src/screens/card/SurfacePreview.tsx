@@ -65,6 +65,7 @@ export function SurfacePreview(props: PreviewInput) {
             type="button"
             onClick={() => setSurface(s.id)}
             aria-pressed={surface === s.id}
+            aria-label={s.label}
             className={cn(
               "flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-semibold transition",
               surface === s.id
@@ -117,40 +118,47 @@ function AppCard({
             )}
           </span>
           <span className="truncate text-[13px] font-semibold">{shopName}</span>
-          <span className="ml-auto text-[12px] opacity-80">{progressLabel}</span>
+          {/* A stamp card needs the count beside the row; the others print it large below, and
+              showing it twice just reads as a mistake. */}
+          {showsStamps && <span className="ml-auto text-[12px] opacity-80">{progressLabel}</span>}
         </div>
 
         <div className="mt-1 text-[15px] font-bold">{title || "Loyalty Card"}</div>
 
         {showsStamps ? (
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
+          /*
+           * Mirrors apps/card/src/StampCard.tsx exactly: a five-column grid, white discs for what
+           * is earned, dashed outlines for what is not. Inventing a layout here — it used to be a
+           * flex-wrap, which put eight stamps on one line and two on the next — makes the preview
+           * a picture of a card that does not exist.
+           */
+          <div
+            className="mt-3 grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${Math.min(shown, 5)}, minmax(0, 1fr))` }}
+          >
             {Array.from({ length: shown }, (_, i) => {
               const on = i < filled;
-              const faded = on || design.emptyStampImageUrl ? 1 : (design.unearnedOpacity ?? 0.28);
-              // Artwork wins where a shop has supplied it; their emoji is the fallback, and a plain
-              // disc the fallback to that. The wallet strip can only ever use the artwork.
-              if (design.stampImageUrl) {
-                return (
-                  <img
-                    key={i}
-                    src={on ? design.stampImageUrl : (design.emptyStampImageUrl ?? design.stampImageUrl)}
-                    alt=""
-                    className="size-8 object-contain"
-                    style={{ opacity: faded }}
-                  />
-                );
-              }
+              const art = on ? design.stampImageUrl : (design.emptyStampImageUrl ?? design.stampImageUrl);
               return (
                 <span
                   key={i}
-                  className="grid size-8 place-items-center rounded-full text-[15px]"
+                  className={cn(
+                    "grid aspect-square place-items-center rounded-full text-sm",
+                    on ? "shadow" : "border-[1.5px] border-dashed",
+                  )}
                   style={
                     on
-                      ? { background: `${ink}22` }
-                      : { border: `2px solid ${ink}`, opacity: design.unearnedOpacity ?? 0.28 }
+                      ? { background: ink, color: design.brandColor }
+                      : { borderColor: `${ink}66` }
                   }
                 >
-                  {on ? design.stampIcon : ""}
+                  {design.stampImageUrl ? (
+                    <img src={art} alt="" className="size-[72%] object-contain" />
+                  ) : on ? (
+                    design.stampIcon
+                  ) : (
+                    ""
+                  )}
                 </span>
               );
             })}

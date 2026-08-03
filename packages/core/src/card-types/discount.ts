@@ -46,6 +46,8 @@ export const discountCard: CardTypeModule<DiscountMechanics> = {
   // Nothing accumulates, so there is no threshold to reach.
   maxTarget: 1,
 
+  defaultTarget: 1,
+
   drawsStampStrip: false,
 
   accrues: false,
