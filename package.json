@@ -11,6 +11,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "e2e": "turbo run build --filter=@qrew/api --filter=@qrew/card --filter=@qrew/dashboard && pnpm --filter @qrew/e2e e2e",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @qrew/db migrate",

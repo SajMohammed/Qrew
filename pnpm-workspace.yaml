@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "e2e"
 
 # Native binaries these deps need to compile/download at install time.
 allowBuilds:
