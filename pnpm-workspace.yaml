@@ -8,3 +8,14 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true # optional native accel for bullmq's msgpack (falls back to JS if unbuilt)
   sharp: false # Next's image lib — unused (no next/image on the marketing page); flip to true if added
+
+# Security floors for transitive dependencies whose parents haven't picked up the fix yet. Each is
+# pinned within its current major: an open-ended ">=" would let nanoid jump to its ESM-only 6.x,
+# which postcss cannot require. Drop an entry once `pnpm audit` is clean without it.
+overrides:
+  "proxy-addr@<2.0.8": "^2.0.8" # express — IP spoofing behind a proxy
+  "qs@<6.16.0": "^6.16.0" # express — query-string DoS
+  "postcss@<8.5.23": "^8.5.23" # vite, tailwind, next (build time)
+  "nanoid@<3.3.18": "^3.3.18" # postcss (build time)
+  "source-map-js@<1.2.2": "^1.2.2" # postcss (build time)
+  "sharp@<0.35.5": "^0.35.5" # next's image optimiser, which the static marketing site never runs
