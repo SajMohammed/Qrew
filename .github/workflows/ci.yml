@@ -15,32 +15,44 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: qrew
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d qrew"
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
 
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/qrew
-      DATABASE_URL_APP: postgres://qrew_app:qrew_app@localhost:5432/qrew
+      # Migrations and the admin path run as an owner that is NOT a superuser, the shape AWS RDS
+      # gives you. Running them as `postgres` would hide any reliance on superuser privileges.
+      DATABASE_URL: postgres://qrew_owner:qrew_owner@localhost:5432/qrew
+      # The migrator moves qrew_app off its public default password; the tests then log in with this.
+      QREW_APP_PASSWORD: ci-only-app-password-not-a-secret
+      DATABASE_URL_APP: postgres://qrew_app:ci-only-app-password-not-a-secret@localhost:5432/qrew
+      NODE_ENV: test
 
     steps:
       - uses: actions/checkout@v4
 
+      # The pnpm version comes from package.json's packageManager field; naming one here as well
+      # makes the action refuse to run.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+
+      - name: Create an RDS-like database owner (no superuser, no BYPASSRLS)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -c "create role qrew_owner login password 'qrew_owner' nosuperuser nobypassrls createrole" \
+            -c "create database qrew owner qrew_owner"
 
       - name: Apply migrations (schema + RLS)
         run: pnpm db:migrate
@@ -52,3 +64,6 @@ jobs:
       # rows, this fails and the merge is blocked.
       - name: Test (incl. RLS tenant-isolation)
         run: pnpm test
+
+      - name: Build
+        run: pnpm build
