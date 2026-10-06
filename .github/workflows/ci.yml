@@ -22,6 +22,16 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+      # Stamp and redeem queue a wallet sync; without Redis they wait on the connection.
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     env:
       # Migrations and the admin path run as an owner that is NOT a superuser, the shape AWS RDS
