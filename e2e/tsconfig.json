@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    // page.evaluate callbacks run in the browser and reach for window.Clerk.
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["playwright.config.ts", "servers.ts", "tests/**/*.ts"]
+}

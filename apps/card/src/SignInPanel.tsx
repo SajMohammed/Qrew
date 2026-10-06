@@ -72,6 +72,10 @@ export function SignInPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved]);
 
+  // The email form below is a stand-in for Google that only a development API accepts. A production
+  // build without a client id offers no sign-in rather than one that cannot work.
+  if (!CLIENT_ID && !import.meta.env.DEV) return null;
+
   return (
     <div
       className={cn(

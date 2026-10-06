@@ -14,8 +14,9 @@ export default defineConfig({
     host: true, // bind 0.0.0.0 so a phone on the same network can reach it
     port: 5173,
     proxy: {
+      // `vite preview` inherits this proxy; the e2e suite points it at its own API.
       "/api": {
-        target: "http://localhost:4000",
+        target: process.env.API_PROXY_TARGET ?? "http://localhost:4000",
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, ""),
       },
