@@ -83,14 +83,20 @@ export interface WalletProvider {
    * Best-effort: the design is saved in our DB regardless.
    */
   syncTemplate(content: PassContent): Promise<void>;
-  /** Create a pass for a new enrollment; returns platform ids to persist. */
+  /**
+   * Create the pass if it does not exist yet (idempotent). Called by the wallet worker, never on a
+   * request path, so a slow or failing vendor can't hold up a signup.
+   */
   issuePass(content: PassContent): Promise<PassRef>;
   /**
    * Update an existing pass after a scan. Takes the whole change, not just a number: the stamp
    * strip is a URL carrying the count, so re-pointing it is part of what "the count changed"
    * means — patch only the number and the pass keeps showing yesterday's stamps.
+   *
+   * Resolves false when there is no pass to update, so the caller can create one from the card's
+   * current state instead of silently dropping the change.
    */
-  updateStamps(ref: PassRef, update: PassUpdate): Promise<void>;
+  updateStamps(ref: PassRef, update: PassUpdate): Promise<boolean>;
   /** Send a lock-screen push (the changeMessage-style nudge). Rate-limited by the caller. */
   pushUpdate(ref: PassRef, message: string): Promise<void>;
   /** Void a pass (e.g. on PDPL erasure). */

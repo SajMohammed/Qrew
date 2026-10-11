@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { generateKeyPairSync, createVerify } from "node:crypto";
 import { GoogleWalletProvider } from "../src/google/provider";
 import { signJwtRs256 } from "../src/google/auth";
@@ -6,7 +6,9 @@ import type { PassContent } from "../src/types";
 
 /**
  * Everything here is offline: id derivation, payload mapping and JWT signing are pure. The network
- * calls (class/object CRUD) are exercised against Google itself, not mocked into a false green.
+ * calls' semantics (class/object CRUD) are exercised against Google itself by the selftest script,
+ * not mocked into a false green. Only the transport wrapper — deadlines, error naming, reading a
+ * 404 as "no pass" — is unit-tested here, against a stubbed fetch.
  */
 
 let publicKey: string;
@@ -142,13 +144,60 @@ describe("GoogleWalletProvider", () => {
     expect(payload.aud).toBe("google");
     expect(payload.origins).toEqual(["https://my.qrew.ae"]);
 
-    // "Fat" JWT: the object travels inside it, so Google creates the pass on save and we never
-    // provision passes for the many customers who never add one.
+    // "Fat" JWT: the object travels inside it, so saving works even before the worker has created
+    // the object, and the card page never waits on Google to build the link.
     const object = payload.payload.loyaltyObjects[0];
     expect(object.id).toBe(`3388000000022222222.${CONTENT.serial}`);
     expect(object.classId).toBe(`3388000000022222222.${CONTENT.programId}`);
     expect(object.barcode.value).toBe(CONTENT.serial);
     expect(object.loyaltyPoints.balance.int).toBe(3);
+  });
+});
+
+describe("transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** A Google that issues a token and answers every Wallet API call with `api(url)`. */
+  function stubGoogle(api: (url: string) => Response): ReturnType<typeof vi.fn> {
+    const fetch = vi.fn(async (url: string) =>
+      url.startsWith("https://oauth2.googleapis.com/")
+        ? Response.json({ access_token: "tok", expires_in: 3600 })
+        : api(url),
+    );
+    vi.stubGlobal("fetch", fetch);
+    return fetch;
+  }
+
+  const UPDATE = { serial: CONTENT.serial, currentStamps: 4, stampsRequired: 10 };
+
+  it("reports a missing pass as false, so the worker can create it", async () => {
+    stubGoogle(() => new Response("not found", { status: 404 }));
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe(false);
+  });
+
+  it("reports an updated pass as true", async () => {
+    stubGoogle(() => Response.json({ id: "x" }));
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe(true);
+  });
+
+  it("gives every call — the token exchange included — a deadline", async () => {
+    const fetch = stubGoogle(() => Response.json({ id: "x" }));
+    await withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetch.mock.calls) {
+      expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it("names the call that timed out", async () => {
+    stubGoogle(() => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    });
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).rejects.toThrow(
+      /Google Wallet PATCH \/loyaltyObject\/.+ timed out after 5000ms/,
+    );
   });
 });
 

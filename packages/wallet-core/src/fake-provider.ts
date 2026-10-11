@@ -32,9 +32,10 @@ export class FakeWalletProvider implements WalletProvider {
     };
   }
 
-  async updateStamps(ref: PassRef, update: PassUpdate): Promise<void> {
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<boolean> {
     const pass = this.passes.get(ref.serial);
     if (pass) pass.currentStamps = update.currentStamps;
+    return pass !== undefined;
   }
 
   async pushUpdate(ref: PassRef, message: string): Promise<void> {

@@ -134,8 +134,10 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
 
   // Hand wallet propagation to the background worker so the request never waits on Apple/Google.
   // Best-effort: the stamp is already committed to the ledger (the truth). If the queue's Redis
-  // is unreachable, we log and return anyway rather than fail a scan the customer already earned.
-  if (outcome.applied && (outcome.enrollment.applePassId || outcome.enrollment.googleObjectId)) {
+  // is unreachable, enqueueing gives up within a bound and we return anyway rather than fail a
+  // scan the customer already earned. Every applied stamp is queued: pass ids derive from the
+  // serial, so whether one was stored says nothing about whether the customer has a pass.
+  if (outcome.applied) {
     try {
       await enqueueWalletSync({
         merchantId: input.merchantId,

@@ -1,6 +1,8 @@
 import type { WalletProvider, PassContent, PassRef, PassUpdate } from "../types";
 import {
+  GOOGLE_TIMEOUT_MS,
   ServiceAccountTokens,
+  namedTimeout,
   serviceAccountFromEnv,
   signJwtRs256,
   type ServiceAccount,
@@ -17,9 +19,9 @@ const SAVE_LINK = "https://pay.google.com/gp/v/save/";
  * `<issuer>.<programId>` and `<issuer>.<serial>` — so nothing extra has to be persisted and a retry
  * always addresses the same pass.
  *
- * The save link is a "fat" JWT carrying the whole object: Google creates the object when the
- * customer taps Save. That means we never create passes for the many customers who never add one,
- * and updates simply address the id we already know they'd have.
+ * The save link is a "fat" JWT carrying the whole object, so the card page never waits on an
+ * object being created. The wallet worker creates each object ahead of time anyway (see issuePass),
+ * so a stamp that lands before the customer taps Save still has a pass to update.
  */
 export class GoogleWalletProvider implements WalletProvider {
   private readonly sa: ServiceAccount;
@@ -95,9 +97,13 @@ export class GoogleWalletProvider implements WalletProvider {
   }
 
   /**
-   * Create the object server-side. The save-link flow doesn't need this — Google creates the object
-   * on save — but issuing eagerly is what the port promises, and a pre-existing object is simply
-   * adopted when the customer saves.
+   * Create the object server-side, if it isn't there yet.
+   *
+   * The save link alone would let Google create the object when the customer taps Save, but only
+   * with the state baked into the link when the card page built it. A stamp landing between that
+   * read and the tap would PATCH an object that doesn't exist yet, and be lost until the next visit.
+   * Creating it ahead of time, from the worker, means every later sync has something to update; a
+   * pre-existing object is simply adopted when the customer saves.
    */
   async issuePass(content: PassContent): Promise<PassRef> {
     await this.ensureClass(content);
@@ -108,12 +114,13 @@ export class GoogleWalletProvider implements WalletProvider {
   }
 
   /**
-   * Reflect the current count. A 404 means the customer has not added this card to their wallet —
-   * the overwhelmingly common case, and not an error worth failing a stamp over.
+   * Reflect the current count. A 404 means no object exists for this card yet — not an error worth
+   * failing a stamp over, and reported as false so the worker can create it instead.
    */
-  async updateStamps(ref: PassRef, update: PassUpdate): Promise<void> {
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<boolean> {
     const id = this.resolveObjectId(ref);
-    await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
+    // A successful PATCH answers 200 with the object, so undefined can only mean the 404.
+    const updated = await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
       loyaltyPoints: { balance: { int: update.currentStamps }, label: update.pointsLabel ?? "Stamps" },
       /*
        * Re-point the pass at its programme's class.
@@ -137,6 +144,7 @@ export class GoogleWalletProvider implements WalletProvider {
       // customer looking at the picture drawn before this scan.
       ...(update.stripUrl ? { heroImage: { sourceUri: { uri: update.stripUrl } } } : {}),
     });
+    return updated !== undefined;
   }
 
   /**
@@ -288,17 +296,23 @@ export class GoogleWalletProvider implements WalletProvider {
     body?: unknown,
   ): Promise<Record<string, unknown> | undefined> {
     const token = await this.tokens.get();
-    const res = await fetch(`${API}${path}`, {
-      method,
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (res.status === 404) return undefined;
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`Google Wallet ${method} ${path} -> ${res.status} ${detail.slice(0, 300)}`);
+    // One deadline per call, covering the body read too: the signal aborts that as well.
+    try {
+      const res = await fetch(`${API}${path}`, {
+        method,
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
+      });
+      if (res.status === 404) return undefined;
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(`Google Wallet ${method} ${path} -> ${res.status} ${detail.slice(0, 300)}`);
+      }
+      return res.status === 204 ? undefined : ((await res.json()) as Record<string, unknown>);
+    } catch (err) {
+      throw namedTimeout(err, `Google Wallet ${method} ${path}`);
     }
-    return res.status === 204 ? undefined : ((await res.json()) as Record<string, unknown>);
   }
 }
 

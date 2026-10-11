@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments } from "@qrew/db";
 import { getWalletProvider, stripUrlFor } from "@qrew/wallet-core";
-import { cardTypeModule, isCardType } from "@qrew/core";
+import { cardTypeModule, isCardType, walletPassFor } from "@qrew/core";
 import type { WalletJobData } from "@qrew/queue";
 
 /**
@@ -44,10 +44,11 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
   if (!ctx) return `enrollment ${data.enrollmentId} gone — skipped`;
 
   const { enrollment, stampsRequired, rewardText, card, mechanics } = ctx;
-  if (!enrollment.applePassId && !enrollment.googleObjectId) {
-    return `${enrollment.cardSerial} has no wallet pass — skipped`;
-  }
+  // A product with no Google loyalty mapping has no pass yet (see getCard). Creating one here would
+  // issue a stamp counter for a card that has nothing to count.
+  if (card.wallet.google !== "loyalty") return `${enrollment.cardSerial}: ${card.type} cards have no pass yet — skipped`;
 
+  // The stored ids are only hints: the provider falls back to the id derived from the serial.
   const ref = {
     serial: enrollment.cardSerial,
     applePassId: enrollment.applePassId ?? undefined,
@@ -56,7 +57,7 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
 
   // 1) reflect the current count on the pass, then 2) nudge the lock screen. With a real
   // provider these are the slow external calls we moved off the request path.
-  await provider.updateStamps(ref, {
+  const present = await provider.updateStamps(ref, {
     serial: enrollment.cardSerial,
     stampsRequired,
     rewardText,
@@ -68,6 +69,18 @@ export async function processWalletSync(data: WalletJobData): Promise<string> {
       : undefined,
     pointsLabel: card.unitLabel(card.normalize(mechanics) as never),
   });
+
+  // No pass yet — a new card, or one whose "enroll" job was lost. Create it from the card's current
+  // state, which already includes this change, so nothing is dropped. A pass nobody has saved yet
+  // has nobody to notify, so there is no message to send.
+  if (!present) {
+    const content = await walletPassFor(enrollment.cardSerial);
+    if (!content) return `${enrollment.cardSerial} gone before its pass was created — skipped`;
+    await provider.issuePass(content);
+    return `created pass for ${enrollment.cardSerial} at ${enrollment.currentProgress}/${stampsRequired}`;
+  }
+  if (data.kind === "enroll") return `pass for ${enrollment.cardSerial} already exists`;
+
   const message = walletMessage(data.kind, enrollment.currentProgress, stampsRequired);
   await provider.pushUpdate(ref, message);
 

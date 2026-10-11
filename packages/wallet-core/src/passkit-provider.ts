@@ -37,10 +37,11 @@ export class PassKitProvider implements WalletProvider {
     };
   }
 
-  async updateStamps(ref: PassRef, update: PassUpdate): Promise<void> {
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<boolean> {
     await this.request("PUT", `/members/member/${encodeURIComponent(ref.serial)}`, {
       points: update.currentStamps,
     });
+    return true;
   }
 
   async pushUpdate(ref: PassRef, message: string): Promise<void> {

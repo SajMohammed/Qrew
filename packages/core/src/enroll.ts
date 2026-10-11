@@ -9,7 +9,7 @@ import {
   enrollments,
   loyaltyProgressEvents,
 } from "@qrew/db";
-import { getWalletProvider } from "@qrew/wallet-core";
+import { enqueueWalletSync } from "@qrew/queue";
 import { NotFoundError } from "./errors";
 
 export interface EnrollInput {
@@ -25,23 +25,20 @@ export interface EnrollResult {
   enrollmentId: string;
   serial: string;
   currentStamps: number;
-  applePassId?: string;
-  googleObjectId?: string;
   alreadyEnrolled: boolean;
 }
 
 /**
- * Enroll a customer into a program and issue their wallet pass.
+ * Enroll a customer into a program.
  *
  * - Idempotent per (customer, program): re-scanning returns the existing card and does
  *   NOT re-seed bonus stamps (prevents bonus farming).
  * - Endowed-progress: seeds the program's bonus stamps as a ledger event on signup.
- * - The external pass-issuing call happens OUTSIDE the DB transaction (never hold a
- *   transaction open across the network).
+ * - No wallet call: the pass is created by the wallet worker from a queued job, and the card page
+ *   hands out a save link built from the card's state either way. A vendor outage used to fail
+ *   the signup after the card was already saved — and left that card's pass unsynced for good.
  */
 export async function enroll(input: EnrollInput): Promise<EnrollResult> {
-  const provider = getWalletProvider();
-
   // A signed-in customer's email — read OUTSIDE the tenant tx (the account is global/admin-path) and
   // snapshotted onto the merchant's customer row so the dashboard shows who enrolled, not "Guest".
   const accountEmail = input.customerAccountId ? await getAccountEmail(input.customerAccountId) : null;
@@ -189,42 +186,21 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
 
   const e = created.enrollment;
   if (created.alreadyEnrolled) {
-    return {
-      enrollmentId: e.id,
-      serial: e.cardSerial,
-      currentStamps: e.currentProgress,
-      applePassId: e.applePassId ?? undefined,
-      googleObjectId: e.googleObjectId ?? undefined,
-      alreadyEnrolled: true,
-    };
+    return { enrollmentId: e.id, serial: e.cardSerial, currentStamps: e.currentProgress, alreadyEnrolled: true };
   }
 
-  // issue the wallet pass OUTSIDE the transaction
-  const ref = await provider.issuePass({
-    serial: e.cardSerial,
-    programId: created.program.id,
-    merchantName: created.merchantName,
-    programName: created.program.name,
-    rewardText: created.program.rewardText,
-    currentStamps: created.program.bonusStamps,
-    stampsRequired: created.program.stampsRequired,
-    qrToken: e.cardSerial, // TODO(security): a signed, rotating token rather than the raw serial
-  });
-
-  // tx2 — persist the platform ids
-  await withTenant(input.merchantId, (db) =>
-    db
-      .update(enrollments)
-      .set({ applePassId: ref.applePassId, googleObjectId: ref.googleObjectId })
-      .where(eq(enrollments.id, e.id)),
-  );
+  // Ask the worker to create the pass. Best-effort and bounded: the card is committed, and if the
+  // job is lost the first stamp's sync creates the pass instead.
+  try {
+    await enqueueWalletSync({ merchantId: input.merchantId, enrollmentId: e.id, kind: "enroll" });
+  } catch (err) {
+    console.error("[wallet] enqueue failed (card created; pass will be created on its first sync):", err);
+  }
 
   return {
     enrollmentId: e.id,
     serial: e.cardSerial,
     currentStamps: created.program.bonusStamps,
-    applePassId: ref.applePassId,
-    googleObjectId: ref.googleObjectId,
     alreadyEnrolled: false,
   };
 }

@@ -7,10 +7,9 @@ config({ path: resolve(process.cwd(), "../../.env") });
 /*
  * Never let a test talk to a real wallet vendor.
  *
- * The root .env carries WALLET_PROVIDER=google once a developer has wired their issuer, and the
- * enrol path issues a pass — so without this the suite creates real pass objects in a live Google
- * account, slows to a crawl on network calls, and fails anywhere without connectivity. Domain tests
- * care THAT a pass was issued, not who issued it; the provider itself is covered in
- * @qrew/wallet-core against its own fixtures.
+ * The root .env carries WALLET_PROVIDER=google once a developer has wired their issuer, and card
+ * reads and design saves call the provider — so without this the suite talks to a live Google
+ * account, slows to a crawl on network calls, and fails anywhere without connectivity. The provider
+ * itself is covered in @qrew/wallet-core against its own fixtures.
  */
 process.env.WALLET_PROVIDER = "fake";

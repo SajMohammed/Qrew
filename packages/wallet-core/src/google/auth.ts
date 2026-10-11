@@ -14,6 +14,22 @@ const SCOPE = "https://www.googleapis.com/auth/wallet_object.issuer";
 /** Refresh a minute early so an in-flight request never races the expiry. */
 const EXPIRY_SKEW_MS = 60_000;
 
+/**
+ * The longest any single Google call may take. Without a deadline a stalled connection holds a
+ * wallet job (or a card read) open indefinitely; 5s matches the artwork fetch in png-decode.
+ */
+export const GOOGLE_TIMEOUT_MS = 5_000;
+
+/**
+ * Name a deadline that fired. The abort surfaces as a bare DOMException ("The operation was
+ * aborted due to timeout"), which says nothing about which call or how long it waited.
+ */
+export function namedTimeout(err: unknown, what: string): unknown {
+  return err instanceof Error && err.name === "TimeoutError"
+    ? new Error(`${what} timed out after ${GOOGLE_TIMEOUT_MS}ms`)
+    : err;
+}
+
 export interface ServiceAccount {
   clientEmail: string;
   privateKey: string;
@@ -67,29 +83,35 @@ export class ServiceAccountTokens {
       this.sa,
     );
 
-    const res = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion,
-      }),
-    });
+    // One deadline for the whole exchange: the signal also aborts reading the response body.
+    try {
+      const res = await fetch(TOKEN_URL, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+          assertion,
+        }),
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
+      });
 
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      // The message names the likely cause: this fails almost exclusively on a malformed key or a
-      // service account that was never granted access to the issuer.
-      throw new Error(
-        `Google token exchange failed (${res.status}). Check GOOGLE_WALLET_SA_EMAIL / ` +
-          `GOOGLE_WALLET_SA_PRIVATE_KEY and that the service account has access to the issuer. ${detail.slice(0, 200)}`,
-      );
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        // The message names the likely cause: this fails almost exclusively on a malformed key or a
+        // service account that was never granted access to the issuer.
+        throw new Error(
+          `Google token exchange failed (${res.status}). Check GOOGLE_WALLET_SA_EMAIL / ` +
+            `GOOGLE_WALLET_SA_PRIVATE_KEY and that the service account has access to the issuer. ${detail.slice(0, 200)}`,
+        );
+      }
+
+      const body = (await res.json()) as { access_token: string; expires_in: number };
+      this.token = body.access_token;
+      this.expiresAt = Date.now() + body.expires_in * 1000;
+      return this.token;
+    } catch (err) {
+      throw namedTimeout(err, "Google token exchange");
     }
-
-    const body = (await res.json()) as { access_token: string; expires_in: number };
-    this.token = body.access_token;
-    this.expiresAt = Date.now() + body.expires_in * 1000;
-    return this.token;
   }
 }
 

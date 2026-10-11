@@ -99,12 +99,9 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
   });
 
   // Wallet propagation runs off the request path (see apps/wallet-worker). Best-effort: the
-  // redemption is already committed, so a queue outage must not fail the customer's reward.
-  if (
-    outcome.redeemed &&
-    outcome.reason === "redeemed" &&
-    (outcome.enrollment.applePassId || outcome.enrollment.googleObjectId)
-  ) {
+  // redemption is already committed, so a queue outage must not fail the customer's reward — and,
+  // bounded, must not delay it either.
+  if (outcome.redeemed && outcome.reason === "redeemed") {
     try {
       await enqueueWalletSync({
         merchantId: input.merchantId,
