@@ -1,12 +1,15 @@
 import { describe, it, expect, afterAll } from "vitest";
-import { eq } from "drizzle-orm";
-import { adminDb, closeDb, merchants, loyaltyPrograms } from "@qrew/db";
+import { eq, sql } from "drizzle-orm";
+import { adminDb, closeDb, withTenant, merchants, loyaltyPrograms } from "@qrew/db";
 import { createDefaultProgram } from "../src/index";
 
 let merchantId: string;
+let racedId: string;
 
 afterAll(async () => {
-  if (merchantId) await adminDb.delete(merchants).where(eq(merchants.id, merchantId)); // cascades
+  for (const id of [merchantId, racedId]) {
+    if (id) await adminDb.delete(merchants).where(eq(merchants.id, id)); // cascades
+  }
   await closeDb();
 });
 
@@ -28,6 +31,22 @@ describe("createDefaultProgram", () => {
     expect(p2.id).toBe(p1.id);
 
     const rows = await adminDb.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.merchantId, merchantId));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("seeds exactly one programme when first sign-ins race (two tabs)", async () => {
+    const [m] = await adminDb
+      .insert(merchants)
+      .values({ name: "Race Co", slug: `race-${process.pid.toString(36)}` })
+      .returning();
+    racedId = m!.id;
+
+    // The pool opens connections lazily, so on a fast local database calls would otherwise run back
+    // to back and never overlap. Holding ten connections open at once first makes them truly concurrent.
+    await Promise.all(Array.from({ length: 10 }, () => withTenant(racedId, (db) => db.execute(sql`select pg_sleep(0.05)`))));
+    const seeded = await Promise.all(Array.from({ length: 10 }, () => createDefaultProgram(racedId)));
+    expect(new Set(seeded.map((p) => p.id)).size).toBe(1);
+    const rows = await adminDb.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.merchantId, racedId));
     expect(rows).toHaveLength(1);
   });
 });

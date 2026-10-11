@@ -59,7 +59,9 @@ export async function provisionMerchantForOwner(input: { userId: string; name: s
     await tx.insert(staff).values({
       merchantId: m!.id,
       externalAuthId: input.userId,
-      name: input.name,
+      // staff.name labels a PERSON in the Team list. The shop's name lives on merchants and can be
+      // renamed, so copying it here would leave a stale shop name on the owner's row.
+      name: "Owner",
       role: "owner",
     });
     return m!.id;

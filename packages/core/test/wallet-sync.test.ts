@@ -12,7 +12,7 @@ import {
   syncPass,
   syncProgramTemplate,
   recordFinalFailure,
-  requestTemplateSync,
+  renameMerchant,
   walletSyncView,
   WALLET_SYNC_STALE_MS,
 } from "../src/index";
@@ -178,10 +178,15 @@ describe("pushing a programme's template", () => {
     expect((await getProgram(merchantId, membershipProgram))?.walletSync.failedPasses).toBe(1);
   });
 
-  it("re-pushes every pass-bearing programme on request (a shop rename), leaving discount alone", async () => {
-    await requestTemplateSync(merchantId);
+  it("re-pushes every pass-bearing programme when the shop is renamed, leaving discount alone", async () => {
+    expect(await renameMerchant(merchantId, "Sync Café & Bakery")).toEqual({ merchantId, name: "Sync Café & Bakery" });
     expect((await getProgram(merchantId, stampProgram))?.walletSync.state).toBe("pending");
     expect((await getProgram(merchantId, discountProgram))?.walletSync.state).toBe("none");
+
+    // The push carries the new name — it's the issuer on every saved pass.
+    await syncProgramTemplate({ kind: "template", merchantId, programId: stampProgram });
+    expect(fake().template(stampProgram)?.merchantName).toBe("Sync Café & Bakery");
+    expect((await getProgram(merchantId, stampProgram))?.walletSync.state).toBe("ok");
   });
 });
 

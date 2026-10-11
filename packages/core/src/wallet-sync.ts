@@ -215,20 +215,6 @@ export async function queueTemplateSyncs(merchantId: string, programIds: string[
 }
 
 /**
- * Re-push every pass-bearing programme of a shop — what a rename needs, since the shop's name is on
- * each programme's template. Programmes with no pass (a discount card) are left alone.
- */
-export async function requestTemplateSync(merchantId: string): Promise<void> {
-  const programIds = await withTenant(merchantId, async (db) => {
-    const programs = await db.select({ id: loyaltyPrograms.id, type: loyaltyPrograms.type }).from(loyaltyPrograms);
-    const ids = programs.filter((p) => isWalletIssuable(p.type)).map((p) => p.id);
-    await markTemplateSyncRequested(db, ids);
-    return ids;
-  });
-  await queueTemplateSyncs(merchantId, programIds);
-}
-
-/**
  * A job that used up its retries. A template push records its error for the owner; a pass refresh
  * counts towards the programme's "couldn't be updated" passes; a single card's sync needs nothing —
  * its next scan tries again.

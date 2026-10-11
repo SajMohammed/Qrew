@@ -176,11 +176,29 @@ export const LeadRequest = z.object({
 });
 export type LeadRequest = z.infer<typeof LeadRequest>;
 
-// Merchant onboarding — first Clerk login creates a merchant + a default program.
+/**
+ * A shop's name. Customers see it on their card, the sign-up page, the Google Wallet pass (as the
+ * issuer) and the printed counter poster, so: trimmed, short enough for a pass header (40), and one
+ * clean line. Control characters would break those single-line layouts; bidi overrides (U+202A-E,
+ * U+2066-9) could make it render reversed or spoof another shop's. Any script is fine, and the zero-
+ * width joiners Arabic and Persian names use are not refused.
+ */
+export const ShopName = z
+  .string()
+  .trim()
+  .min(2, "Shop name must be at least 2 characters")
+  .max(40, "Shop name must be 40 characters or fewer")
+  .regex(/^[^\p{Cc}\u202A-\u202E\u2066-\u2069]+$/u, "Shop name can't contain line breaks or control characters");
+
+// Merchant onboarding — the owner names their shop on first sign-in, before anything is provisioned.
 export const OnboardingRequest = z.object({
-  businessName: z.string().min(1).max(120).optional(),
+  businessName: ShopName,
 });
 export type OnboardingRequest = z.infer<typeof OnboardingRequest>;
+
+// Renaming the shop — owner-only (PATCH /merchant).
+export const MerchantUpdate = z.object({ name: ShopName });
+export type MerchantUpdate = z.infer<typeof MerchantUpdate>;
 
 export const ProgramDTO = z.object({
   id: z.string(),

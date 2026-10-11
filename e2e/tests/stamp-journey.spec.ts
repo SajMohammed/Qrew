@@ -6,6 +6,9 @@ import { CARDS, SHOP } from "../servers";
 
 let ownerId: string | undefined;
 
+const SHOP_NAME = "E2E Roasters";
+const RENAMED = "E2E Roasters & Bakery";
+
 // The owner is a real user in the Clerk development instance; don't leave one behind per run.
 test.afterAll(async () => {
   if (ownerId) await createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY }).users.deleteUser(ownerId);
@@ -31,9 +34,20 @@ test("a new owner sets up a stamp card, and a customer earns and redeems the rew
     );
   });
 
-  await test.step("the first sign-in provisions their shop", async () => {
-    // Lazy onboarding: the dashboard's first call 409s, it provisions a shop, then loads.
-    await expect(page.getByText("My Shop").first()).toBeVisible({ timeout: 30_000 });
+  await test.step("the first sign-in asks them to name their shop", async () => {
+    // The dashboard's first call 409s (no shop yet); nothing is created until the owner names it.
+    await expect(page.getByRole("heading", { name: "Name your shop" })).toBeVisible({ timeout: 30_000 });
+    await page.getByLabel("Shop name").fill(SHOP_NAME);
+    await page.getByRole("button", { name: "Create my shop" }).click();
+    await expect(page.getByText(SHOP_NAME, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  });
+
+  await test.step("they rename it in settings", async () => {
+    await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+    await expect(page.getByLabel("Shop name")).toHaveValue(SHOP_NAME);
+    await page.getByLabel("Shop name").fill(RENAMED);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   });
 
   await test.step("they design a three-stamp card with no head start", async () => {
@@ -47,6 +61,7 @@ test("a new owner sets up a stamp card, and a customer earns and redeems the rew
 
   const enroll = await test.step("their counter code links to the shop's card", async () => {
     await page.getByRole("button", { name: "Counter QR", exact: true }).first().click();
+    await expect(page.locator(".print-poster").getByText(RENAMED)).toBeVisible(); // the new name, on print
     const link = await page.locator("code").filter({ hasText: "?m=" }).innerText();
     return new URL(link);
   });
@@ -56,6 +71,7 @@ test("a new owner sets up a stamp card, and a customer earns and redeems the rew
 
   const serial = await test.step("a customer scans it and gets the card", async () => {
     await phone.goto(`${CARDS}/${enroll.search}`);
+    await expect(phone.getByText(RENAMED).first()).toBeVisible();
     await phone.getByRole("button", { name: /Get this shop's card/ }).click();
     await expect(phone).toHaveURL(/\?card=/);
     await expect(phone.getByText("0/3", { exact: true })).toBeVisible();

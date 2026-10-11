@@ -7,6 +7,7 @@ export * from "./dashboard";
 export * from "./analytics";
 export * from "./customer-list";
 export * from "./program";
+export * from "./merchant";
 export * from "./wallet-pass";
 export * from "./wallet-sync";
 export * from "./card-types";

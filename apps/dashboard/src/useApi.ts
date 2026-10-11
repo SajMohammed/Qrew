@@ -88,12 +88,15 @@ export function useApi() {
         if (!res.ok) throw new Error(`Dashboard failed (${res.status})`);
         return res.json();
       },
-      async onboard(businessName?: string): Promise<void> {
-        const res = await call("/onboarding", {
-          method: "POST",
-          body: JSON.stringify(businessName ? { businessName } : {}),
-        });
-        if (!res.ok) throw new Error(`Onboarding failed (${res.status})`);
+      async onboard(businessName: string): Promise<void> {
+        const res = await call("/onboarding", { method: "POST", body: JSON.stringify({ businessName }) });
+        if (!res.ok) throw new Error(await describe(res, "Could not create your shop"));
+      },
+      async renameShop(name: string): Promise<{ merchantId: string; name: string }> {
+        const res = await call("/merchant", { method: "PATCH", body: JSON.stringify({ name }) });
+        if (res.status === 403) throw new Error("Only the shop's owner can rename it.");
+        if (!res.ok) throw new Error(await describe(res, "Could not rename the shop"));
+        return res.json();
       },
       // ── Owner console ──
       async getAnalytics(range: AnalyticsRange): Promise<Analytics> {

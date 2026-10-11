@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import { withTenant, merchants, loyaltyPrograms, enrollments } from "@qrew/db";
 import { cardTypeModule, normalizeMechanics, isCardType, type CardType } from "./card-types";
 import { InvalidInputError } from "./errors";
@@ -182,6 +182,11 @@ export async function updateProgram(
 /** Seed a merchant's first loyalty program (idempotent) — used at onboarding after provisioning. */
 export async function createDefaultProgram(merchantId: string): Promise<ProgramView> {
   return withTenant(merchantId, async (db) => {
+    // Two onboarding calls at once (two tabs) both get past provisioning, which is idempotent, and
+    // would each seed a programme here. The lock serialises them so the second sees the first's row.
+    // Not a unique index: a shop may run several programmes. The prefix keeps this key apart from
+    // provisioning's per-user lock (packages/db/src/auth.ts).
+    await db.execute(sql`select pg_advisory_xact_lock(hashtext(${`default-program:${merchantId}`}))`);
     const [existing] = await db
       .select()
       .from(loyaltyPrograms)
