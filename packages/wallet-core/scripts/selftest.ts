@@ -17,7 +17,7 @@ import { ServiceAccountTokens, serviceAccountFromEnv } from "../src/google/auth"
 import { GoogleWalletProvider } from "../src/google/provider";
 import type { PassContent } from "../src/types";
 
-config({ path: resolve(import.meta.dirname, "../../../.env") });
+config({ path: resolve(__dirname, "../../../.env") });
 
 const ok = (m: string) => console.log(`  \x1b[32m✓\x1b[0m ${m}`);
 const step = (m: string) => console.log(`\n\x1b[1m${m}\x1b[0m`);
@@ -32,6 +32,7 @@ async function main() {
   const serial = `selftest-${Date.now()}`;
   const content: PassContent = {
     serial,
+    programId: "qrew-selftest", // a fixed throwaway class, never a real programme's
     merchantName: "Qrew Self Test",
     programName: "Self Test Card",
     rewardText: "1 free item",
@@ -39,6 +40,7 @@ async function main() {
     stampsRequired: 10,
     qrToken: "selftest.token",
     brandColor: "#146A2E",
+    pointsLabel: "Stamps",
   };
 
   const read = async (id: string) => {
@@ -60,16 +62,48 @@ async function main() {
   ok(`state=${obj.state}  balance=${obj.loyaltyPoints?.balance?.int}  barcode=${obj.barcode?.value}`);
 
   step("3. Stamp it — this is exactly what the worker does on every scan");
-  await provider.updateStamps(ref, 7);
+  const outcome = await provider.updateStamps(ref, {
+    serial,
+    programId: content.programId,
+    currentStamps: 7,
+    stampsRequired: 10,
+    rewardText: content.rewardText,
+    pointsLabel: "Stamps",
+  });
   obj = await read(ref.googleObjectId!);
-  ok(`balance is now ${obj.loyaltyPoints?.balance?.int} (was 3)`);
+  ok(`balance is now ${obj.loyaltyPoints?.balance?.int} (was 3) — ${outcome}`);
   if (obj.loyaltyPoints?.balance?.int !== 7) throw new Error("balance did not update");
 
-  step("4. Push a lock-screen nudge");
-  await provider.pushUpdate(ref, "You're 3 stamps from a free coffee");
+  step("4. Push a lock-screen notification");
+  await provider.pushUpdate(ref, {
+    id: `selftest-${Date.now()}`,
+    header: content.merchantName,
+    body: "Your reward is ready: 1 free item",
+  });
   obj = await read(ref.googleObjectId!);
   const messages = (obj.messages ?? []) as { body?: string }[];
   ok(`${messages.length} message(s) on the pass: "${messages.at(-1)?.body ?? ""}"`);
+
+  step("4b. Replace the template — a removed row and location must disappear");
+  const readClass = async () => {
+    const res = await fetch(`${API}/loyaltyClass/${encodeURIComponent(provider.classId(content.programId))}`, {
+      headers: { authorization: `Bearer ${await tokens.get()}` },
+    });
+    if (!res.ok) throw new Error(`read class -> ${res.status} ${await res.text()}`);
+    return (await res.json()) as Record<string, any>;
+  };
+  await provider.syncTemplate({
+    ...content,
+    details: [{ label: "Hours", value: "8am – 5pm" }],
+    location: { lat: 25.2, lng: 55.27 },
+  });
+  let cls = await readClass();
+  if (!cls.textModulesData?.length || !cls.locations?.length) throw new Error("the row and location were not added");
+  ok("row and location added to the class");
+  await provider.syncTemplate(content);
+  cls = await readClass();
+  if (cls.textModulesData?.length || cls.locations?.length) throw new Error("removed row or location survived the replacement");
+  ok("both gone after the replacement — removals reach saved passes");
 
   step("5. Revoke it (Google has no delete — a pass leaves the wallet by expiring)");
   await provider.revoke(ref);

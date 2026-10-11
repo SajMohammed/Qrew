@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { adminDb, closeDb, merchants, loyaltyPrograms } from "@qrew/db";
 import { closeWalletQueue } from "@qrew/queue";
-import { enroll, addStamp, redeem } from "../src/index";
+import { enroll, addStamp, redeem, updateProgram, getProgram } from "../src/index";
 
 /*
  * Redis is down. Each test file runs in its own process, so pointing the queue at a closed port
@@ -66,5 +66,13 @@ describe("with the wallet queue's Redis unreachable and no usable wallet vendor"
     expect(redeemed.result.redeemed).toBe(true);
     expect(redeemed.result.currentStamps).toBe(0);
     expect(redeemed.ms).toBeLessThan(PROMPT_MS);
+  });
+
+  it("saves a design promptly, and says the passes weren't updated rather than 'pending' forever", async () => {
+    const saved = await timed(() => updateProgram(merchantId, programId, { rewardText: "Free cake" }));
+    expect(saved.ms).toBeLessThan(PROMPT_MS);
+    expect(saved.result?.rewardText).toBe("Free cake");
+    expect(saved.result?.walletSync.state).toBe("failed");
+    expect((await getProgram(merchantId, programId))?.walletSync.state).toBe("failed"); // and it stays recorded
   });
 });

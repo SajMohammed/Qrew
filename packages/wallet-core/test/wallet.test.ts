@@ -4,6 +4,7 @@ import type { PassContent } from "../src/index";
 
 const content: PassContent = {
   serial: "card-1",
+  programId: "program-1",
   merchantName: "Nadia's Coffee",
   programName: "Coffee Card",
   rewardText: "1 free coffee",
@@ -12,6 +13,8 @@ const content: PassContent = {
   qrToken: "tok-abc",
   locale: "en",
 };
+
+const update = { serial: "card-1", currentStamps: 5, stampsRequired: 10 };
 
 describe("WalletProvider contract (fake adapter)", () => {
   it("issues a pass and returns both platform ids", async () => {
@@ -25,15 +28,21 @@ describe("WalletProvider contract (fake adapter)", () => {
   it("updates the stamp count on an existing pass", async () => {
     const provider = new FakeWalletProvider();
     const ref = await provider.issuePass(content);
-    await provider.updateStamps(ref, { currentStamps: 5 });
+    await expect(provider.updateStamps(ref, update)).resolves.toBe("in_wallet");
     expect(provider.peek("card-1")?.currentStamps).toBe(5);
   });
 
-  it("records a lock-screen push message", async () => {
+  it("reports a pass that doesn't exist as absent, so the caller can create it", async () => {
+    const provider = new FakeWalletProvider();
+    await expect(provider.updateStamps({ serial: "nobody" }, { ...update, serial: "nobody" })).resolves.toBe("absent");
+  });
+
+  it("records a lock-screen notification", async () => {
     const provider = new FakeWalletProvider();
     const ref = await provider.issuePass(content);
-    await provider.pushUpdate(ref, "1 stamp to go");
-    expect(provider.lastMessage("card-1")).toBe("1 stamp to go");
+    await provider.pushUpdate(ref, { id: "m1", header: "Nadia's Coffee", body: "Your reward is ready" });
+    expect(provider.messages("card-1")).toHaveLength(1);
+    expect(provider.lastMessage("card-1")).toBe("Your reward is ready");
   });
 
   it("revokes a pass", async () => {

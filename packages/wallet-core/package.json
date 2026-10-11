@@ -13,11 +13,10 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
     "doctor": "tsx scripts/doctor.ts",
-    "selftest": "tsx scripts/selftest.ts",
-    "resync": "tsx scripts/resync.ts"
+    "selftest": "tsx scripts/selftest.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
@@ -25,8 +24,5 @@
     "tsx": "^4.23.0",
     "typescript": "^7.0.0",
     "vitest": "^3.0.0"
-  },
-  "dependencies": {
-    "@qrew/db": "workspace:*"
   }
 }

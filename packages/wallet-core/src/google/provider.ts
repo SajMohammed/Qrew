@@ -1,4 +1,4 @@
-import type { WalletProvider, PassContent, PassRef, PassUpdate } from "../types";
+import type { WalletProvider, PassContent, PassMessage, PassRef, PassSyncOutcome, PassUpdate } from "../types";
 import {
   GOOGLE_TIMEOUT_MS,
   ServiceAccountTokens,
@@ -115,9 +115,9 @@ export class GoogleWalletProvider implements WalletProvider {
 
   /**
    * Reflect the current count. A 404 means no object exists for this card yet — not an error worth
-   * failing a stamp over, and reported as false so the worker can create it instead.
+   * failing a stamp over, and reported as "absent" so the worker can create it instead.
    */
-  async updateStamps(ref: PassRef, update: PassUpdate): Promise<boolean> {
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<PassSyncOutcome> {
     const id = this.resolveObjectId(ref);
     // A successful PATCH answers 200 with the object, so undefined can only mean the 404.
     const updated = await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
@@ -144,17 +144,22 @@ export class GoogleWalletProvider implements WalletProvider {
       // customer looking at the picture drawn before this scan.
       ...(update.stripUrl ? { heroImage: { sourceUri: { uri: update.stripUrl } } } : {}),
     });
-    return updated !== undefined;
+    if (!updated) return "absent";
+    // Google sets hasUsers once anyone has saved the object — the only way to know a person will see it.
+    return updated.hasUsers === true ? "in_wallet" : "not_saved";
   }
 
   /**
-   * A lock-screen nudge. Google delivers this to everyone holding the pass when the message is
-   * added to the object, so this is the free push channel the wallet buys us.
+   * A lock-screen notification to everyone holding the pass — the free push channel the wallet buys.
+   *
+   * TEXT_AND_NOTIFY is what makes it a notification. Without a messageType Google files a silent
+   * TEXT message on the back of the pass, which is how per-scan messages used to pile up there
+   * without anyone ever being nudged.
    */
-  async pushUpdate(ref: PassRef, message: string): Promise<void> {
+  async pushUpdate(ref: PassRef, message: PassMessage): Promise<void> {
     const id = this.resolveObjectId(ref);
     await this.request("POST", `/loyaltyObject/${encodeURIComponent(id)}/addMessage`, {
-      message: { header: "Qrew", body: message },
+      message: { id: message.id, header: message.header, body: message.body, messageType: "TEXT_AND_NOTIFY" },
     });
   }
 
@@ -269,14 +274,18 @@ export class GoogleWalletProvider implements WalletProvider {
   // ── transport ────────────────────────────────────────────────────────────────
 
   /**
-   * Push the current design onto the class. Unlike ensureClass this always writes, because it is
+   * Replace the class with the current design. Unlike ensureClass this always writes, because it is
    * called when the owner has just changed something and expects to see it.
+   *
+   * PUT, not PATCH: PATCH merges, keeping any field the body leaves out (see the note in
+   * updateStamps), so a detail row or location the shop removed would stay on every pass forever.
+   * A full replacement drops it.
    */
   async syncTemplate(content: PassContent): Promise<void> {
     const id = this.classId(content.programId);
     const body = this.toClass(content);
     const existing = await this.request("GET", `/loyaltyClass/${encodeURIComponent(id)}`);
-    if (existing) await this.request("PATCH", `/loyaltyClass/${encodeURIComponent(id)}`, body);
+    if (existing) await this.request("PUT", `/loyaltyClass/${encodeURIComponent(id)}`, body);
     else await this.request("POST", "/loyaltyClass", body);
     this.ensuredClasses.add(id);
   }

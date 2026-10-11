@@ -7,18 +7,38 @@ import { createQueueConnection } from "./connection";
 export const WALLET_QUEUE = "wallet-sync";
 
 /**
- * A wallet-sync job. Deliberately THIN — just the keys, not a snapshot of the stamp count.
- * The worker re-reads the enrollment when it runs, so the wallet always converges to the
- * DB's current value even if the job is delayed, retried, or runs out of order.
- *
- * "enroll" asks the worker to create the card's pass; "stamp" and "redeem" bring it up to date
- * (creating it first if it somehow doesn't exist yet).
+ * Wallet jobs. Deliberately THIN — just keys, never a snapshot of a count or a design. The worker
+ * re-reads the database when it runs, so the wallet always converges to the current state even if a
+ * job is delayed, retried, deduplicated or runs out of order.
  */
-export interface WalletJobData {
+
+/**
+ * One card's pass after something happened to that card: "enroll" asks for it to be created;
+ * "stamp" and "redeem" bring it up to date (creating it first if it somehow doesn't exist).
+ * `notify` marks the one scan that made a reward ready — the only moment worth a lock-screen push.
+ */
+export interface PassJob {
+  kind: "enroll" | "stamp" | "redeem";
   merchantId: string;
   enrollmentId: string;
-  kind: "enroll" | "stamp" | "redeem";
+  notify?: "reward_ready";
 }
+
+/** One card's pass after its programme's design changed what every pass shows. Low priority. */
+export interface RefreshJob {
+  kind: "refresh";
+  merchantId: string;
+  enrollmentId: string;
+}
+
+/** A programme's template (the shop's design and name), pushed after the owner changed either. */
+export interface TemplateJob {
+  kind: "template";
+  merchantId: string;
+  programId: string;
+}
+
+export type WalletJobData = PassJob | RefreshJob | TemplateJob;
 
 /**
  * The longest a request will wait to hand a job to Redis. A healthy add takes about a
@@ -54,15 +74,8 @@ export function getWalletQueue(): Queue<WalletJobData> {
   return queue;
 }
 
-/**
- * Enqueue a wallet-sync job. Best-effort by contract: the ledger write is already committed,
- * so callers catch failures here rather than fail the user-facing request — and this never makes
- * them wait longer than ENQUEUE_TIMEOUT_MS to find out.
- *
- * An add that times out may still land once Redis comes back. That is harmless: the job is thin
- * and the worker re-reads the database, so a late job only brings the pass up to date.
- */
-export async function enqueueWalletSync(data: WalletJobData): Promise<void> {
+/** Resolve or reject with `work`, but give up after ENQUEUE_TIMEOUT_MS. */
+async function bounded<T>(work: Promise<T>): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const timedOut = new Promise<never>((_, reject) => {
     timer = setTimeout(
@@ -71,10 +84,55 @@ export async function enqueueWalletSync(data: WalletJobData): Promise<void> {
     );
   });
   try {
-    // Promise.race subscribes to the add too, so its rejection after a timeout is still handled.
-    await Promise.race([getWalletQueue().add("sync", data), timedOut]);
+    // Promise.race subscribes to the work too, so its rejection after a timeout is still handled.
+    return await Promise.race([work, timedOut]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Enqueue a card's pass sync. Best-effort by contract: the ledger write is already committed,
+ * so callers catch failures here rather than fail the user-facing request — and this never makes
+ * them wait longer than ENQUEUE_TIMEOUT_MS to find out.
+ *
+ * An add that times out may still land once Redis comes back. That is harmless: the job is thin
+ * and the worker re-reads the database, so a late job only brings the pass up to date.
+ *
+ * Never deduplicated: a stamp job may carry the reward-ready notification, and folding it into
+ * another job would drop it.
+ */
+export async function enqueueWalletSync(data: PassJob): Promise<void> {
+  await bounded(getWalletQueue().add("sync", data));
+}
+
+/**
+ * Enqueue a programme's template push. Saving the design several times in a row collapses into at
+ * most one running push and one waiting — the waiting one re-reads the latest design anyway.
+ */
+export async function enqueueTemplateSync(merchantId: string, programId: string): Promise<void> {
+  const job: TemplateJob = { kind: "template", merchantId, programId };
+  await bounded(
+    getWalletQueue().add("template", job, { deduplication: { id: `template:${programId}`, keepLastIfActive: true } }),
+  );
+}
+
+/**
+ * Queue a refresh for every pass of a programme. Called by the worker, never on a request path.
+ *
+ * Priority 10 lets live stamp syncs (unprioritised) go first under the worker's rate limit, so a
+ * backfill across thousands of passes never delays the pass of someone standing at the counter.
+ * Deduplicated per card, so repeated design saves don't stack refreshes.
+ */
+export async function enqueuePassRefreshes(jobs: RefreshJob[]): Promise<void> {
+  for (let i = 0; i < jobs.length; i += 500) {
+    await getWalletQueue().addBulk(
+      jobs.slice(i, i + 500).map((data) => ({
+        name: "refresh",
+        data,
+        opts: { priority: 10, deduplication: { id: `refresh:${data.enrollmentId}`, keepLastIfActive: true } },
+      })),
+    );
   }
 }
 

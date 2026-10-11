@@ -11,6 +11,7 @@ import {
 } from "@qrew/db";
 import { enqueueWalletSync } from "@qrew/queue";
 import { NotFoundError } from "./errors";
+import { isWalletIssuable } from "./wallet-pass";
 
 export interface EnrollInput {
   merchantId: string; // from the merchant's (public) counter QR — routing, not auth
@@ -189,12 +190,14 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
     return { enrollmentId: e.id, serial: e.cardSerial, currentStamps: e.currentProgress, alreadyEnrolled: true };
   }
 
-  // Ask the worker to create the pass. Best-effort and bounded: the card is committed, and if the
-  // job is lost the first stamp's sync creates the pass instead.
-  try {
-    await enqueueWalletSync({ merchantId: input.merchantId, enrollmentId: e.id, kind: "enroll" });
-  } catch (err) {
-    console.error("[wallet] enqueue failed (card created; pass will be created on its first sync):", err);
+  // Ask the worker to create the pass, for a product that has one. Best-effort and bounded: the card
+  // is committed, and if the job is lost the first stamp's sync creates the pass instead.
+  if (isWalletIssuable(created.program.type)) {
+    try {
+      await enqueueWalletSync({ merchantId: input.merchantId, enrollmentId: e.id, kind: "enroll" });
+    } catch (err) {
+      console.error("[wallet] enqueue failed (card created; pass will be created on its first sync):", err);
+    }
   }
 
   return {

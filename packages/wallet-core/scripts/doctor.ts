@@ -11,8 +11,9 @@
 import { config } from "dotenv";
 import { resolve } from "node:path";
 import { ServiceAccountTokens, serviceAccountFromEnv } from "../src/google/auth";
+import { GoogleWalletProvider } from "../src/google/provider";
 
-config({ path: resolve(import.meta.dirname, "../../../.env") });
+config({ path: resolve(__dirname, "../../../.env") });
 
 const ok = (m: string) => console.log(`  \x1b[32m✓\x1b[0m ${m}`);
 const bad = (m: string) => console.log(`  \x1b[31m✗\x1b[0m ${m}`);
@@ -114,10 +115,11 @@ async function main() {
 
   // 5 ─ end to end: can we actually mint a save link? This is what the card screen calls, so it
   //     catches anything the earlier checks can't — a class that won't create, a bad origin, etc.
-  const { GoogleWalletProvider } = await import("../src/google/provider");
   const provider = new GoogleWalletProvider();
   const url = await provider.getSaveUrl({
     serial: "doctor-probe-0000",
+    // One fixed probe class, created on the first run and reused after — never a real programme's.
+    programId: "qrew-doctor-probe",
     merchantName: "Qrew Doctor Probe",
     programName: "Setup Check",
     rewardText: "1 free item",

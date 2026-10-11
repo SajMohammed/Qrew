@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Palette, Signature, LayoutGrid, ListPlus, MapPin, Plus, Trash2, Check } from "lucide-react";
 import { useApi } from "@/useApi";
-import type { CardDesign, CardType, Program } from "@/api";
+import type { CardDesign, CardType, Program, WalletSync } from "@/api";
 import { Card as Panel } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -45,6 +45,9 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
   const [design, setDesign] = useState<CardDesign>({ brandColor: "#146A2E", stampIcon: "☕" });
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [err, setErr] = useState<string | null>(null);
+  // Bumped by every save, so a status check that started before a newer save is ignored instead of
+  // overwriting that save's "pending" with the previous outcome.
+  const saves = useRef(0);
 
   useEffect(() => {
     Promise.all([api.getProgram(), api.getCardTypes()])
@@ -81,8 +84,28 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
     setTarget(returning ? program.stampsRequired : t.defaultTarget);
   }
 
+  // While passes are being updated, check back every few seconds (for up to two minutes) so the owner
+  // sees the outcome. Only the wallet status is merged — the form being edited is never touched.
+  const syncing = program?.walletSync.state === "pending";
+  useEffect(() => {
+    if (!syncing) return;
+    let polls = 0;
+    const timer = window.setInterval(() => {
+      if (++polls > 24) return window.clearInterval(timer);
+      const started = saves.current;
+      api
+        .getProgram()
+        .then((fresh) => {
+          if (saves.current === started) setProgram((p) => p && { ...p, walletSync: fresh.walletSync });
+        })
+        .catch(() => {}); // a missed check is harmless; the next one tries again
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [syncing, api]);
+
   async function save() {
     if (!program) return;
+    saves.current++;
     setStatus("saving");
     setErr(null);
     try {
@@ -362,11 +385,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
               </span>
             )}
             {err && <span className="text-destructive text-[13px]">{err}</span>}
-            {!err && status !== "saved" && (
-              <span className="text-muted-foreground text-[13px]">
-                Saved changes reach passes already in customers' phones.
-              </span>
-            )}
+            {!err && status !== "saved" && <WalletSyncNote sync={program.walletSync} />}
           </div>
         </div>
       </div>
@@ -427,5 +446,30 @@ function previewLabel(type: CardType, target: number, mechanics: Record<string, 
     }
     default:
       return `${part}/${target}`;
+  }
+}
+
+/** What happened to the passes already in customers' phones after the last save. */
+function WalletSyncNote({ sync }: { sync: WalletSync }) {
+  const muted = "text-muted-foreground text-[13px]";
+  switch (sync.state) {
+    case "pending":
+      return <span className={muted}>Updating passes already in customers' phones…</span>;
+    case "failed":
+      return (
+        <span className="text-destructive text-[13px]">
+          Your card is saved, but passes already in customers' phones weren't updated. Save again to retry.
+        </span>
+      );
+    case "ok":
+      return (
+        <span className={muted}>
+          {sync.failedPasses > 0
+            ? `Sent to passes in customers' phones. ${sync.failedPasses} couldn't be updated yet — they'll catch up at that customer's next visit.`
+            : "Sent to passes already in customers' phones."}
+        </span>
+      );
+    default:
+      return <span className={muted}>Saved changes reach passes already in customers' phones.</span>;
   }
 }

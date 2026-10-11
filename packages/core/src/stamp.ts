@@ -138,11 +138,19 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
   // scan the customer already earned. Every applied stamp is queued: pass ids derive from the
   // serial, so whether one was stored says nothing about whether the customer has a pass.
   if (outcome.applied) {
+    // The one scan that made a reward redeemable is the only one worth a lock-screen notification.
+    const card = cardTypeModule(outcome.program.type);
+    const mechanics = card.normalize(outcome.program.mechanics) as never;
+    const target = outcome.program.stampsRequired;
+    const reachedReward =
+      !card.redeemable(outcome.enrollment.currentProgress, target, mechanics) &&
+      card.redeemable(outcome.currentStamps, target, mechanics);
     try {
       await enqueueWalletSync({
         merchantId: input.merchantId,
         enrollmentId: input.enrollmentId,
         kind: "stamp",
+        ...(reachedReward ? { notify: "reward_ready" as const } : {}),
       });
     } catch (err) {
       console.error("[wallet] enqueue failed (stamp committed; pass will sync late):", err);

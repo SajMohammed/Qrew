@@ -13,9 +13,10 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
-    "strip:serve": "tsx scripts/strip-server.ts"
+    "strip:serve": "tsx scripts/strip-server.ts",
+    "wallet:resync": "tsx scripts/resync.ts"
   },
   "dependencies": {
     "@qrew/db": "workspace:*",

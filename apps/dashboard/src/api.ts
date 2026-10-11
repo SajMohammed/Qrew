@@ -64,6 +64,14 @@ export interface Program {
   bonusStamps: number;
   active: boolean;
   cardDesign: CardDesign;
+  /** Whether the last design change reached the passes already in customers' phones. */
+  walletSync: WalletSync;
+}
+
+export interface WalletSync {
+  state: "none" | "pending" | "ok" | "failed";
+  /** Passes whose refresh finally failed — they catch up at that customer's next scan. */
+  failedPasses: number;
 }
 
 export type ProgramPatch = Partial<{

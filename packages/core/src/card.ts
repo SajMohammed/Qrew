@@ -3,17 +3,16 @@ import { adminDb, merchants, loyaltyPrograms, enrollments, customers } from "@qr
 import {
   getWalletProvider,
   renderStampStrip,
-  stripUrlFor,
   loadIcon,
   loadRawImage,
   GOOGLE_STRIP,
   APPLE_STRIP,
   fetchArtwork,
-  type PassContent,
 } from "@qrew/wallet-core";
 import { getAsset, ownAssetId } from "./asset";
 import { mintCardToken } from "./token";
-import { normalizeDesign, type CardDesign } from "./program";
+import { normalizeDesign, type CardDesign } from "./design";
+import { isWalletIssuable, passContentFor, type PassSource } from "./wallet-pass";
 import { cardTypeModule, isCardType } from "./card-types";
 
 /** Which wallet the strip is being drawn for — they want different aspect ratios. */
@@ -74,51 +73,9 @@ async function readCard(serial: string) {
 
 type CardRow = NonNullable<Awaited<ReturnType<typeof readCard>>>;
 
-/**
- * Only a loyalty-mapped product can be issued today. A discount card maps to a Google OFFER, a
- * different resource with its own class shape, and there is no adapter for it yet. Issuing it as
- * a loyalty pass instead would put a stamp counter on a card that has nothing to count — and an
- * object cannot be moved between class types afterwards, so every customer would have to re-save.
- * No pass is better than the wrong pass.
- */
-function issuable(row: CardRow): boolean {
-  return cardTypeModule(isCardType(row.type) ? row.type : "stamp").wallet.google === "loyalty";
-}
-
-/** What the card's wallet pass shows, built from its current state. */
-function passContent(row: CardRow, qrToken: string): PassContent {
-  const design = normalizeDesign(row.cardDesign);
-  const card = cardTypeModule(isCardType(row.type) ? row.type : "stamp");
-  return {
-    serial: row.serial,
-    programId: row.programId,
-    customerName: row.customerName,
-    merchantName: row.merchantName,
-    programName: row.programName,
-    rewardText: row.rewardText,
-    currentStamps: row.currentStamps,
-    stampsRequired: row.stampsRequired,
-    qrToken,
-    brandColor: design.brandColor,
-    logoUrl: design.logoUrl, // the shop's own mark, when they've set one
-    // Omitted unless this product is drawn as stamps — a points balance renders natively, so a
-    // strip would put a row of stamps on a card that does not work that way.
-    stripUrl: card.drawsStampStrip ? stripUrlFor(row.serial, row.currentStamps) : undefined,
-    pointsLabel: card.unitLabel(card.normalize(row.mechanics) as never),
-    details: design.details,
-    location: design.location,
-  };
-}
-
-/**
- * The content of a card's wallet pass, for the worker to create it from — or null when the card
- * is gone or its product has no pass yet. Read via adminDb by serial, like getCard.
- */
-export async function walletPassFor(serial: string): Promise<PassContent | null> {
-  const row = await readCard(serial);
-  if (!row || !issuable(row)) return null;
-  // A pass barcode carries the serial, never the rotating app token (see the Google provider).
-  return passContent(row, row.serial);
+/** The card row as the shared pass builders read it. */
+function passSource(row: CardRow): PassSource {
+  return { ...row, currentProgress: row.currentStamps };
 }
 
 /** Resolve to `fallback` if `work` hasn't settled within `ms`. The work itself carries on. */
@@ -148,8 +105,8 @@ export async function getCard(serial: string): Promise<CardView | null> {
    * getSaveUrl answers null on any failure, and the deadline caps a slow one, so a wallet outage
    * costs the button, never the card.
    */
-  const google = issuable(row)
-    ? await withDeadline(getWalletProvider().getSaveUrl(passContent(row, qrToken)), SAVE_LINK_DEADLINE_MS, null)
+  const google = isWalletIssuable(row.type)
+    ? await withDeadline(getWalletProvider().getSaveUrl(passContentFor(passSource(row), qrToken)), SAVE_LINK_DEADLINE_MS, null)
     : null;
 
   return {

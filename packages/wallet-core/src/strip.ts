@@ -335,10 +335,13 @@ export function encodePng(width: number, height: number, rgba: Buffer): Buffer {
  * undefined and the pass simply has no strip — better than pointing Google at an unreachable host.
  *
  * The count rides along purely as a cache-buster: the bytes change on every scan, and a CDN would
- * otherwise keep serving the strip drawn before it.
+ * otherwise keep serving the strip drawn before it. The design `version` does the same for a design
+ * change — new artwork or layout redraws the strip at the same count, and Google keeps showing the
+ * image it already fetched unless the URL is new.
  */
-export function stripUrlFor(serial: string, currentStamps: number): string | undefined {
+export function stripUrlFor(serial: string, currentStamps: number, version?: string): string | undefined {
   const base = process.env.PUBLIC_API_URL;
   if (!base) return undefined;
-  return `${base.replace(/\/$/, "")}/card/${encodeURIComponent(serial)}/strip.png?s=${currentStamps}`;
+  const url = `${base.replace(/\/$/, "")}/card/${encodeURIComponent(serial)}/strip.png?s=${currentStamps}`;
+  return version ? `${url}&v=${encodeURIComponent(version)}` : url;
 }

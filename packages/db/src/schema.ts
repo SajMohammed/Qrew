@@ -86,11 +86,22 @@ export const loyaltyPrograms = pgTable(
     mechanics: jsonb("mechanics").notNull().default(sql`'{}'::jsonb`),
     active: boolean("active").notNull().default(true),
     createdAt: createdAt(),
+    // Whether design changes reached the passes in customers' phones (migration 0013). Tracked by
+    // generation, not timestamps: a save bumps the requested one, the worker records the one it pushed.
+    walletSyncGeneration: integer("wallet_sync_generation").notNull().default(0),
+    walletSyncedGeneration: integer("wallet_synced_generation").notNull().default(0),
+    // Database clock, set with the request — only used to notice a push nobody processed.
+    walletSyncRequestedAt: timestamp("wallet_sync_requested_at", { withTimezone: true }),
+    walletSyncError: text("wallet_sync_error"),
+    walletSyncFailedPasses: integer("wallet_sync_failed_passes").notNull().default(0),
+    // What every pass of the programme shows (reward, unit, strip). Unchanged → no per-pass refresh.
+    walletPassesFingerprint: text("wallet_passes_fingerprint"),
   },
   (t) => [
     index("programs_merchant_idx").on(t.merchantId),
     index("loyalty_programs_merchant_type_idx").on(t.merchantId, t.type),
     check("loyalty_programs_type_known", sql`${t.type} in ('stamp', 'points', 'discount', 'membership')`),
+    check("loyalty_programs_wallet_failed_nonneg", sql`${t.walletSyncFailedPasses} >= 0`),
   ],
 );
 

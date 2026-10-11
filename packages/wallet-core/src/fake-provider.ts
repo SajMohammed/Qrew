@@ -1,9 +1,10 @@
-import type { WalletProvider, PassContent, PassRef, PassUpdate } from "./types";
+import type { WalletProvider, PassContent, PassMessage, PassRef, PassSyncOutcome, PassUpdate } from "./types";
 
 interface FakePass {
   content: PassContent;
   currentStamps: number;
-  lastMessage?: string;
+  lastUpdate?: PassUpdate;
+  messages: PassMessage[];
 }
 
 /**
@@ -13,18 +14,21 @@ interface FakePass {
  */
 export class FakeWalletProvider implements WalletProvider {
   private readonly passes = new Map<string, FakePass>();
+  private readonly templates = new Map<string, PassContent>();
 
   /** A recognisably fake link, so dev can exercise the button without Google credentials. */
   async getSaveUrl(content: PassContent): Promise<string | null> {
     return `https://example.invalid/fake-wallet/${encodeURIComponent(content.serial)}`;
   }
 
-  async syncTemplate(_content: PassContent): Promise<void> {
-    /* nothing to sync in memory */
+  async syncTemplate(content: PassContent): Promise<void> {
+    this.templates.set(content.programId, content);
   }
 
   async issuePass(content: PassContent): Promise<PassRef> {
-    this.passes.set(content.serial, { content, currentStamps: content.currentStamps });
+    if (!this.passes.has(content.serial)) {
+      this.passes.set(content.serial, { content, currentStamps: content.currentStamps, messages: [] });
+    }
     return {
       serial: content.serial,
       applePassId: `apple_${content.serial}`,
@@ -32,15 +36,16 @@ export class FakeWalletProvider implements WalletProvider {
     };
   }
 
-  async updateStamps(ref: PassRef, update: PassUpdate): Promise<boolean> {
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<PassSyncOutcome> {
     const pass = this.passes.get(ref.serial);
-    if (pass) pass.currentStamps = update.currentStamps;
-    return pass !== undefined;
+    if (!pass) return "absent";
+    pass.currentStamps = update.currentStamps;
+    pass.lastUpdate = update;
+    return "in_wallet"; // the fake pretends every pass it holds was saved
   }
 
-  async pushUpdate(ref: PassRef, message: string): Promise<void> {
-    const pass = this.passes.get(ref.serial);
-    if (pass) pass.lastMessage = message;
+  async pushUpdate(ref: PassRef, message: PassMessage): Promise<void> {
+    this.passes.get(ref.serial)?.messages.push(message);
   }
 
   async revoke(ref: PassRef): Promise<void> {
@@ -52,6 +57,12 @@ export class FakeWalletProvider implements WalletProvider {
     return this.passes.get(serial);
   }
   lastMessage(serial: string): string | undefined {
-    return this.passes.get(serial)?.lastMessage;
+    return this.passes.get(serial)?.messages.at(-1)?.body;
+  }
+  messages(serial: string): PassMessage[] {
+    return this.passes.get(serial)?.messages ?? [];
+  }
+  template(programId: string): PassContent | undefined {
+    return this.templates.get(programId);
   }
 }

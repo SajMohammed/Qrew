@@ -1,7 +1,7 @@
 import "./load-env"; // must be first: populates env before @qrew/db loads
 import { Worker } from "bullmq";
 import { WALLET_QUEUE, createWorkerConnection, type WalletJobData } from "@qrew/queue";
-import { assertDeployableConfig } from "@qrew/core";
+import { assertDeployableConfig, recordFinalFailure } from "@qrew/core";
 import { assertAppRoleIsolated, closeDb } from "@qrew/db";
 import { processWalletSync } from "./processor";
 
@@ -21,8 +21,9 @@ const connection = createWorkerConnection();
  *
  * - concurrency: how many jobs run at once in THIS process. Scale out further by starting more
  *   worker processes — BullMQ hands each job to exactly one of them.
- * - limiter: a gentle global rate cap. Apple/Google cap lock-screen pushes (~a few per pass per
- *   day), so throttling here keeps us well under the ceiling once a real provider is wired.
+ * - limiter: a gentle global rate cap on writes to the wallet vendor, so a design change that
+ *   refreshes thousands of passes trickles out instead of bursting. (Lock-screen notifications are
+ *   milestone-only — see syncPass — so they are nowhere near Google's per-pass cap.)
  */
 const worker = new Worker<WalletJobData>(
   WALLET_QUEUE,
@@ -46,7 +47,15 @@ assertAppRoleIsolated().then(
 
 worker.on("ready", () => console.log(`wallet-worker listening on "${WALLET_QUEUE}"`));
 worker.on("completed", (job, result) => console.log(`✓ [job ${job.id}] ${result}`));
-worker.on("failed", (job, err) => console.error(`✗ [job ${job?.id}] ${err?.message}`));
+worker.on("failed", (job, err) => {
+  console.error(`✗ [job ${job?.id}] ${err?.message}`);
+  // Out of retries: record it where the owner can see it (see recordFinalFailure).
+  if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+    void recordFinalFailure(job.data, err.message).catch((e: Error) =>
+      console.error("could not record the wallet failure:", e.message),
+    );
+  }
+});
 // A connection-level error (e.g. Redis down) shouldn't crash the process — BullMQ reconnects.
 worker.on("error", (err) => console.error("wallet-worker error:", err.message));
 

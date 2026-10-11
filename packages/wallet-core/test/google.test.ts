@@ -172,14 +172,34 @@ describe("transport", () => {
 
   const UPDATE = { serial: CONTENT.serial, currentStamps: 4, stampsRequired: 10 };
 
-  it("reports a missing pass as false, so the worker can create it", async () => {
+  it("reports a missing pass as absent, so the worker can create it", async () => {
     stubGoogle(() => new Response("not found", { status: 404 }));
-    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe(false);
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe("absent");
   });
 
-  it("reports an updated pass as true", async () => {
+  it("tells a saved pass from one nobody has saved, by Google's hasUsers", async () => {
+    stubGoogle(() => Response.json({ id: "x", hasUsers: true }));
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe("in_wallet");
+    vi.unstubAllGlobals();
     stubGoogle(() => Response.json({ id: "x" }));
-    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe(true);
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe("not_saved");
+  });
+
+  it("replaces an existing class with PUT, so removed rows and locations disappear", async () => {
+    const fetch = stubGoogle(() => Response.json({ id: "class" }));
+    await withEnv().syncTemplate(CONTENT);
+    const methods = fetch.mock.calls.slice(1).map(([url, init]) => `${(init as RequestInit).method} ${String(url).split("/v1")[1]}`);
+    expect(methods).toEqual([
+      `GET /loyaltyClass/3388000000022222222.${CONTENT.programId}`,
+      `PUT /loyaltyClass/3388000000022222222.${CONTENT.programId}`,
+    ]);
+  });
+
+  it("sends a notification Google will actually push", async () => {
+    const fetch = stubGoogle(() => Response.json({}));
+    await withEnv().pushUpdate({ serial: CONTENT.serial }, { id: "reward-1", header: "Nadia's Coffee", body: "Ready" });
+    const body = JSON.parse(String((fetch.mock.calls[1]![1] as RequestInit).body));
+    expect(body.message).toEqual({ id: "reward-1", header: "Nadia's Coffee", body: "Ready", messageType: "TEXT_AND_NOTIFY" });
   });
 
   it("gives every call — the token exchange included — a deadline", async () => {
