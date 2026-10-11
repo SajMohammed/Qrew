@@ -123,6 +123,24 @@ describe("addStamp", () => {
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
+  // Only the card's own row is locked, so the same key on two cards at once both pass the key check.
+  // The one that loses the insert must not be told "duplicate" — that would claim a stamp it never got.
+  it("refuses a key raced onto two cards at once", async () => {
+    process.env.STAMP_COOLDOWN_SECONDS = "0";
+    // Several pairs: one alone may not overlap, and then the key check catches it the ordinary way.
+    for (let i = 0; i < 5; i++) {
+      const a = await enroll({ merchantId, programId, phone: `+97150000020${i}` });
+      const b = await enroll({ merchantId, programId, phone: `+97150000021${i}` });
+      const results = await Promise.allSettled([
+        addStamp({ merchantId, enrollmentId: a.enrollmentId, idempotencyKey: `raced-${i}` }),
+        addStamp({ merchantId, enrollmentId: b.enrollmentId, idempotencyKey: `raced-${i}` }),
+      ]);
+      expect(results.filter((r) => r.status === "fulfilled" && r.value.reason === "applied")).toHaveLength(1);
+      const lost = results.find((r) => r.status === "rejected");
+      expect(lost?.status === "rejected" && lost.reason instanceof ConflictError).toBe(true);
+    }
+  });
+
   it("a deliberate stamp skips the cooldown, and a camera read after it still waits", async () => {
     process.env.STAMP_COOLDOWN_SECONDS = "60";
     const { enrollmentId } = await enroll({ merchantId, programId, phone: "+971500000101" });

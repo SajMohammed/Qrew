@@ -8,7 +8,7 @@ import {
   redemptions,
   type TenantDb,
 } from "@qrew/db";
-import { getWalletProvider } from "@qrew/wallet-core";
+import { getWalletProvider, type PassSyncOutcome } from "@qrew/wallet-core";
 import {
   enqueuePassRefreshes,
   enqueueTemplateSync,
@@ -73,8 +73,9 @@ async function readPassSource(merchantId: string, enrollmentId: string) {
  * retried: Google allows a few per pass per day, and a retry could spend them on a duplicate.
  */
 export async function syncPass(data: PassJob | RefreshJob): Promise<string> {
-  const src = await readPassSource(data.merchantId, data.enrollmentId);
-  if (!src) return `enrollment ${data.enrollmentId} gone — skipped`;
+  const first = await readPassSource(data.merchantId, data.enrollmentId);
+  if (!first) return `enrollment ${data.enrollmentId} gone — skipped`;
+  let src = first;
   if (!isWalletIssuable(src.type)) return `${short(src.serial)}: ${src.type} cards have no pass yet — skipped`;
 
   const provider = getWalletProvider();
@@ -84,14 +85,26 @@ export async function syncPass(data: PassJob | RefreshJob): Promise<string> {
     applePassId: src.applePassId ?? undefined,
     googleObjectId: src.googleObjectId ?? undefined,
   };
-  const progress = `${src.currentProgress}/${src.stampsRequired}`;
 
-  const outcome = await provider.updateStamps(ref, passUpdateFor(src));
-  if (outcome === "absent") {
-    // A pass barcode carries the serial, never the rotating app token (see the Google provider).
-    await provider.issuePass(passContentFor(src, src.serial));
-    return `created pass for ${short(src.serial)} at ${progress}`;
+  /*
+   * Jobs for one card can run side by side — a stamp's, and a design change's refresh — and each
+   * writes what it read. One that read the older picture could land last and leave the pass behind
+   * until the next scan. So after writing, look again, and write again if the card has moved on.
+   */
+  let outcome: PassSyncOutcome;
+  for (let round = 0; ; round++) {
+    const update = passUpdateFor(src);
+    outcome = await provider.updateStamps(ref, update);
+    if (outcome === "absent") {
+      // A pass barcode carries the serial, never the rotating app token (see the Google provider).
+      await provider.issuePass(passContentFor(src, src.serial));
+      return `created pass for ${short(src.serial)} at ${src.currentProgress}/${src.stampsRequired}`;
+    }
+    const now = await readPassSource(data.merchantId, data.enrollmentId);
+    if (!now || round === 2 || JSON.stringify(passUpdateFor(now)) === JSON.stringify(update)) break;
+    src = now;
   }
+  const progress = `${src.currentProgress}/${src.stampsRequired}`;
 
   let notified = "";
   if (data.kind === "stamp" && data.notify === "reward_ready" && outcome === "in_wallet") {
@@ -161,7 +174,8 @@ export async function syncProgramTemplate(data: TemplateJob): Promise<string> {
       .update(loyaltyPrograms)
       .set({
         walletSyncedGeneration: sql`greatest(${loyaltyPrograms.walletSyncedGeneration}, ${generation})`,
-        walletSyncError: null,
+        // Only an error this push answers for: a newer save may have failed to queue meanwhile.
+        walletSyncError: sql`case when ${loyaltyPrograms.walletSyncGeneration} <= ${generation} then null else ${loyaltyPrograms.walletSyncError} end`,
         // A new fingerprint starts a new round of refreshes, so the failure count starts again too.
         ...(fingerprint && fingerprint !== program.walletPassesFingerprint
           ? { walletPassesFingerprint: fingerprint, walletSyncFailedPasses: 0 }

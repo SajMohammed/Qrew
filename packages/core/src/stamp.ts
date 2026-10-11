@@ -151,6 +151,23 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
       .onConflictDoNothing({ target: [loyaltyProgressEvents.merchantId, loyaltyProgressEvents.idempotencyKey] })
       .returning();
 
+    if (inserted.length === 0) {
+      // The key landed in another request at the same moment. Only this card's row is locked, so
+      // that request may have been for another card — then this is no replay of it.
+      const [winner] = await db
+        .select({ enrollmentId: loyaltyProgressEvents.enrollmentId })
+        .from(loyaltyProgressEvents)
+        .where(
+          and(
+            eq(loyaltyProgressEvents.merchantId, input.merchantId),
+            eq(loyaltyProgressEvents.idempotencyKey, input.idempotencyKey),
+          ),
+        );
+      if (winner && winner.enrollmentId !== input.enrollmentId) {
+        throw new ConflictError("this stamp key was already used for a different card");
+      }
+    }
+
     const [after] = await db
       .select({ currentStamps: enrollments.currentProgress })
       .from(enrollments)

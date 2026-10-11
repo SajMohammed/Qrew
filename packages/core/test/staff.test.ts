@@ -105,6 +105,18 @@ describe("guessing PINs", () => {
     await expect(verifyStaffPin(merchantId, "1357")).rejects.toBeInstanceOf(TooManyAttemptsError);
   });
 
+  // Checks used to run side by side, each passing the gate before any had missed — so a burst of
+  // guesses sent at once was tried in full, the right PIN included, and the shop locked only after.
+  it("holds a burst of guesses sent at once to the same limit", async () => {
+    const merchantId = await shop("Burst Co");
+    await addStaffPin(merchantId, { name: "Rami", pin: "8080" });
+    const guesses = ["1001", "1002", "1003", "1004", "1005", "1006", "1007", "1008", "8080"];
+    const results = await Promise.allSettled(guesses.map((pin) => verifyStaffPin(merchantId, pin)));
+    expect(results.filter((r) => r.status === "fulfilled" && r.value === null)).toHaveLength(5);
+    const last = results.at(-1)!;
+    expect(last.status === "rejected" && last.reason instanceof TooManyAttemptsError).toBe(true);
+  });
+
   it("keeps other shops unaffected", async () => {
     const merchantId = await shop("Calm Co");
     await addStaffPin(merchantId, { name: "Noor", pin: "8642" });

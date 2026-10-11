@@ -29,6 +29,15 @@ export interface RedeemResult {
  *      resets current_progress.
  *   4. enqueue a wallet-sync job — the wallet-worker resets the pass off the request path.
  */
+/** A unique-index violation on `constraint`, however deep the driver wraps it. */
+function violates(err: unknown, constraint: string): boolean {
+  for (let e: unknown = err; e && typeof e === "object"; e = (e as { cause?: unknown }).cause) {
+    const pg = e as { code?: string; constraint_name?: string };
+    if (pg.code === "23505" && pg.constraint_name === constraint) return true;
+  }
+  return false;
+}
+
 export async function redeem(input: RedeemInput): Promise<RedeemResult> {
   const outcome = await withTenant(input.merchantId, async (db) => {
     // Lock the card row so two simultaneous redeems serialize — otherwise both pass the ledger
@@ -101,6 +110,13 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
       currentStamps: after?.currentStamps ?? balance - program.stampsRequired,
       rewardText: program.rewardText,
     };
+  }).catch((err: unknown) => {
+    // The same key redeemed on another card at the same moment: each locked only its own card, so
+    // both got past the key check, and the index caught the second. Same answer as when they don't race.
+    if (violates(err, "redemptions_idem_uq")) {
+      throw new ConflictError("this redeem key was already used for a different card");
+    }
+    throw err;
   });
 
   // Wallet propagation runs off the request path (see apps/wallet-worker). Best-effort: the

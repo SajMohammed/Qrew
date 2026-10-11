@@ -208,6 +208,12 @@ function weight(entry: CachedImage): number {
 
 function remember(url: string, entry: CachedImage): void {
   if (weight(entry) > CACHE_BUDGET_BYTES) return; // would evict everything else and still not fit
+  // Two loads of one URL at once both land here: the second replaces the first, so its weight goes.
+  const replaced = imageCache.get(url);
+  if (replaced) {
+    imageCache.delete(url);
+    cachedBytes -= weight(replaced);
+  }
   imageCache.set(url, entry);
   cachedBytes += weight(entry);
   for (const [oldest, old] of imageCache) {

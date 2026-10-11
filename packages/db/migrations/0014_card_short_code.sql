@@ -20,8 +20,12 @@ $$;
 
 alter table enrollments add column short_code text;
 
--- Backfill one card at a time, drawing again on the rare clash, so creating the unique index below
--- can never fail this migration.
+-- Unique per shop (two shops may share a code), and the index the counter's lookup uses. Created
+-- before the backfill — NULLs don't clash — so each clash check below is an index probe, not a scan
+-- of the shop's cards.
+create unique index enrollments_merchant_short_code_uq on enrollments(merchant_id, short_code);
+
+-- Backfill one card at a time, drawing again on the rare clash.
 do $$
 declare
   r record;
@@ -46,5 +50,3 @@ alter table enrollments alter column short_code set not null;
 alter table enrollments add constraint enrollments_short_code_format
   check (short_code ~ '^[2-9A-HJKMNP-TV-Z]{6}$');
 
--- Unique per shop (two shops may share a code), and the index the counter's lookup uses.
-create unique index enrollments_merchant_short_code_uq on enrollments(merchant_id, short_code);

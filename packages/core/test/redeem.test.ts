@@ -94,6 +94,18 @@ describe("redeem", () => {
     expect(rows).toHaveLength(0); // card B still holds its reward
   });
 
+  it("refuses a key raced onto two cards at once with a 409, not a 500", async () => {
+    const a = await enrolledWith3Stamps("+971500000027");
+    const b = await enrolledWith3Stamps("+971500000028");
+    const results = await Promise.allSettled([
+      redeem({ merchantId, enrollmentId: a, idempotencyKey: "rd-raced" }),
+      redeem({ merchantId, enrollmentId: b, idempotencyKey: "rd-raced" }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled" && r.value.reason === "redeemed")).toHaveLength(1);
+    const lost = results.find((r) => r.status === "rejected");
+    expect(lost?.status === "rejected" && lost.reason instanceof ConflictError).toBe(true);
+  });
+
   // A points balance can hold two rewards' worth, so the ledger check alone would pass twice. The
   // counter sends the same key for one reward-ready result, and that is what stops a double tap.
   it("a double tap on a points card holding two rewards redeems once", async () => {

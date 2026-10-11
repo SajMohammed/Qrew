@@ -160,15 +160,41 @@ export async function removeStaff(merchantId: string, staffId: string): Promise<
 const PIN_BURST = new WindowCounter(5, 15 * 60_000);
 const PIN_DAILY = new WindowCounter(20, 24 * 60 * 60_000);
 
+/*
+ * A shop's PIN checks run one at a time. The lockout is decided before a check and a miss counted
+ * after it, so checks running side by side would each pass the gate before any of them had missed —
+ * a burst of every 4-digit PIN at once would all be tried. Taking turns also keeps a burst from
+ * filling the thread pool with scrypt work. (Per process, like the counters themselves.)
+ */
+const pinTurns = new Map<string, Promise<void>>();
+
+async function inTurn<T>(merchantId: string, work: () => Promise<T>): Promise<T> {
+  const before = pinTurns.get(merchantId) ?? Promise.resolve();
+  let done!: () => void;
+  const mine = before.then(() => new Promise<void>((resolve) => (done = resolve)));
+  pinTurns.set(merchantId, mine);
+  await before;
+  try {
+    return await work();
+  } finally {
+    done();
+    if (pinTurns.get(merchantId) === mine) pinTurns.delete(merchantId);
+  }
+}
+
 /**
  * Resolve a counter PIN to a staff member within the merchant (RLS-scoped), with a shift token for
  * attributing their scans. Null if no PIN matches. Throws TooManyAttemptsError while PIN entry is
  * paused — even for a correct PIN, or the pause would be no pause at all.
  */
-export async function verifyStaffPin(
+export function verifyStaffPin(
   merchantId: string,
   pin: string,
 ): Promise<(StaffIdentity & { staffToken: string }) | null> {
+  return inTurn(merchantId, () => checkPin(merchantId, pin));
+}
+
+async function checkPin(merchantId: string, pin: string): Promise<(StaffIdentity & { staffToken: string }) | null> {
   const wait = Math.max(PIN_BURST.blockedFor(merchantId), PIN_DAILY.blockedFor(merchantId));
   if (wait > 0) {
     const seconds = Math.ceil(wait / 1000);

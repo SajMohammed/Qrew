@@ -62,6 +62,22 @@ describe("loadIcon", () => {
     expect(source).toHaveBeenCalledTimes(1);
   });
 
+  // Two loads of one URL at once both cached it, and the first copy's size was never taken off the
+  // running total. Enough of those pushed the total past the budget for good, and from then on the
+  // cache dropped everything — including what it had just stored.
+  it("keeps caching after many loads of one image at once", async () => {
+    const png = encodePng(1024, 1024, swatch(1024, 1024)); // 4 MiB decoded
+    const source = vi.fn(async () => png);
+    for (let i = 0; i < 20; i++) {
+      const u = url();
+      await Promise.all([loadIcon(u, source), loadIcon(u, source)]);
+    }
+    const u = url();
+    await loadIcon(u, source);
+    await loadIcon(u, source);
+    expect(source).toHaveBeenCalledTimes(41); // 2 per raced URL, then once for the last
+  });
+
   it("falls back to no artwork when the fetch fails, rather than throwing", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(loadIcon(url(), async () => Promise.reject(new Error("ENOTFOUND")))).resolves.toBeUndefined();
