@@ -71,6 +71,21 @@ function num(v: unknown, lo: number, hi: number): number | undefined {
   return typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined;
 }
 
+/**
+ * An image link is only kept when it is a whole http(s) URL. A data:, javascript: or half-typed link
+ * — the designer previews on every keystroke — is treated as unset, so it falls back to the plain
+ * stamps rather than reaching a fetch or a pass.
+ */
+function imageUrl(v: unknown): string | undefined {
+  if (typeof v !== "string" || !v || v.length > 500) return undefined;
+  try {
+    const { protocol } = new URL(v);
+    return protocol === "https:" || protocol === "http:" ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function normalizeDesign(raw: unknown): CardDesign {
   const d = (raw ?? {}) as Partial<CardDesign>;
   const details = Array.isArray(d.details)
@@ -82,14 +97,18 @@ export function normalizeDesign(raw: unknown): CardDesign {
   const gapX = num(d.stampGapX, 0, 0.6);
   const gapY = num(d.stampGapY, 0, 0.6);
   const unearned = num(d.unearnedOpacity, 0.05, 1);
+  const logo = imageUrl(d.logoUrl);
+  const stamp = imageUrl(d.stampImageUrl);
+  const emptyStamp = imageUrl(d.emptyStampImageUrl);
+  const customStrip = imageUrl(d.customStripUrl);
   return {
     brandColor: typeof d.brandColor === "string" ? d.brandColor : DEFAULT_DESIGN.brandColor,
     stampIcon: typeof d.stampIcon === "string" ? d.stampIcon : DEFAULT_DESIGN.stampIcon,
     // An empty string means "cleared" — store it as absent so adapters fall back cleanly.
-    ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
-    ...(d.stampImageUrl ? { stampImageUrl: d.stampImageUrl } : {}),
-    ...(d.emptyStampImageUrl ? { emptyStampImageUrl: d.emptyStampImageUrl } : {}),
-    ...(d.customStripUrl ? { customStripUrl: d.customStripUrl } : {}),
+    ...(logo ? { logoUrl: logo } : {}),
+    ...(stamp ? { stampImageUrl: stamp } : {}),
+    ...(emptyStamp ? { emptyStampImageUrl: emptyStamp } : {}),
+    ...(customStrip ? { customStripUrl: customStrip } : {}),
     ...(d.stampLayout && LAYOUTS.includes(d.stampLayout) ? { stampLayout: d.stampLayout } : {}),
     ...(scale !== undefined ? { stampScale: scale } : {}),
     ...(gapX !== undefined ? { stampGapX: gapX } : {}),

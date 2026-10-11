@@ -8,8 +8,10 @@ import {
   loadRawImage,
   GOOGLE_STRIP,
   APPLE_STRIP,
+  fetchArtwork,
   type PassContent,
 } from "@qrew/wallet-core";
+import { getAsset, ownAssetId } from "./asset";
 import { mintCardToken } from "./token";
 import { normalizeDesign, type CardDesign } from "./program";
 import { cardTypeModule, isCardType } from "./card-types";
@@ -195,6 +197,18 @@ export async function getCardStrip(
 }
 
 /**
+ * Where a design's artwork bytes come from: our own uploads straight from Postgres, anything a shop
+ * pasted through the guarded fetch (https only, public hosts only, size-capped — see fetchArtwork).
+ */
+async function artworkBytes(url: string): Promise<Buffer> {
+  const id = ownAssetId(url);
+  if (!id) return fetchArtwork(url);
+  const asset = await getAsset(id);
+  if (!asset) throw new Error(`asset ${id} not found`);
+  return asset.bytes;
+}
+
+/**
  * Draw a design's strip. Shared by the live card and the designer's preview, so what a shop sees
  * while editing is the same code path the wallet fetches — not a mock that can drift from it.
  */
@@ -209,14 +223,14 @@ export async function stripFor(
    * count for full control of the artwork, so compositing on top would defeat the choice.
    */
   if (design.customStripUrl) {
-    const custom = await loadRawImage(design.customStripUrl);
+    const custom = await loadRawImage(design.customStripUrl, artworkBytes);
     if (custom) return custom;
     // Unreachable artwork falls through to a generated strip rather than leaving the pass blank.
   }
 
   const [icon, emptyIcon] = await Promise.all([
-    loadIcon(design.stampImageUrl),
-    loadIcon(design.emptyStampImageUrl),
+    loadIcon(design.stampImageUrl, artworkBytes),
+    loadIcon(design.emptyStampImageUrl, artworkBytes),
   ]);
 
   return renderStampStrip({

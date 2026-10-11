@@ -51,6 +51,13 @@ export const StaffPinUpdate = z.object({
 });
 export type StaffPinUpdate = z.infer<typeof StaffPinUpdate>;
 
+/**
+ * A saved image link: http(s) only. Any other scheme — data:, javascript:, file: — would reach a
+ * server-side fetch or a wallet pass. http stays allowed because development uploads live on
+ * http://localhost; the strip's fetch itself only follows https links (see fetchArtwork).
+ */
+const imageUrl = z.url({ protocol: /^https?$/ }).max(500);
+
 export const ProgramUpdate = z.object({
   name: z.string().min(1).max(60).optional(),
   /**
@@ -76,19 +83,19 @@ export const ProgramUpdate = z.object({
       brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "must be a #RRGGBB hex colour").optional(),
       stampIcon: z.string().min(1).max(8).optional(),
       /** Public https image. Google fetches this URL; Apple bundles the file into the pass. */
-      logoUrl: z.string().url().max(500).optional().or(z.literal("")),
+      logoUrl: imageUrl.optional().or(z.literal("")),
       /**
        * The shop's stamp artwork — a square transparent PNG, drawn into the wallet stamp strip.
        * PNG specifically: the strip is composited server-side, and JPEG cannot be decoded there.
        */
-      stampImageUrl: z.string().url().max(500).optional().or(z.literal("")),
+      stampImageUrl: imageUrl.optional().or(z.literal("")),
       /** Artwork for a stamp not yet earned. Without one, the earned artwork is drawn faded. */
-      emptyStampImageUrl: z.string().url().max(500).optional().or(z.literal("")),
+      emptyStampImageUrl: imageUrl.optional().or(z.literal("")),
       /**
        * A finished strip the shop drew themselves, passed through untouched. Costs them the live
        * stamp count — the image cannot change as they earn — so it is opt-in, never the default.
        */
-      customStripUrl: z.string().url().max(500).optional().or(z.literal("")),
+      customStripUrl: imageUrl.optional().or(z.literal("")),
       stampLayout: z.enum(["row", "grid", "top-heavy", "diamond"]).optional(),
       stampScale: z.number().min(0.5).max(1.4).optional(),
       stampGapX: z.number().min(0).max(0.6).optional(),
@@ -119,7 +126,21 @@ export type ProgramUpdate = z.infer<typeof ProgramUpdate>;
  * card; they are display state, not anything this writes.
  */
 export const StripPreviewRequest = z.object({
-  cardDesign: z.record(z.string(), z.unknown()),
+  /**
+   * Only what the strip uses, and lenient on purpose: the designer previews on every keystroke, so
+   * a half-typed link must not 400 the preview. The domain drops what it cannot use.
+   */
+  cardDesign: z.object({
+    brandColor: z.string().max(32).optional(),
+    stampImageUrl: z.string().max(500).optional(),
+    emptyStampImageUrl: z.string().max(500).optional(),
+    customStripUrl: z.string().max(500).optional(),
+    stampLayout: z.string().max(20).optional(),
+    stampScale: z.number().optional(),
+    stampGapX: z.number().optional(),
+    stampGapY: z.number().optional(),
+    unearnedOpacity: z.number().optional(),
+  }),
   stampsRequired: z.number().int().min(1).max(20),
   currentStamps: z.number().int().min(0).max(20),
   platform: z.enum(["google", "apple"]).default("google"),
@@ -135,7 +156,8 @@ export type AssetUploadQuery = z.infer<typeof AssetUploadQuery>;
 export const EnrollRequest = z.object({
   merchantId: z.string().uuid(), // from the merchant's counter QR (public routing, not auth)
   programId: z.string().uuid(),
-  phone: z.string().min(5).max(32).optional(),
+  // No phone: an unverified number is not identity. Matching on one would hand anyone who typed a
+  // customer's number that customer's card serial — a bearer credential for their card.
   name: z.string().min(1).max(120).optional(),
   consent: z.object({ sms: z.boolean().optional(), whatsapp: z.boolean().optional() }).optional(),
 });

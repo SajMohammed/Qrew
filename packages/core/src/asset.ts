@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { adminDb, withTenant, merchantAssets } from "@qrew/db";
-import { decodePng } from "@qrew/wallet-core";
+import { decodePng, readPngSize } from "@qrew/wallet-core";
 import { InvalidInputError } from "./errors";
 
 /**
@@ -59,21 +59,32 @@ export async function storeAsset(
     throw new InvalidInputError(`image is ${Math.round(bytes.length / 1024)} KB — the limit is ${MAX_ASSET_BYTES / 1024} KB`);
   }
 
+  // The message matters: "not a PNG" is the difference between the shop re-exporting and giving up.
+  const unreadable = (err: unknown) =>
+    new InvalidInputError(
+      `that file could not be read as a PNG${err instanceof Error ? ` (${err.message})` : ""}. ` +
+        `Wallet stamps are composited on our server, which reads PNG only — re-export as PNG and try again.`,
+    );
+
+  // Size from the header FIRST: decoding allocates whatever the header declares, so a small file
+  // claiming a huge image must be turned away before it gets that far.
+  let size;
+  try {
+    size = readPngSize(bytes);
+  } catch (err) {
+    throw unreadable(err);
+  }
+  if (size.width > MAX_ASSET_DIMENSION || size.height > MAX_ASSET_DIMENSION) {
+    throw new InvalidInputError(
+      `image is ${size.width}×${size.height} — the limit is ${MAX_ASSET_DIMENSION}×${MAX_ASSET_DIMENSION}`,
+    );
+  }
+
   let decoded;
   try {
     decoded = decodePng(bytes);
   } catch (err) {
-    // The message matters: "not a PNG" is the difference between the shop re-exporting and giving up.
-    throw new InvalidInputError(
-      `that file could not be read as a PNG${err instanceof Error ? ` (${err.message})` : ""}. ` +
-        `Wallet stamps are composited on our server, which reads PNG only — re-export as PNG and try again.`,
-    );
-  }
-
-  if (decoded.width > MAX_ASSET_DIMENSION || decoded.height > MAX_ASSET_DIMENSION) {
-    throw new InvalidInputError(
-      `image is ${decoded.width}×${decoded.height} — the limit is ${MAX_ASSET_DIMENSION}×${MAX_ASSET_DIMENSION}`,
-    );
+    throw unreadable(err);
   }
 
   const [row] = await withTenant(merchantId, (db) =>
@@ -104,6 +115,24 @@ export async function getAsset(id: string): Promise<AssetBytes | null> {
     .where(eq(merchantAssets.id, id));
 
   return row ? { bytes: Buffer.from(row.bytes), contentType: row.contentType } : null;
+}
+
+/**
+ * The asset id in one of our own upload links, or null for anything else.
+ *
+ * Our uploads are read straight from Postgres when a strip is drawn, never fetched over HTTP: that
+ * keeps the guarded network fetch for links a shop pasted, and spares a round trip out through the
+ * load balancer and back. Matched on the path alone, so links saved under an older public host (a
+ * dev tunnel's URL changes every run) keep working; at worst a lookalike link reads nothing here.
+ */
+export function ownAssetId(url: string): string | null {
+  let pathname: string;
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    return null;
+  }
+  return /^\/asset\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.png$/i.exec(pathname)?.[1] ?? null;
 }
 
 /** A rejected upload — the message is written to be shown to the shop as-is. */
