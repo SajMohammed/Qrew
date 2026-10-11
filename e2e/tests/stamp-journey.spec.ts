@@ -69,14 +69,36 @@ test("a new owner sets up a stamp card, and a customer earns and redeems the rew
   // The customer is a separate device: its own storage, no Clerk session.
   const phone = await (await browser.newContext()).newPage();
 
-  const code = await test.step("a customer scans it and gets the card", async () => {
+  const { code, serial } = await test.step("a customer scans it and gets the card", async () => {
     await phone.goto(`${CARDS}/${enroll.search}`);
     await expect(phone.getByText(RENAMED).first()).toBeVisible();
     await phone.getByRole("button", { name: /Get this shop's card/ }).click();
     await expect(phone).toHaveURL(/\?card=/);
     await expect(phone.getByText("0/3", { exact: true })).toBeVisible();
-    // The code printed under the QR, for when it won't scan — what this test types at the counter.
-    return phone.getByText(/^[2-9A-HJKMNP-TV-Z]{3} [2-9A-HJKMNP-TV-Z]{3}$/).innerText();
+    return {
+      serial: new URL(phone.url()).searchParams.get("card")!,
+      // The code printed under the QR, for when it won't scan — what this test types at the counter.
+      code: await phone.getByText(/^[2-9A-HJKMNP-TV-Z]{3} [2-9A-HJKMNP-TV-Z]{3}$/).innerText(),
+    };
+  });
+
+  await test.step("scanning the counter code again opens the same card, not a second one", async () => {
+    await phone.goto(`${CARDS}/${enroll.search}`);
+    await expect(phone).toHaveURL(new RegExp(`card=${serial}`));
+    await expect(phone.getByRole("button", { name: /Get this shop's card/ })).toHaveCount(0);
+    // Back lands on the wallet, which holds exactly one card from this shop.
+    await phone.getByRole("button", { name: "‹ All cards" }).click();
+    const tile = phone.getByRole("button", { name: new RegExp(RENAMED) });
+    await expect(tile).toHaveCount(1);
+    await tile.click();
+    await expect(phone).toHaveURL(new RegExp(`card=${serial}`));
+  });
+
+  await test.step("the card says when the phone is offline, and recovers on its own", async () => {
+    await phone.context().setOffline(true);
+    await expect(phone.getByText("No connection — reconnecting…")).toBeVisible({ timeout: 15_000 });
+    await phone.context().setOffline(false);
+    await expect(phone.getByText("Live — updates as staff stamp your card")).toBeVisible({ timeout: 15_000 });
   });
 
   await test.step("the counter stamps it by its code, once per visit unless asked for more", async () => {

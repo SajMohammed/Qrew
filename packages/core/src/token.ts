@@ -38,7 +38,8 @@ export function unsafeTokenSecrets(env: Record<string, string | undefined> = pro
     .map(([name]) => name);
 }
 
-const CARD_TTL_MS = 120_000; // 2 minutes — refreshed as the card polls
+// 2 minutes — refreshed as the card polls. Exported so the card read can tell the app how long its QR lives.
+export const CARD_TTL_MS = 120_000;
 export const STAFF_TTL_MS = 8 * 60 * 60 * 1000; // one shift — the counter asks for the PIN again when it ends
 export const CUSTOMER_ACCESS_TTL_MS = 15 * 60 * 1000; // 15 min — the refresh token rotates it
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { adminDb, closeDb, merchants, loyaltyPrograms } from "@qrew/db";
-import { enroll, getProgram, updateProgram, getCard, getShopPreview } from "../src/index";
+import { enroll, getProgram, updateProgram, getCard, getShopPreview, CARD_TTL_MS } from "../src/index";
 
 let merchantId: string;
 let programId: string;
@@ -48,6 +48,10 @@ describe("program (card designer)", () => {
     expect(card?.brandColor).toBe("#6C2A4B");
     expect(card?.stampIcon).toBe("☕");
     expect(card?.rewardText).toBe("free pastry");
+    // What lets the app reopen this card when the counter code is scanned again, and know when its
+    // QR has lapsed.
+    expect(card?.programId).toBe(programId);
+    expect(card?.qrTtlMs).toBe(CARD_TTL_MS);
   });
 
   it("getShopPreview returns the public shop branding for the enroll landing", async () => {

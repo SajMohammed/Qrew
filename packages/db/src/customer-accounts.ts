@@ -116,29 +116,52 @@ export async function revokeRefreshSession(refreshTokenHash: string): Promise<vo
 }
 
 /**
+ * What claiming a card came to:
+ * - claimed — it is this account's card now (or already was);
+ * - refused — no such card, or it belongs to a different account;
+ * - has_own — the account already has its own card at this shop, so this one can't join it.
+ */
+export type ClaimOutcome = "claimed" | "refused" | "has_own";
+
+/**
  * Fold an anonymous (walk-in) card into a signed-in account, by its serial — the bridge for the
  * hybrid UX (get an instant card, then sign in to save it). Possession of the unguessable serial is
  * the credential. Refuses a card already owned by a DIFFERENT account (no stealing); a no-op if it's
- * already this account's. Returns true when the card is (now) linked to this account.
+ * already this account's.
  */
-export async function claimCardBySerial(accountId: string, serial: string): Promise<boolean> {
+export async function claimCardBySerial(accountId: string, serial: string): Promise<ClaimOutcome> {
   return adminDb.transaction(async (tx) => {
     const [e] = await tx
       .select({ customerId: enrollments.customerId })
       .from(enrollments)
       .where(eq(enrollments.cardSerial, serial))
       .limit(1);
-    if (!e) return false;
+    if (!e) return "refused";
     const [c] = await tx
-      .select({ id: customers.id, accountId: customers.customerAccountId })
+      .select({ id: customers.id, merchantId: customers.merchantId, accountId: customers.customerAccountId })
       .from(customers)
       .where(eq(customers.id, e.customerId))
       .limit(1)
       .for("update");
-    if (!c) return false;
-    if (c.accountId) return c.accountId === accountId; // already linked — mine (ok) or someone else's (refuse)
+    if (!c) return "refused";
+    // already linked — mine (ok) or someone else's (refuse)
+    if (c.accountId) return c.accountId === accountId ? "claimed" : "refused";
+
+    /*
+     * A person is one customer per shop, so an account that already has a card here can't take this
+     * one as well — linking it would break that rule (and used to fail as a 500 on every sign-in).
+     * Merging two cards' stamps is a policy not yet settled, so this card stays as it is: unclaimed,
+     * and still on the device that holds it.
+     */
+    const [own] = await tx
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.merchantId, c.merchantId), eq(customers.customerAccountId, accountId)))
+      .limit(1);
+    if (own) return "has_own";
+
     await tx.update(customers).set({ customerAccountId: accountId }).where(eq(customers.id, c.id));
-    return true;
+    return "claimed";
   });
 }
 
@@ -154,6 +177,8 @@ export async function getAccountEmail(accountId: string): Promise<string | null>
 
 export interface MyCard {
   serial: string;
+  /** Lets the app spot that it already holds this shop's card when the counter QR is scanned again. */
+  programId: string;
   merchantName: string;
   programName: string;
   rewardText: string;
@@ -172,6 +197,7 @@ export async function getMyCards(accountId: string): Promise<MyCard[]> {
   return adminDb
     .select({
       serial: enrollments.cardSerial,
+      programId: enrollments.programId,
       merchantName: merchants.name,
       programName: loyaltyPrograms.name,
       rewardText: loyaltyPrograms.rewardText,

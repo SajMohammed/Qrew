@@ -9,8 +9,13 @@ import {
   getShopPreview,
   tileFromMyCard,
   tileFromCardView,
+  heldCardFor,
+  failureKind,
+  friendlyError,
   type CardView,
   type CardTile,
+  type EnrollResult,
+  type FailureKind,
   type ShopPreview,
 } from "./api";
 import { useCustomerAuth } from "./useCustomerAuth";
@@ -18,10 +23,20 @@ import { StampCard } from "./StampCard";
 import { CardsGrid } from "./CardsGrid";
 import { CardPreview } from "./CardPreview";
 import { SignInPanel } from "./SignInPanel";
+import { SaveCardNudge } from "./SaveCardNudge";
+import { ConnectionNotice } from "./ConnectionNotice";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { CardsSkeleton, CardDetailSkeleton } from "@/components/Skeleton";
+import { CardsSkeleton, CardDetailSkeleton, Skeleton } from "@/components/Skeleton";
 import { buzz } from "@/lib/haptics";
+import {
+  POLL_MS,
+  MISSING_POLL_MS,
+  DEFAULT_QR_TTL_MS,
+  shouldAdoptToken,
+  qrExpiresAt,
+  qrState,
+} from "@/lib/connection";
 
 function param(name: string): string {
   return new URLSearchParams(window.location.search).get(name) ?? "";
@@ -46,6 +61,28 @@ function writeLocal(serials: string[]): void {
   localStorage.removeItem("qrew.card");
 }
 
+// "Not now" on the save-your-card nudge, remembered for this device.
+const NUDGE_KEY = "qrew.saveNudge.dismissed";
+function readNudgeDismissed(): boolean {
+  try {
+    return localStorage.getItem(NUDGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeNudgeDismissed(): void {
+  try {
+    localStorage.setItem(NUDGE_KEY, "1");
+  } catch {
+    /* shown again next visit — harmless */
+  }
+}
+
+type PreviewState =
+  | { status: "idle" | "loading" }
+  | { status: "ready"; preview: ShopPreview }
+  | { status: "failed"; reason: FailureKind };
+
 const SCREEN = "mx-auto w-full max-w-[440px] sm:max-w-[560px]";
 
 export function App() {
@@ -54,30 +91,48 @@ export function App() {
   const [localSerials, setLocalSerials] = useState<string[]>(readLocal);
   const [tiles, setTiles] = useState<CardTile[]>([]);
   const [tilesLoaded, setTilesLoaded] = useState(false);
+  // Cards that couldn't be checked just now (missing: how many; null when it's the whole account list).
+  const [tilesProblem, setTilesProblem] = useState<{ kind: FailureKind; missing: number | null } | null>(null);
   const [selected, setSelected] = useState<string | null>(() => param("card") || null);
   const [card, setCard] = useState<CardView | null>(null);
-  const [detailError, setDetailError] = useState(false);
+  // Why the open card hasn't loaded (before it ever has).
+  const [detailError, setDetailError] = useState<FailureKind | null>(null);
+  // Whether the open card's polls are failing. A new object each time, so the code's age is re-judged.
+  const [sync, setSync] = useState<{ failing: FailureKind | null; at: number }>({ failing: null, at: 0 });
+  const [qrHeld, setQrHeld] = useState<{ at: number; ttlMs: number } | null>(null);
+  const retryDetailRef = useRef<() => void>(() => {});
+  const [nudgeDismissed, setNudgeDismissed] = useState(readNudgeDismissed);
   const [enrollCtx, setEnrollCtx] = useState<{
     serial: string;
     enrollmentId: string;
     merchantId: string;
   } | null>(null);
-  const [preview, setPreview] = useState<ShopPreview | null>(null);
+  const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const claimedRef = useRef(false);
   // The QR's signed token is valid ~2 min; hold it steady across the 4s stamp-poll (refresh only near
   // expiry) so it doesn't visibly change every few seconds while the customer is showing it to staff.
-  const qrRef = useRef<{ token: string; at: number } | null>(null);
+  const qrRef = useRef<{ token: string; at: number; ttlMs: number } | null>(null);
 
   // Fetch the shop's card preview when arriving from a counter QR (?m=&p=), so the customer sees what
   // they'll get before enrolling.
   useEffect(() => {
-    if (shop.m && shop.p)
-      getShopPreview(shop.m, shop.p)
-        .then(setPreview)
-        .catch(() => setPreview(null));
-  }, [shop.m, shop.p]);
+    if (!shop.m || !shop.p) {
+      setPreview({ status: "idle" });
+      return;
+    }
+    let alive = true;
+    setPreview({ status: "loading" });
+    getShopPreview(shop.m, shop.p).then(
+      (p) => alive && setPreview({ status: "ready", preview: p }),
+      (e) => alive && setPreview({ status: "failed", reason: failureKind(e) }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [shop.m, shop.p, previewAttempt]);
 
   const run = useCallback(async (fn: () => Promise<void>) => {
     setErr(null);
@@ -85,7 +140,7 @@ export function App() {
     try {
       await fn();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(friendlyError(e));
     } finally {
       setBusy(false);
     }
@@ -93,21 +148,58 @@ export function App() {
 
   // The grid: signed in → /me/cards; anonymous → each device-local serial via the public getCard.
   const loadTiles = useCallback(async () => {
-    if (auth.token) {
-      setTiles((await getMyCards(auth.token)).map(tileFromMyCard));
-    } else {
-      const settled = await Promise.allSettled(localSerials.map((s) => getCard(s)));
-      setTiles(
-        settled.flatMap((r) => (r.status === "fulfilled" ? [tileFromCardView(r.value)] : [])),
-      );
+    try {
+      if (auth.token) {
+        try {
+          setTiles((await getMyCards(auth.token)).map(tileFromMyCard));
+          setTilesProblem(null);
+        } catch (e) {
+          // Keep whatever is on screen, and say why it may be out of date.
+          setTilesProblem({ kind: failureKind(e), missing: null });
+        }
+      } else if (!auth.stalled) {
+        const settled = await Promise.allSettled(localSerials.map((s) => getCard(s)));
+        const fresh = new Map<string, CardTile>();
+        const unchecked = new Set<string>();
+        let offline = false;
+        settled.forEach((r, i) => {
+          const serial = localSerials[i]!;
+          if (r.status === "fulfilled") {
+            fresh.set(serial, tileFromCardView(r.value));
+          } else if (failureKind(r.reason) !== "not_found") {
+            unchecked.add(serial);
+            offline ||= failureKind(r.reason) === "offline";
+          }
+          // A card that answers 404 is hidden but stays stored: a misrouted deploy answers 404 for
+          // everything, and pruning on it would wipe every customer's cards for good.
+        });
+        // A card that couldn't be checked keeps the tile it had, rather than vanishing.
+        setTiles((prev) =>
+          localSerials.flatMap((s) => {
+            const t = fresh.get(s) ?? (unchecked.has(s) ? prev.find((p) => p.serial === s) : undefined);
+            return t ? [t] : [];
+          }),
+        );
+        setTilesProblem(unchecked.size ? { kind: offline ? "offline" : "server", missing: unchecked.size } : null);
+      }
+    } finally {
+      setTilesLoaded(true);
     }
-    setTilesLoaded(true);
-  }, [auth.token, localSerials]);
+  }, [auth.token, auth.stalled, localSerials]);
 
   useEffect(() => {
-    // surface load failures (e.g. an expired token 401) instead of silently showing an empty grid
-    if (auth.ready) loadTiles().catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+    if (auth.ready) void loadTiles();
   }, [auth.ready, loadTiles]);
+
+  // Back online: check the cards again, and the shop's card if that's what failed.
+  useEffect(() => {
+    const onOnline = () => {
+      void loadTiles();
+      if (preview.status === "failed" && preview.reason !== "not_found") setPreviewAttempt((n) => n + 1);
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [loadTiles, preview]);
 
   // Reset the one-shot claim guard whenever we're signed out, so a later sign-in claims again.
   useEffect(() => {
@@ -135,39 +227,97 @@ export function App() {
 
   // Card detail: fetch + poll so stamps added by staff appear live.
   useEffect(() => {
-    if (!selected) {
-      setCard(null);
-      setDetailError(false);
-      return;
-    }
-    setDetailError(false);
+    setCard(null);
+    setDetailError(null);
+    setSync({ failing: null, at: 0 });
+    setQrHeld(null);
     qrRef.current = null; // new card → adopt a fresh stable token on first load
+    if (!selected) return;
+
     let alive = true;
-    let loaded = false; // once we've shown the card, a later poll blip must NOT flip to the error screen
+    let loaded = false; // once we've shown the card, a later poll blip must NOT flip to an error screen
+    let inFlight = false;
+    let lastLoadAt = 0;
+    let timer: number | undefined;
+
+    // Each poll schedules the next once it has answered, so a slow one never piles up behind itself.
     const load = async () => {
+      if (inFlight || !alive) return;
+      inFlight = true;
+      window.clearTimeout(timer);
+      let next = POLL_MS;
       try {
         const c = await getCard(selected);
-        if (alive) {
-          // Hold the QR steady: only adopt a fresh token when we have none or the current is near expiry.
-          // Stamp counts still update every poll; the code just stops flickering every 4s.
-          if (!qrRef.current || Date.now() - qrRef.current.at > 100_000) {
-            qrRef.current = { token: c.qrToken, at: Date.now() };
-          }
-          setCard({ ...c, qrToken: qrRef.current.token });
-          loaded = true;
-          setDetailError(false);
+        if (!alive) return;
+        const now = Date.now();
+        // Hold the QR steady: only adopt a fresh token when we have none or the current is near expiry.
+        // Stamp counts still update every poll; the code just stops flickering every 4s.
+        if (!qrRef.current || shouldAdoptToken(qrRef.current.at, qrRef.current.ttlMs, now)) {
+          qrRef.current = { token: c.qrToken, at: now, ttlMs: c.qrTtlMs ?? DEFAULT_QR_TTL_MS };
+          setQrHeld({ at: now, ttlMs: qrRef.current.ttlMs });
         }
-      } catch {
-        if (alive && !loaded) setDetailError(true); // only a dead-end if the card never loaded
+        setCard({ ...c, qrToken: qrRef.current.token });
+        loaded = true;
+        setDetailError(null);
+        setSync({ failing: null, at: now });
+      } catch (e) {
+        if (!alive) return;
+        const kind = failureKind(e);
+        if (loaded) {
+          setSync({ failing: kind, at: Date.now() }); // keep the card; say it's reconnecting
+        } else {
+          setDetailError(kind);
+          // Most likely gone for good — but a misrouted deploy answers 404 too, so keep looking, slowly.
+          if (kind === "not_found") next = MISSING_POLL_MS;
+        }
+      } finally {
+        inFlight = false;
+        lastLoadAt = Date.now();
+        if (alive) timer = window.setTimeout(() => void load(), next);
       }
     };
+
+    const onOnline = () => void load();
+    // Back from the background: judge the code's age now (the phone may have slept past it), and
+    // reload if the last answer is older than a poll. A quick app switch costs nothing extra.
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      setSync((s) => ({ ...s, at: Date.now() }));
+      if (Date.now() - lastLoadAt > POLL_MS) void load();
+    };
+    retryDetailRef.current = () => void load();
+
     void load();
-    const t = window.setInterval(load, 4000);
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
-      window.clearInterval(t);
+      window.clearTimeout(timer);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [selected]);
+
+  // Re-judge the code the moment it lapses, rather than at whichever poll comes next.
+  useEffect(() => {
+    if (!qrHeld) return;
+    const wait = Math.max(0, qrExpiresAt(qrHeld.at, qrHeld.ttlMs) - Date.now()) + 50;
+    const t = window.setTimeout(() => setSync((s) => ({ ...s, at: Date.now() })), wait);
+    return () => window.clearTimeout(t);
+  }, [qrHeld]);
+
+  /*
+   * Keep a card opened from its link. An iOS Home Screen app has its own storage, separate from
+   * Safari's, and the card link it opens with is how a card gets there; it also keeps a card someone
+   * reopened from its link. Only for someone signed out — a signed-in person's cards live on their
+   * account — and never while a session is waiting to be restored.
+   */
+  useEffect(() => {
+    if (!card || !auth.ready || auth.signedIn || auth.stalled || localSerials.includes(card.serial)) return;
+    const next = [...localSerials, card.serial];
+    writeLocal(next);
+    setLocalSerials(next);
+  }, [card, auth.ready, auth.signedIn, auth.stalled, localSerials]);
 
   /*
    * Real history entries, so the phone's Back button moves from a card to the wallet instead of
@@ -177,6 +327,20 @@ export function App() {
     window.history.pushState({ card: serial }, "", `?card=${serial}`);
     setSelected(serial);
   }, []);
+
+  /*
+   * Scanning a counter code for a programme this device already holds opens that card — never a
+   * second one with a second head start. The landing entry is replaced, so Back from the card goes
+   * to the wallet rather than into this redirect again.
+   */
+  useEffect(() => {
+    if (!shop.p || !tilesLoaded) return;
+    const held = heldCardFor(tiles, shop.p);
+    if (!held) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    setShop({ m: "", p: "" });
+    openCard(held.serial);
+  }, [shop.p, tilesLoaded, tiles, openCard]);
 
   const backHome = useCallback(() => {
     if ((window.history.state as { card?: string } | null)?.card) {
@@ -201,12 +365,24 @@ export function App() {
 
   const addShopCard = () =>
     void run(async () => {
-      const r = await enroll({ merchantId: shop.m, programId: shop.p }, auth.token);
+      let r: EnrollResult;
+      try {
+        r = await enroll({ merchantId: shop.m, programId: shop.p }, auth.token);
+      } catch (e) {
+        // The shop's card went away between the preview and the tap.
+        if (failureKind(e) === "not_found") {
+          setPreview({ status: "failed", reason: "not_found" });
+          return;
+        }
+        throw e;
+      }
       setEnrollCtx({ serial: r.serial, enrollmentId: r.enrollmentId, merchantId: shop.m });
       if (!auth.token) {
         const next = [...new Set([...localSerials, r.serial])];
         writeLocal(next);
         setLocalSerials(next);
+        // Ask the browser not to clear the only copy of this card. Quietly: most say yes or no unasked.
+        void navigator.storage?.persist?.().catch(() => false);
       }
       setShop({ m: "", p: "" }); // got it — hide the CTA
       buzz([12, 40, 16]);
@@ -230,7 +406,19 @@ export function App() {
     });
   };
 
-  const screen = selected ? (card ? "detail" : detailError ? "missing" : "loading") : "home";
+  const screen = selected
+    ? card
+      ? "detail"
+      : detailError === "not_found"
+        ? "missing"
+        : detailError
+          ? "unreachable"
+          : "loading"
+    : "home";
+
+  const qr = qrHeld ? qrState({ heldAt: qrHeld.at, ttlMs: qrHeld.ttlMs, failing: sync.failing, now: Date.now() }) : "live";
+  const showNudge =
+    Boolean(card) && auth.ready && !auth.signedIn && !auth.stalled && !nudgeDismissed && localSerials.includes(card!.serial);
 
   return (
     <div
@@ -245,6 +433,21 @@ export function App() {
             onBack={backHome}
             onStamp={import.meta.env.DEV && enrollCtx?.serial === selected ? devStamp : undefined}
             onRedeem={import.meta.env.DEV && enrollCtx?.serial === selected ? devRedeem : undefined}
+            connection={{ qr, failing: sync.failing }}
+            onRetry={() => retryDetailRef.current()}
+            footer={
+              showNudge ? (
+                <SaveCardNudge
+                  serial={card.serial}
+                  onGoogle={auth.signInGoogle}
+                  onDev={auth.signInDev}
+                  onDismiss={() => {
+                    writeNudgeDismissed();
+                    setNudgeDismissed(true);
+                  }}
+                />
+              ) : null
+            }
           />
         )}
 
@@ -265,6 +468,43 @@ export function App() {
               <p className="text-muted-foreground text-sm">
                 This card may have been removed. Head back to your cards.
               </p>
+              <button
+                type="button"
+                onClick={() => retryDetailRef.current()}
+                className="text-primary mt-2 min-h-11 px-2 text-sm font-semibold"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {screen === "unreachable" && (
+          <div className={`${SCREEN} flex flex-col gap-4 px-5 pt-4`}>
+            <button
+              type="button"
+              onClick={backHome}
+              className="text-muted-foreground -ml-1 self-start rounded-lg px-1 py-2 text-sm font-semibold"
+            >
+              ‹ All cards
+            </button>
+            <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <span className="text-4xl" aria-hidden>
+                📡
+              </span>
+              <h1 className="text-xl font-extrabold">Can't load your card</h1>
+              <p className="text-muted-foreground text-sm">
+                {detailError === "offline"
+                  ? "No connection. Your stamps are safe — your card will load as soon as you're back online."
+                  : "Qrew isn't responding right now. Your stamps are safe — try again in a moment."}
+              </p>
+              <button
+                type="button"
+                onClick={() => retryDetailRef.current()}
+                className="bg-primary text-primary-foreground mt-3 min-h-12 rounded-2xl px-6 text-sm font-bold"
+              >
+                Try again
+              </button>
             </div>
           </div>
         )}
@@ -298,18 +538,81 @@ export function App() {
                 </div>
               </header>
 
-              {shop.m && shop.p && (
+              {auth.stalled && (
+                <ConnectionNotice
+                  title={auth.stalled === "offline" ? "No connection" : "Can't reach Qrew right now"}
+                  body={
+                    auth.stalled === "offline"
+                      ? "You're signed in — your cards will show when you're back online."
+                      : "You're signed in, and your stamps are safe — try again in a moment."
+                  }
+                  onRetry={auth.retry}
+                />
+              )}
+
+              {/* Only once this device's cards are known: one of them may be this shop's (see the redirect). */}
+              {shop.m && shop.p && tilesLoaded && (
                 <div className="flex flex-col gap-3">
-                  {preview && <CardPreview preview={preview} />}
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={addShopCard}
-                    className="bg-primary text-primary-foreground min-h-13 w-full rounded-2xl text-[15px] font-extrabold transition active:scale-[0.98] disabled:opacity-50"
-                  >
-                    {busy ? "Getting your card…" : "＋ Get this shop's card"}
-                  </button>
+                  {preview.status === "ready" ? (
+                    <>
+                      <CardPreview preview={preview.preview} />
+                      <button
+                        type="button"
+                        // Not while a signed-in session is waiting: this would make an anonymous card.
+                        disabled={busy || Boolean(auth.stalled)}
+                        onClick={addShopCard}
+                        className="bg-primary text-primary-foreground min-h-13 w-full rounded-2xl text-[15px] font-extrabold transition active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {busy ? "Getting your card…" : "＋ Get this shop's card"}
+                      </button>
+                    </>
+                  ) : preview.status === "failed" ? (
+                    preview.reason === "not_found" ? (
+                      <ConnectionNotice
+                        tone="neutral"
+                        title="This code isn't active"
+                        body="This shop's card isn't available right now — ask the staff for help."
+                      />
+                    ) : (
+                      <ConnectionNotice
+                        title={preview.reason === "offline" ? "No connection" : "Couldn't load this shop's card"}
+                        body={
+                          preview.reason === "offline"
+                            ? "Connect to the internet to get this card."
+                            : "Try again in a moment."
+                        }
+                        onRetry={() => setPreviewAttempt((n) => n + 1)}
+                      />
+                    )
+                  ) : (
+                    <>
+                      <Skeleton className="h-[220px] rounded-3xl" />
+                      <button
+                        type="button"
+                        disabled
+                        className="bg-primary text-primary-foreground min-h-13 w-full rounded-2xl text-[15px] font-extrabold opacity-50"
+                      >
+                        Loading…
+                      </button>
+                    </>
+                  )}
                 </div>
+              )}
+
+              {tilesProblem && (
+                <ConnectionNotice
+                  title={tilesProblem.kind === "offline" ? "No connection" : "Can't reach Qrew right now"}
+                  body={
+                    tilesProblem.kind !== "offline"
+                      ? "Your stamps are safe — try again in a moment."
+                      : tilesProblem.missing !== null
+                        ? `${tilesProblem.missing} card${tilesProblem.missing === 1 ? "" : "s"} on this device couldn't be checked — they'll update when you're back online.`
+                        : tiles.length
+                          ? "Showing your cards from earlier."
+                          : "Your cards will show when you're back online."
+                  }
+                  onRetry={() => void loadTiles()}
+                />
               )}
 
               {!tilesLoaded ? (
@@ -321,7 +624,7 @@ export function App() {
                   </h1>
                   <CardsGrid cards={tiles} onOpen={openCard} />
                 </>
-              ) : shop.m && shop.p ? null : (
+              ) : (shop.m && shop.p) || tilesProblem || auth.stalled ? null : (
                 <div className="flex flex-col items-center gap-2 py-16 text-center">
                   <span className="text-4xl" aria-hidden>
                     🎟️
@@ -333,7 +636,7 @@ export function App() {
                 </div>
               )}
 
-              {!auth.signedIn && auth.ready && (
+              {!auth.signedIn && auth.ready && !auth.stalled && (
                 <SignInPanel
                   onGoogle={auth.signInGoogle}
                   onDev={auth.signInDev}

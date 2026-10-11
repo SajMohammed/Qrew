@@ -11,9 +11,24 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Qrew" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
+    <!-- iOS ignores an SVG touch icon; this PNG is full-bleed because iOS rounds the corners itself. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script>
+      // iOS gives a Home Screen web app its own storage, separate from Safari's, so a card saved in
+      // Safari isn't there when the icon opens. With no manifest, iOS opens the icon at the page it
+      // was added from (?card=…), and the app keeps that card. Everyone else gets the manifest —
+      // Android needs it (and its start_url) to install.
+      (function () {
+        var ua = navigator.userAgent;
+        var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+        if (ios) return;
+        var l = document.createElement("link");
+        l.rel = "manifest";
+        l.href = "/manifest.webmanifest";
+        document.head.appendChild(l);
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:ital,wght@0,300..900;1,400..700&display=swap" rel="stylesheet" />

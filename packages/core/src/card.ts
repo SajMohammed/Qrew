@@ -10,7 +10,7 @@ import {
   fetchArtwork,
 } from "@qrew/wallet-core";
 import { getAsset, ownAssetId } from "./asset";
-import { mintCardToken } from "./token";
+import { CARD_TTL_MS, mintCardToken } from "./token";
 import { normalizeDesign, type CardDesign } from "./design";
 import { isWalletIssuable, passContentFor, type PassSource } from "./wallet-pass";
 import { cardTypeModule, isCardType } from "./card-types";
@@ -21,8 +21,15 @@ export type StripPlatform = "google" | "apple";
 
 export interface CardView {
   serial: string;
+  /**
+   * The programme this card belongs to. Public — the counter QR already carries it — and how the app
+   * spots that it already holds this shop's card when that QR is scanned again.
+   */
+  programId: string;
   /** Short-lived signed token to render in the QR (rotates as the card polls). */
   qrToken: string;
+  /** How long qrToken stays valid, in ms — after that the app shows the code as expired. */
+  qrTtlMs: number;
   /** What a cashier types when the QR won't scan, formatted: "K7M 4QX". */
   shortCode: string;
   merchantName: string;
@@ -117,7 +124,9 @@ export async function getCard(serial: string): Promise<CardView | null> {
 
   return {
     serial: row.serial,
+    programId: row.programId,
     qrToken,
+    qrTtlMs: CARD_TTL_MS,
     shortCode: formatShortCode(row.shortCode),
     merchantName: row.merchantName,
     programName: row.programName,
