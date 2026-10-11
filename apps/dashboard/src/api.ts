@@ -88,11 +88,21 @@ export type ProgramPatch = Partial<{
 export interface ScanResult {
   found: boolean;
   enrollmentId?: string; // present when found — lets us redeem this exact card
+  shortCode?: string; // the card's code, "K7M 4QX" — shown so staff can see which card it was
   applied?: boolean;
   reason?: "applied" | "duplicate" | "cooldown" | "reward_ready" | "no_accrual";
   currentStamps?: number;
   stampsRequired?: number;
   rewardReady?: boolean;
+}
+
+/** The answer to a deliberate extra stamp — the stamp half of a scan result. */
+export interface StampOutcome {
+  applied: boolean;
+  reason: NonNullable<ScanResult["reason"]>;
+  currentStamps: number;
+  stampsRequired: number;
+  rewardReady: boolean;
 }
 
 export interface RedeemResult {
@@ -106,6 +116,8 @@ export interface VerifiedCashier {
   staffToken: string;
   name: string;
   role: string;
+  /** How long the shift token lasts from now. */
+  expiresInSeconds: number;
 }
 
 // ── Analytics + CRM (the owner console) ───────────────────────────────────────────

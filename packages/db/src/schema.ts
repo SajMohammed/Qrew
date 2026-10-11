@@ -147,11 +147,16 @@ export const enrollments = pgTable(
     applePassId: text("apple_pass_id"),
     googleObjectId: text("google_object_id"),
     status: text("status").notNull().default("active"),
+    // What a cashier types when the QR won't scan: six characters, unique per shop, drawn by the
+    // database (migration 0014). Not a capability — only the shop's own scan endpoint accepts it.
+    shortCode: text("short_code").notNull().default(sql`qrew_short_code()`),
     createdAt: createdAt(),
   },
   (t) => [
     index("enrollments_merchant_idx").on(t.merchantId),
     uniqueIndex("enrollments_card_serial_uq").on(t.cardSerial),
+    uniqueIndex("enrollments_merchant_short_code_uq").on(t.merchantId, t.shortCode),
+    check("enrollments_short_code_format", sql`${t.shortCode} ~ '^[2-9A-HJKMNP-TV-Z]{6}$'`),
     // one card per customer per program (blocks the duplicate-enrollment / double-bonus race)
     uniqueIndex("enrollments_customer_program_uq").on(t.customerId, t.programId),
     // the projection can never go negative — backstop behind the redeem FOR UPDATE fix

@@ -6,6 +6,7 @@ import type {
   ProgramPatch,
   ScanResult,
   RedeemResult,
+  StampOutcome,
   VerifiedCashier,
   Analytics,
   AnalyticsRange,
@@ -14,8 +15,6 @@ import type {
   StaffMember,
   CardType,
 } from "./api";
-
-const rnd = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * Prefer the server's own explanation over a bare status code. Validation failures carry a field
@@ -63,6 +62,40 @@ export class PinLocked extends Error {
   }
 }
 
+/** Why a counter action failed — each calls for something different from the person at the till. */
+export type CounterFailure = "offline" | "server" | "signed_out" | "cashier_expired" | "rejected";
+
+const COUNTER_COPY: Record<Exclude<CounterFailure, "rejected">, string> = {
+  offline: "Can't reach Qrew — check the internet connection, then scan again.",
+  server: "Something went wrong on our side. Scan again in a moment.",
+  signed_out: "This device has been signed out. Ask the owner to sign in again.",
+  cashier_expired: "The cashier sign-in has expired. Enter the PIN again.",
+};
+
+export class CounterError extends Error {
+  constructor(
+    readonly kind: CounterFailure,
+    message: string = kind === "rejected" ? "That didn't work." : COUNTER_COPY[kind],
+  ) {
+    super(message);
+    this.name = "CounterError";
+  }
+}
+
+/**
+ * Sort a refused counter request. A 401 is either the device's own sign-in (nothing the cashier can
+ * fix) or the cashier's shift token — which the server marks, so the counter can drop the cashier
+ * and carry on rather than stall every scan.
+ */
+async function counterFailure(res: Response, fallback: string): Promise<CounterError> {
+  if (res.status >= 500) return new CounterError("server");
+  if (res.status === 401) {
+    const body = (await res.json().catch(() => null)) as { code?: string } | null;
+    return new CounterError(body?.code === "staff_token_invalid" ? "cashier_expired" : "signed_out");
+  }
+  return new CounterError("rejected", await describe(res, fallback));
+}
+
 // Threads the Clerk session token onto every API call (the api.ts functions are plain modules and
 // can't call the useAuth hook themselves). The server derives the merchant from the token — no
 // more x-merchant-id.
@@ -78,6 +111,18 @@ export function useApi() {
       return fetch(`${BASE}${path}`, { ...init, headers });
     },
     [getToken],
+  );
+
+  /** A counter POST. No answer at all — offline, or the sign-in couldn't refresh — is "offline". */
+  const counterPost = useCallback(
+    async (path: string, body: unknown): Promise<Response> => {
+      try {
+        return await call(path, { method: "POST", body: JSON.stringify(body) });
+      } catch {
+        throw new CounterError("offline");
+      }
+    },
+    [call],
   );
 
   return useMemo(
@@ -179,26 +224,27 @@ export function useApi() {
         if (!res.ok) throw new Error(await describe(res, "Preview failed"));
         return URL.createObjectURL(await res.blob());
       },
-      // ── Scan tab ──
-      async scan(serial: string, staffToken?: string): Promise<ScanResult> {
-        const res = await call("/loyalty/scan", {
-          method: "POST",
-          body: JSON.stringify({ serial, idempotencyKey: `scan-${rnd()}`, staffToken }),
-        });
+      // ── Counter ──
+      // The caller owns each idempotency key: a retry must reuse it, or it could stamp twice.
+      async scan(value: string, idempotencyKey: string, staffToken?: string): Promise<ScanResult> {
+        const res = await counterPost("/loyalty/scan", { serial: value, idempotencyKey, staffToken });
         if (res.status === 404) return { found: false };
-        if (!res.ok) throw new Error(`Scan failed (${res.status})`);
+        if (!res.ok) throw await counterFailure(res, "Scan failed");
         return res.json();
       },
-      async redeem(enrollmentId: string, staffToken?: string): Promise<RedeemResult> {
-        const res = await call("/loyalty/redeem", {
-          method: "POST",
-          body: JSON.stringify({ enrollmentId, idempotencyKey: `redeem-${rnd()}`, staffToken }),
-        });
-        if (!res.ok) throw new Error(`Redeem failed (${res.status})`);
+      /** A deliberate extra stamp on a card already scanned — a second purchase on the same visit. */
+      async stampAgain(enrollmentId: string, idempotencyKey: string, staffToken?: string): Promise<StampOutcome> {
+        const res = await counterPost("/loyalty/stamp", { enrollmentId, idempotencyKey, staffToken });
+        if (!res.ok) throw await counterFailure(res, "Stamp failed");
+        return res.json();
+      },
+      async redeem(enrollmentId: string, idempotencyKey: string, staffToken?: string): Promise<RedeemResult> {
+        const res = await counterPost("/loyalty/redeem", { enrollmentId, idempotencyKey, staffToken });
+        if (!res.ok) throw await counterFailure(res, "Redeem failed");
         return res.json();
       },
       async verifyPin(pin: string): Promise<VerifiedCashier> {
-        const res = await call("/staff/verify-pin", { method: "POST", body: JSON.stringify({ pin }) });
+        const res = await counterPost("/staff/verify-pin", { pin });
         if (res.status === 429) throw new PinLocked(await describe(res, "Too many wrong PINs. Try again later."));
         if (!res.ok) throw new Error(`PIN failed (${res.status})`);
         return res.json();
@@ -223,7 +269,7 @@ export function useApi() {
         if (!res.ok) throw new Error(await describe(res, "Could not remove them"));
       },
     }),
-    [call],
+    [call, counterPost],
   );
 }
 

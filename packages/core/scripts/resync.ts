@@ -39,6 +39,7 @@ async function main(): Promise<void> {
   const rows = await adminDb
     .select({
       serial: enrollments.cardSerial,
+      shortCode: enrollments.shortCode,
       programId: enrollments.programId,
       googleObjectId: enrollments.googleObjectId,
       customerName: customers.name,

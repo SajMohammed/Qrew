@@ -14,6 +14,7 @@ import { mintCardToken } from "./token";
 import { normalizeDesign, type CardDesign } from "./design";
 import { isWalletIssuable, passContentFor, type PassSource } from "./wallet-pass";
 import { cardTypeModule, isCardType } from "./card-types";
+import { formatShortCode } from "./short-code";
 
 /** Which wallet the strip is being drawn for — they want different aspect ratios. */
 export type StripPlatform = "google" | "apple";
@@ -22,6 +23,8 @@ export interface CardView {
   serial: string;
   /** Short-lived signed token to render in the QR (rotates as the card polls). */
   qrToken: string;
+  /** What a cashier types when the QR won't scan, formatted: "K7M 4QX". */
+  shortCode: string;
   merchantName: string;
   programName: string;
   rewardText: string;
@@ -51,6 +54,7 @@ async function readCard(serial: string) {
   const [row] = await adminDb
     .select({
       serial: enrollments.cardSerial,
+      shortCode: enrollments.shortCode,
       programId: enrollments.programId,
       customerName: customers.name,
       currentStamps: enrollments.currentProgress,
@@ -91,6 +95,8 @@ function withDeadline<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> 
  * Public read of a card by its serial. The serial is an unguessable capability token
  * (a random UUID = the card's bearer secret), so this reads via adminDb filtered strictly
  * by serial — the serial itself is the authorization, no tenant/session needed.
+ *
+ * Never by short code: that is six guessable characters, accepted only by a shop's own scan.
  */
 export async function getCard(serial: string): Promise<CardView | null> {
   const row = await readCard(serial);
@@ -112,6 +118,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
   return {
     serial: row.serial,
     qrToken,
+    shortCode: formatShortCode(row.shortCode),
     merchantName: row.merchantName,
     programName: row.programName,
     rewardText: row.rewardText,

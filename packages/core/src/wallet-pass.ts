@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { stripUrlFor, type PassContent, type PassUpdate } from "@qrew/wallet-core";
 import { cardTypeModule, isCardType } from "./card-types";
 import { normalizeDesign, type CardDesign } from "./design";
+import { formatShortCode } from "./short-code";
 
 /*
  * What a card's wallet pass shows, built in one place. The card page (for the save link), the
@@ -14,6 +15,8 @@ import { normalizeDesign, type CardDesign } from "./design";
 /** Everything a card's pass is built from — its enrollment, programme, shop and holder. */
 export interface PassSource {
   serial: string;
+  /** The card's typeable code, as stored. */
+  shortCode: string;
   programId: string;
   customerName: string | null;
   merchantName: string;
@@ -88,6 +91,7 @@ export function passContentFor(src: PassSource, qrToken: string): PassContent {
   const design = normalizeDesign(src.cardDesign);
   return {
     serial: src.serial,
+    shortCode: formatShortCode(src.shortCode),
     programId: src.programId,
     customerName: src.customerName,
     merchantName: src.merchantName,
@@ -109,6 +113,7 @@ export function passContentFor(src: PassSource, qrToken: string): PassContent {
 export function passUpdateFor(src: PassSource): PassUpdate {
   return {
     serial: src.serial,
+    shortCode: formatShortCode(src.shortCode),
     // Re-points a pass issued against an older template at its programme's class.
     programId: src.programId,
     currentStamps: src.currentProgress,

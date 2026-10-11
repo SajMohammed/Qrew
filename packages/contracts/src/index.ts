@@ -24,7 +24,8 @@ export const RedeemRequest = z.object({
 export type RedeemRequest = z.infer<typeof RedeemRequest>;
 
 export const ScanRequest = z.object({
-  serial: z.string().min(8).max(200), // the customer card serial from the scanned QR
+  // The scanned QR value (a signed token or a serial), or a short card code typed at the counter.
+  serial: z.string().trim().min(6).max(200),
   idempotencyKey: z.string().min(8).max(200),
   staffToken,
 });

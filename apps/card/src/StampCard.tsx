@@ -167,6 +167,13 @@ export function StampCard({
           <span className="text-[12px] font-medium opacity-80">
             Show this to staff to earn a stamp
           </span>
+          {/* The code a cashier types when the QR won't read — a glare, a cracked screen. */}
+          {card.shortCode && (
+            <span className="text-[12px] opacity-80">
+              Can't scan? Code{" "}
+              <span className="font-mono text-sm font-bold tracking-[0.15em]">{card.shortCode}</span>
+            </span>
+          )}
         </div>
       </m.div>
 

@@ -39,6 +39,7 @@ async function readPassSource(merchantId: string, enrollmentId: string) {
     db
       .select({
         serial: enrollments.cardSerial,
+        shortCode: enrollments.shortCode,
         programId: enrollments.programId,
         applePassId: enrollments.applePassId,
         googleObjectId: enrollments.googleObjectId,

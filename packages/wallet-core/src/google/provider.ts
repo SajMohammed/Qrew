@@ -134,9 +134,9 @@ export class GoogleWalletProvider implements WalletProvider {
       /*
        * PATCH MERGES nested objects rather than replacing them, so a field left out simply survives
        * — an old caption or a stale row will sit on the pass forever unless it is explicitly
-       * nulled. That is why alternateText is cleared by name rather than by omission.
+       * nulled. That is why alternateText is set by name: to the card's code, or cleared, never left.
        */
-      barcode: { type: "QR_CODE", value: update.serial, alternateText: null },
+      barcode: { type: "QR_CODE", value: update.serial, alternateText: update.shortCode ?? null },
       ...(update.rewardText
         ? { textModulesData: [{ header: "Reward", body: update.rewardText, id: "reward" }] }
         : {}),
@@ -248,11 +248,12 @@ export class GoogleWalletProvider implements WalletProvider {
        * and then tells the customer "card not found" at the till. The serial is already the card's
        * capability — the same value the app's QR falls back to — so this loses nothing.
        */
-      // No alternateText: it is meant as a fallback for manual entry, and a UUID serial is not
-      // something a cashier can type. Filling it with the count just repeated the points field.
+      // alternateText is the fallback for manual entry: the card's short code, which a cashier can
+      // type when the barcode won't read. (A UUID serial was no use there.)
       barcode: {
         type: "QR_CODE",
         value: content.serial,
+        ...(content.shortCode ? { alternateText: content.shortCode } : {}),
       },
       // The count already appears as the points field AND on the stamp strip. A third copy in a
       // "Progress" row is what made the pass feel cluttered, so only the reward lives here.

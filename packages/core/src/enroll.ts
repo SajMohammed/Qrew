@@ -22,6 +22,9 @@ export interface EnrollInput {
   customerAccountId?: string; // present when the consumer is signed in — links the card to "all my cards"
 }
 
+/** Draws of a short code before giving up — a clash within one shop is about one in a million. */
+const SHORT_CODE_ATTEMPTS = 5;
+
 export interface EnrollResult {
   enrollmentId: string;
   serial: string;
@@ -146,43 +149,47 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
       return { alreadyEnrolled: true as const, enrollment: existing, program, merchantName: merchant.name };
     }
 
-    const serial = randomUUID();
-    const [enrollment] = await db
-      .insert(enrollments)
-      .values({
-        merchantId: input.merchantId,
-        programId: program.id,
-        customerId: customer!.id,
-        cardSerial: serial,
-      })
-      .onConflictDoNothing()
-      .returning();
-    if (!enrollment) {
-      // lost a concurrent enroll for this (customer, program) — reuse the winner's card, seed NO bonus
+    /*
+     * ON CONFLICT covers both of the card's unique indexes: a concurrent enroll of this customer
+     * into this programme, or — rarely — the short code the database drew being taken in this shop.
+     * Only the first leaves a card for this customer behind; a clash simply draws again.
+     */
+    for (let attempt = 0; attempt < SHORT_CODE_ATTEMPTS; attempt++) {
+      const [enrollment] = await db
+        .insert(enrollments)
+        .values({
+          merchantId: input.merchantId,
+          programId: program.id,
+          customerId: customer!.id,
+          cardSerial: randomUUID(),
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (enrollment) {
+        // endowed-progress bonus — ledger append; the trigger updates current_progress
+        if (program.bonusStamps > 0) {
+          await db.insert(loyaltyProgressEvents).values({
+            merchantId: input.merchantId,
+            enrollmentId: enrollment.id,
+            delta: program.bonusStamps,
+            source: "signup_bonus",
+            idempotencyKey: `bonus:${enrollment.id}`,
+          });
+        }
+        return { alreadyEnrolled: false as const, enrollment, program, merchantName: merchant.name };
+      }
+
+      // Any status: the one-card-per-customer index doesn't look at it.
       const [raced] = await db
         .select()
         .from(enrollments)
-        .where(
-          and(
-            eq(enrollments.customerId, customer!.id),
-            eq(enrollments.programId, program.id),
-            eq(enrollments.status, "active"),
-          ),
-        );
-      return { alreadyEnrolled: true as const, enrollment: raced!, program, merchantName: merchant.name };
+        .where(and(eq(enrollments.customerId, customer!.id), eq(enrollments.programId, program.id)));
+      if (raced) {
+        // lost a concurrent enroll for this (customer, program) — reuse the winner's card, seed NO bonus
+        return { alreadyEnrolled: true as const, enrollment: raced, program, merchantName: merchant.name };
+      }
     }
-
-    // endowed-progress bonus — ledger append; the trigger updates current_progress
-    if (program.bonusStamps > 0) {
-      await db.insert(loyaltyProgressEvents).values({
-        merchantId: input.merchantId,
-        enrollmentId: enrollment.id,
-        delta: program.bonusStamps,
-        source: "signup_bonus",
-        idempotencyKey: `bonus:${enrollment.id}`,
-      });
-    }
-    return { alreadyEnrolled: false as const, enrollment, program, merchantName: merchant.name };
+    throw new Error("could not allocate a unique card code");
   });
 
   const e = created.enrollment;

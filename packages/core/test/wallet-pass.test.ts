@@ -3,6 +3,7 @@ import {
   isWalletIssuable,
   passContentFor,
   passFingerprint,
+  passUpdateFor,
   stripVersion,
   templateContentFor,
   type PassSource,
@@ -11,6 +12,7 @@ import { normalizeDesign } from "../src/design";
 
 const stamp: PassSource = {
   serial: "11111111-2222-3333-4444-555555555555",
+  shortCode: "K7M4QX",
   programId: "p-1",
   customerName: "Aya",
   merchantName: "Nomad Coffee",
@@ -49,6 +51,11 @@ describe("pass content", () => {
     expect(content.pointsLabel).toBe("Stamps");
     expect(content.stripUrl).toMatch(/\/card\/11111111-.*\/strip\.png\?s=3&v=[0-9a-f]{8}$/);
     expect(content.customerName).toBe("Aya");
+  });
+
+  it("carries the card's typeable code, formatted, on the pass and every update to it", () => {
+    expect(passContentFor(stamp, "tok").shortCode).toBe("K7M 4QX");
+    expect(passUpdateFor(stamp).shortCode).toBe("K7M 4QX");
   });
 
   it("gives a points card its own word for the balance, and no strip", () => {

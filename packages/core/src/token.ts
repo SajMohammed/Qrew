@@ -39,7 +39,7 @@ export function unsafeTokenSecrets(env: Record<string, string | undefined> = pro
 }
 
 const CARD_TTL_MS = 120_000; // 2 minutes — refreshed as the card polls
-const STAFF_TTL_MS = 8 * 60 * 60 * 1000; // one shift
+export const STAFF_TTL_MS = 8 * 60 * 60 * 1000; // one shift — the counter asks for the PIN again when it ends
 export const CUSTOMER_ACCESS_TTL_MS = 15 * 60 * 1000; // 15 min — the refresh token rotates it
 
 /** A signed, expiring token: base64url(subject.expiry).base64url(hmac). */

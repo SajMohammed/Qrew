@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments, loyaltyProgressEvents } from "@qrew/db";
 import { cardTypeModule } from "./card-types";
 import { enqueueWalletSync } from "@qrew/queue";
-import { NotFoundError } from "./errors";
+import { ConflictError, NotFoundError } from "./errors";
 
 export interface AddStampInput {
   merchantId: string;
@@ -10,6 +10,11 @@ export interface AddStampInput {
   idempotencyKey: string;
   locationId?: string;
   staffId?: string;
+  /**
+   * Staff explicitly asked for this stamp (the counter's "Add another stamp"), so the cooldown
+   * against a double read does not apply. The idempotency key still does.
+   */
+  deliberate?: boolean;
 }
 
 export type StampReason =
@@ -29,14 +34,15 @@ export interface StampResult {
 }
 
 function cooldownMs(): number {
-  return Number(process.env.STAMP_COOLDOWN_SECONDS ?? 2) * 1000;
+  return Number(process.env.STAMP_COOLDOWN_SECONDS ?? 60) * 1000;
 }
 
 /**
  * Record one stamp:
- *   0. reject if the card is already at the reward threshold — redeem before earning more.
- *   1. cooldown guard — a re-scan of the same card within the window is ignored
- *      (belt-and-suspenders alongside the idempotency key).
+ *   0. a key already used replays as "duplicate" — before any rule below could answer otherwise.
+ *   1. reject if the card is already at the reward threshold — redeem before earning more.
+ *   2. cooldown guard — a re-scan of the same card within the window is ignored. A backstop
+ *      behind the counter's one key per presentation of a card; skipped for a deliberate stamp.
  *   2. append to the ledger (idempotent); the DB trigger updates current_progress.
  *   3. enqueue a wallet-sync job — the wallet-worker updates the pass off the request path,
  *      so the cashier never waits on Apple/Google.
@@ -56,6 +62,33 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
       .from(loyaltyPrograms)
       .where(eq(loyaltyPrograms.id, enrollment.programId));
     if (!program) throw new NotFoundError("program not found");
+
+    /*
+     * The key first. The counter resends with the same key when a response is lost, and that retry
+     * must replay as the stamp it repeats — not come back as "cooldown", or "reward ready", because
+     * of the very stamp it is repeating.
+     */
+    const [prior] = await db
+      .select({ enrollmentId: loyaltyProgressEvents.enrollmentId })
+      .from(loyaltyProgressEvents)
+      .where(
+        and(
+          eq(loyaltyProgressEvents.merchantId, input.merchantId),
+          eq(loyaltyProgressEvents.idempotencyKey, input.idempotencyKey),
+        ),
+      );
+    if (prior) {
+      if (prior.enrollmentId !== input.enrollmentId) {
+        throw new ConflictError("this stamp key was already used for a different card");
+      }
+      return {
+        applied: false,
+        reason: "duplicate" as StampReason,
+        enrollment,
+        program,
+        currentStamps: enrollment.currentProgress,
+      };
+    }
 
     const card = cardTypeModule(program.type);
     const mechanics = card.normalize(program.mechanics) as never;
@@ -89,15 +122,17 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
       };
     }
 
-    // cooldown: ignore a rapid re-scan of the same card
-    const [last] = await db
-      .select({ at: loyaltyProgressEvents.createdAt })
-      .from(loyaltyProgressEvents)
-      .where(and(eq(loyaltyProgressEvents.enrollmentId, input.enrollmentId), eq(loyaltyProgressEvents.source, "staff_scan")))
-      .orderBy(desc(loyaltyProgressEvents.createdAt))
-      .limit(1);
-    if (last && Date.now() - last.at.getTime() < cooldownMs()) {
-      return { applied: false, reason: "cooldown" as StampReason, enrollment, program, currentStamps: enrollment.currentProgress };
+    // cooldown: ignore a re-scan of the same card — unless staff asked for this one on purpose
+    if (!input.deliberate) {
+      const [last] = await db
+        .select({ at: loyaltyProgressEvents.createdAt })
+        .from(loyaltyProgressEvents)
+        .where(and(eq(loyaltyProgressEvents.enrollmentId, input.enrollmentId), eq(loyaltyProgressEvents.source, "staff_scan")))
+        .orderBy(desc(loyaltyProgressEvents.createdAt))
+        .limit(1);
+      if (last && Date.now() - last.at.getTime() < cooldownMs()) {
+        return { applied: false, reason: "cooldown" as StampReason, enrollment, program, currentStamps: enrollment.currentProgress };
+      }
     }
 
     const inserted = await db

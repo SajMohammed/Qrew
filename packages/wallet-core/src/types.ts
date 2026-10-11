@@ -33,6 +33,8 @@ export interface PassContent {
   currentStamps: number;
   stampsRequired: number;
   qrToken: string; // encoded into the pass barcode; the staff app scans it to stamp
+  /** The card's typeable code, already formatted — shown under the barcode for manual entry. */
+  shortCode?: string;
   brandColor?: string; // hex; tempered for legibility per platform guidelines
   logoUrl?: string;
   /**
@@ -58,6 +60,8 @@ export interface PassUpdate {
   stampsRequired: number;
   /** The card serial — a wallet barcode is static, so it carries this rather than a token. */
   serial: string;
+  /** The card's typeable code, already formatted — shown under the barcode for manual entry. */
+  shortCode?: string;
   /**
    * The programme this card belongs to. Supplying it re-points the pass at the correct template,
    * which matters for passes issued before the template was keyed on the programme id.

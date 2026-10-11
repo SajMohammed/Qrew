@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments, loyaltyProgressEvents, redemptions } from "@qrew/db";
 import { cardTypeModule } from "./card-types";
 import { enqueueWalletSync } from "@qrew/queue";
-import { NotFoundError } from "./errors";
+import { ConflictError, NotFoundError } from "./errors";
 
 export interface RedeemInput {
   merchantId: string;
@@ -52,6 +52,11 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
       .from(redemptions)
       .where(and(eq(redemptions.merchantId, input.merchantId), eq(redemptions.idempotencyKey, input.idempotencyKey)));
     if (existing) {
+      // A key is one redemption of one card. Answering "redeemed" for a different card would report
+      // a reward that was never taken off it.
+      if (existing.enrollmentId !== input.enrollmentId) {
+        throw new ConflictError("this redeem key was already used for a different card");
+      }
       return { redeemed: true, reason: "duplicate" as RedeemReason, enrollment, currentStamps: enrollment.currentProgress, rewardText: existing.rewardText };
     }
 

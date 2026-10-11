@@ -3,6 +3,8 @@ const BASE = import.meta.env.VITE_API_BASE ?? "/api";
 export interface CardView {
   serial: string;
   qrToken: string;
+  /** What a cashier types when the QR won't scan, formatted: "K7M 4QX". */
+  shortCode: string;
   merchantName: string;
   programName: string;
   rewardText: string;

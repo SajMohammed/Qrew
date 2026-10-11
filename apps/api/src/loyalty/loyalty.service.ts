@@ -9,12 +9,16 @@ export class LoyaltyService {
     return withTenant(merchantId, (db) => db.select().from(loyaltyPrograms));
   }
 
-  /** Add one stamp by enrollment id — delegates to the shared domain layer. */
+  /**
+   * Add one stamp by enrollment id. Never a camera read — only a press of the counter's "Add another
+   * stamp" (or the card app's dev simulate button) — so it is deliberate and the cooldown against a
+   * double read does not apply. The idempotency key still does.
+   */
   addStamp(
     merchantId: string,
     input: { enrollmentId: string; idempotencyKey: string; locationId?: string; staffId?: string },
   ) {
-    return coreAddStamp({ merchantId, ...input });
+    return coreAddStamp({ merchantId, ...input, deliberate: true });
   }
 
   /** Add one stamp by scanned card serial (the staff-scanner path). */

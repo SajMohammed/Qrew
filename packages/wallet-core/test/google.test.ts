@@ -92,6 +92,13 @@ describe("GoogleWalletProvider", () => {
     expect(obj.accountName).toBe("Sara M.");
   });
 
+  it("shows the card's typeable code under the barcode, when it has one", () => {
+    const withCode = withEnv().toObject({ ...CONTENT, shortCode: "K7M 4QX" }) as Record<string, any>;
+    expect(withCode.barcode).toEqual({ type: "QR_CODE", value: CONTENT.serial, alternateText: "K7M 4QX" });
+    const without = withEnv().toObject(CONTENT) as Record<string, any>;
+    expect(without.barcode.alternateText).toBeUndefined();
+  });
+
   it("builds the class from the merchant's own branding", () => {
     const cls = withEnv().toClass(CONTENT) as Record<string, any>;
     expect(cls.issuerName).toBe("Nadia's Coffee");
@@ -175,6 +182,20 @@ describe("transport", () => {
   it("reports a missing pass as absent, so the worker can create it", async () => {
     stubGoogle(() => new Response("not found", { status: 404 }));
     await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe("absent");
+  });
+
+  it("puts the card's code under the barcode on every update, and clears it when there is none", async () => {
+    const fetch = stubGoogle(() => Response.json({ id: "x" }));
+    await withEnv().updateStamps({ serial: CONTENT.serial }, { ...UPDATE, shortCode: "K7M 4QX" });
+    await withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE);
+    const barcodes = fetch.mock.calls
+      .filter(([, init]) => (init as RequestInit | undefined)?.method === "PATCH")
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)).barcode);
+    expect(barcodes).toEqual([
+      { type: "QR_CODE", value: CONTENT.serial, alternateText: "K7M 4QX" },
+      // PATCH merges, so a caption left out would survive — it is cleared by name instead.
+      { type: "QR_CODE", value: CONTENT.serial, alternateText: null },
+    ]);
   });
 
   it("tells a saved pass from one nobody has saved, by Google's hasUsers", async () => {
