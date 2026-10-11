@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { PresentationTracker, PRESENTATION_GAP_MS, RETRY_EVERY_MS } from "./presentation";
+import { PresentationTracker, PRESENTATION_GAP_MS, RETRY_EVERY_MS, cardIdentity } from "./presentation";
+
+/** A card token as the API mints it: base64url("<serial>.<expiry>") + "." + signature. */
+const token = (serial: string, expiry: number) =>
+  `${Buffer.from(`${serial}.${expiry}`).toString("base64url")}.c2lnbmF0dXJl`;
 
 function tracker() {
   let n = 0;
@@ -52,6 +56,33 @@ describe("PresentationTracker", () => {
     for (let now = 100; now <= 8_000; now += 100) expect(t.frame("CARD", now, true)).toBeNull();
     // The answer came at 8 s; the card was in view all along, so it is still the same presentation.
     expect(t.frame("CARD", 8_100, false)).toBeNull();
+  });
+
+  // The customer app swaps its QR token about every 100 s. A phone left resting in front of the
+  // camera must stay one presentation through the swap, or it earns a second stamp.
+  it("keeps one presentation when the card's QR token is swapped while in view", () => {
+    const t = tracker();
+    expect(t.frame(token("serial-1", 1000), 0, false)).not.toBeNull();
+    for (let now = 100; now <= 200_000; now += 100) {
+      expect(t.frame(token("serial-1", now < 100_000 ? 1000 : 2000), now, false)).toBeNull();
+    }
+  });
+
+  it("retries with the freshest token the card has shown", () => {
+    const t = tracker();
+    t.frame(token("serial-1", 1000), 0, false);
+    t.failed(100);
+    expect(t.frame(token("serial-1", 2000), 100 + RETRY_EVERY_MS, false)).toEqual({
+      value: token("serial-1", 2000),
+      key: "key-1",
+    });
+  });
+
+  it("tells cards apart by the serial a token names, and leaves other values as they are", () => {
+    expect(cardIdentity(token("a", 1))).toBe(cardIdentity(token("a", 2)));
+    expect(cardIdentity(token("a", 1))).not.toBe(cardIdentity(token("b", 1)));
+    expect(cardIdentity("bc5da23a-b964-4dfe-b461-c455d26ac019")).toBe("bc5da23a-b964-4dfe-b461-c455d26ac019");
+    expect(cardIdentity("K7M 4QX")).toBe("K7M 4QX");
   });
 
   it("ignores another card while busy, then gives it its own presentation", () => {

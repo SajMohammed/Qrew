@@ -56,6 +56,8 @@ function ShopApp() {
 
   // Polls must not overlap a slow load and stack up requests.
   const inFlight = useRef(false);
+  // A rename made while a poll was out: that poll's answer still carries the old name.
+  const renamed = useRef<{ name: string; at: number } | null>(null);
 
   const load = useCallback(async () => {
     if (inFlight.current) return;
@@ -63,7 +65,10 @@ function ShopApp() {
     setErr(null);
     setLoading(true);
     try {
-      setData(await api.getAnalytics(range));
+      const askedAt = Date.now();
+      const fresh = await api.getAnalytics(range);
+      const r = renamed.current;
+      setData(r && r.at >= askedAt ? { ...fresh, merchantName: r.name } : fresh);
     } catch (e) {
       if (e instanceof NeedsOnboarding) {
         // First sign-in: there is no shop yet. Ask for its name; nothing is provisioned until then.
@@ -174,7 +179,10 @@ function ShopApp() {
           <Settings
             merchantName={data?.merchantName}
             // Update everything that shows the name now, rather than at the next poll.
-            onRenamed={(name) => setData((d) => (d ? { ...d, merchantName: name } : d))}
+            onRenamed={(name) => {
+              renamed.current = { name, at: Date.now() };
+              setData((d) => (d ? { ...d, merchantName: name } : d));
+            }}
           />
         )}
         {view === "counterqr" &&

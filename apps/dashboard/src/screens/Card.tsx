@@ -87,6 +87,8 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
   // While passes are being updated, check back every few seconds (for up to two minutes) so the owner
   // sees the outcome. Only the wallet status is merged — the form being edited is never touched.
   const syncing = program?.walletSync.state === "pending";
+  // Bumped by each save, so a save made while an earlier one is still pending gets its own two minutes.
+  const [round, setRound] = useState(0);
   useEffect(() => {
     if (!syncing) return;
     let polls = 0;
@@ -101,7 +103,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
         .catch(() => {}); // a missed check is harmless; the next one tries again
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [syncing, api]);
+  }, [syncing, api, round]);
 
   async function save() {
     if (!program) return;
@@ -118,7 +120,10 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
         bonusStamps: bonus,
         cardDesign: design,
       });
+      // Again on landing: a check that went out while this save was in flight read the state before it.
+      saves.current++;
       setProgram(updated);
+      setRound((n) => n + 1);
       setType(updated.type);
       setMechanics((updated.mechanics ?? {}) as Record<string, unknown>);
       setStatus("saved");

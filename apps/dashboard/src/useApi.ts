@@ -96,6 +96,18 @@ async function counterFailure(res: Response, fallback: string): Promise<CounterE
   return new CounterError("rejected", await describe(res, fallback));
 }
 
+/** How long a counter request may take. Retrying is safe — it reuses the same idempotency key. */
+const COUNTER_TIMEOUT_MS = 8_000;
+
+/** A counter answer's body. Cut off on the way (a dropped connection, the deadline) counts as no answer. */
+async function counterJson<T>(res: Response): Promise<T> {
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new CounterError("offline");
+  }
+}
+
 // Threads the Clerk session token onto every API call (the api.ts functions are plain modules and
 // can't call the useAuth hook themselves). The server derives the merchant from the token — no
 // more x-merchant-id.
@@ -113,11 +125,19 @@ export function useApi() {
     [getToken],
   );
 
-  /** A counter POST. No answer at all — offline, or the sign-in couldn't refresh — is "offline". */
+  /**
+   * A counter POST. No answer at all — offline, the sign-in couldn't refresh, or nothing back within
+   * the deadline — is "offline". A request held open by a half-dead Wi-Fi would otherwise freeze the
+   * counter for minutes with no sign of why.
+   */
   const counterPost = useCallback(
     async (path: string, body: unknown): Promise<Response> => {
+      const ctrl = new AbortController();
+      // Never cleared: aborting a finished request does nothing, and reading its answer stays under
+      // the same deadline.
+      window.setTimeout(() => ctrl.abort(), COUNTER_TIMEOUT_MS);
       try {
-        return await call(path, { method: "POST", body: JSON.stringify(body) });
+        return await call(path, { method: "POST", body: JSON.stringify(body), signal: ctrl.signal });
       } catch {
         throw new CounterError("offline");
       }
@@ -230,24 +250,24 @@ export function useApi() {
         const res = await counterPost("/loyalty/scan", { serial: value, idempotencyKey, staffToken });
         if (res.status === 404) return { found: false };
         if (!res.ok) throw await counterFailure(res, "Scan failed");
-        return res.json();
+        return counterJson(res);
       },
       /** A deliberate extra stamp on a card already scanned — a second purchase on the same visit. */
       async stampAgain(enrollmentId: string, idempotencyKey: string, staffToken?: string): Promise<StampOutcome> {
         const res = await counterPost("/loyalty/stamp", { enrollmentId, idempotencyKey, staffToken });
         if (!res.ok) throw await counterFailure(res, "Stamp failed");
-        return res.json();
+        return counterJson(res);
       },
       async redeem(enrollmentId: string, idempotencyKey: string, staffToken?: string): Promise<RedeemResult> {
         const res = await counterPost("/loyalty/redeem", { enrollmentId, idempotencyKey, staffToken });
         if (!res.ok) throw await counterFailure(res, "Redeem failed");
-        return res.json();
+        return counterJson(res);
       },
       async verifyPin(pin: string): Promise<VerifiedCashier> {
         const res = await counterPost("/staff/verify-pin", { pin });
         if (res.status === 429) throw new PinLocked(await describe(res, "Too many wrong PINs. Try again later."));
         if (!res.ok) throw new Error(`PIN failed (${res.status})`);
-        return res.json();
+        return counterJson(res);
       },
       // ── Team ──
       async getStaff(): Promise<StaffMember[]> {

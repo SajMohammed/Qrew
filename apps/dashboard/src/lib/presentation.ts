@@ -24,6 +24,26 @@ export function newKey(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Which card a scanned value is, for telling presentations apart. The customer app's QR is a signed
+ * token it swaps for a fresh one about every 100 s, so a phone resting in front of the camera would
+ * otherwise look like a second card — and earn a second stamp once the cooldown had passed. The
+ * token's payload names the card's serial, so two tokens for one card are one card here. Read
+ * without verifying: only the server's check counts; this only groups frames. Anything else (a
+ * pass's serial, a typed code) is its own identity.
+ */
+export function cardIdentity(value: string): string {
+  const parts = value.split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return value;
+  try {
+    const payload = atob(parts[0].replace(/-/g, "+").replace(/_/g, "/"));
+    const dot = payload.lastIndexOf(".");
+    return dot > 0 ? `card:${payload.slice(0, dot)}` : value;
+  } catch {
+    return value;
+  }
+}
+
 /** What to send for a frame: the decoded value, and its presentation's key. */
 export interface Presentation {
   value: string;
@@ -31,9 +51,13 @@ export interface Presentation {
 }
 
 export class PresentationTracker {
-  private current: { value: string; key: string; lastSeenAt: number; retryAt: number | null } | null = null;
+  private current: { card: string; value: string; key: string; lastSeenAt: number; retryAt: number | null } | null =
+    null;
 
-  constructor(private readonly makeKey: () => string = () => newKey("scan")) {}
+  constructor(
+    private readonly makeKey: () => string = () => newKey("scan"),
+    private readonly identify: (value: string) => string = cardIdentity,
+  ) {}
 
   /**
    * A decoded frame. Returns what to send, or null to send nothing. `busy` means a request is in
@@ -41,9 +65,11 @@ export class PresentationTracker {
    * doesn't split it in two, but nothing is sent.
    */
   frame(value: string, now: number, busy: boolean): Presentation | null {
+    const card = this.identify(value);
     const cur = this.current;
-    if (cur && cur.value === value && now - cur.lastSeenAt <= PRESENTATION_GAP_MS) {
+    if (cur && cur.card === card && now - cur.lastSeenAt <= PRESENTATION_GAP_MS) {
       cur.lastSeenAt = now;
+      cur.value = value; // a retry sends the freshest token the card has shown
       if (!busy && cur.retryAt !== null && now >= cur.retryAt) {
         cur.retryAt = null;
         return { value, key: cur.key };
@@ -51,7 +77,7 @@ export class PresentationTracker {
       return null;
     }
     if (busy) return null; // another card while one is being stamped — its next frame will do
-    this.current = { value, key: this.makeKey(), lastSeenAt: now, retryAt: null };
+    this.current = { card, value, key: this.makeKey(), lastSeenAt: now, retryAt: null };
     return { value, key: this.current.key };
   }
 

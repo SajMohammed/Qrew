@@ -23,6 +23,13 @@ const EXTRA_REST_MS = 1_200;
 /** End a cashier's sign-in this long before their token does, so no scan is ever refused over it. */
 const CASHIER_MARGIN_MS = 60_000;
 
+/*
+ * The camera's release, shared by every Scanner: a new one (a quick unmount and remount, or a switch
+ * of camera) waits for the last to finish letting go. Clearing the old view clears #reader by id, so
+ * a new view started before that would be wiped blank.
+ */
+let cameraReleased: Promise<void> = Promise.resolve();
+
 interface Cashier {
   name: string;
   token: string;
@@ -42,6 +49,8 @@ export function Scanner() {
   const [cashierNotice, setCashierNotice] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [pinErr, setPinErr] = useState<string | null>(null);
+  // Enter and "Set" both submit; a double submit would spend two of the shop's few wrong-PIN tries.
+  const pinBusyRef = useRef(false);
 
   const trackerRef = useRef(new PresentationTracker());
   const inFlightRef = useRef(false);
@@ -49,6 +58,8 @@ export function Scanner() {
   const keysRef = useRef({ extra: newKey("extra"), redeem: newKey("redeem") });
   const [code, setCode] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
+  // A card is being looked up — shown, so a press meanwhile isn't silently ignored.
+  const [sending, setSending] = useState(false);
   const [redeemed, setRedeemed] = useState<RedeemResult | null>(null);
   const [busy, setBusy] = useState<"extra" | "redeem" | null>(null);
   const [extraResting, setExtraResting] = useState(false);
@@ -58,7 +69,6 @@ export function Scanner() {
   const [camera, setCamera] = useState<"starting" | "on" | CameraProblem>("starting");
   const [facing, setFacing] = useState<Facing>(loadFacing);
   const [attempt, setAttempt] = useState(0); // bumped by "Try again" to restart the camera
-  const stopRef = useRef<Promise<void>>(Promise.resolve());
   const onFrameRef = useRef<(text: string) => void>(() => {});
 
   function setCashier(next: Cashier | null) {
@@ -67,6 +77,8 @@ export function Scanner() {
   }
 
   async function signInCashier() {
+    if (pinBusyRef.current) return;
+    pinBusyRef.current = true;
     setPinErr(null);
     setCashierNotice(null);
     try {
@@ -76,13 +88,19 @@ export function Scanner() {
     } catch (e) {
       const said = e instanceof PinLocked || (e instanceof CounterError && e.kind === "offline");
       setPinErr(said ? (e as Error).message : "PIN not recognized");
+    } finally {
+      pinBusyRef.current = false;
     }
   }
 
-  /** The cashier's sign-in has run out. Scans carry on, credited to nobody, until a PIN is entered. */
-  const expireCashier = useCallback(() => {
+  /**
+   * The cashier's sign-in has run out. Scans carry on, credited to nobody, until a PIN is entered.
+   * Given a token, only if that token is still the current cashier's — someone who signed in while
+   * a request with the old one was out keeps their sign-in.
+   */
+  const expireCashier = useCallback((token?: string) => {
     const was = cashierRef.current;
-    if (!was) return;
+    if (!was || (token !== undefined && was.token !== token)) return;
     setCashier(null);
     setCashierNotice(
       `${was.name}'s cashier sign-in has ended. Scans still work — enter a PIN to credit them to a cashier.`,
@@ -92,7 +110,7 @@ export function Scanner() {
   // End it on time, rather than at whichever scan comes after.
   useEffect(() => {
     if (!cashier) return;
-    const t = window.setTimeout(expireCashier, Math.max(0, cashier.endsAt - Date.now()));
+    const t = window.setTimeout(() => expireCashier(), Math.max(0, cashier.endsAt - Date.now()));
     return () => window.clearTimeout(t);
   }, [cashier, expireCashier]);
 
@@ -108,23 +126,26 @@ export function Scanner() {
       return await fn(token);
     } catch (e) {
       if (!(token && e instanceof CounterError && e.kind === "cashier_expired")) throw e;
-      expireCashier();
+      expireCashier(token);
       return fn(undefined);
     }
   }
 
-  /** Show a failed request. Returns whether it got no answer at all, so is worth retrying. */
+  /** Show a failed request. Returns whether the same request is worth sending again. */
   function fail(e: unknown): boolean {
     signal("error");
     if (e instanceof CounterError && e.kind === "signed_out") {
+      // Usually the device really was signed out — but a 401 can also be a passing failure to check
+      // the sign-in, so the card in view is retried, and the banner goes at the next success.
       setSignedOut(true);
-      return false;
+      return true;
     }
     setErr(e instanceof Error ? e.message : String(e));
     return e instanceof CounterError && (e.kind === "offline" || e.kind === "server");
   }
 
   function show(r: ScanResult) {
+    setSignedOut(false);
     keysRef.current = { extra: newKey("extra"), redeem: newKey("redeem") };
     setResult(r);
     signal(feedbackFor(r));
@@ -140,6 +161,7 @@ export function Scanner() {
   async function send(value: string, key: string, via: "camera" | "typed") {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
+    setSending(true);
     setErr(null);
     setRedeemed(null);
     setResult(null); // the last card's buttons go the moment another card is being looked up
@@ -151,6 +173,7 @@ export function Scanner() {
       if (fail(e) && via === "camera") trackerRef.current.failed(Date.now());
     } finally {
       inFlightRef.current = false;
+      setSending(false);
     }
   }
 
@@ -179,6 +202,7 @@ export function Scanner() {
     setErr(null);
     try {
       const outcome = await asCashier((t) => api.stampAgain(card.enrollmentId!, keysRef.current.extra, t));
+      setSignedOut(false);
       // The key is spent once a stamp has landed under it ("duplicate": an earlier press that got no
       // answer did land). Until then it is kept, so pressing again after a failure can't add two.
       if (outcome.reason === "applied" || outcome.reason === "duplicate") keysRef.current.extra = newKey("extra");
@@ -202,6 +226,7 @@ export function Scanner() {
     setErr(null);
     try {
       const r = await asCashier((t) => api.redeem(card.enrollmentId!, keysRef.current.redeem, t));
+      setSignedOut(false);
       setResult(null);
       if (r.redeemed) {
         setRedeemed(r);
@@ -228,7 +253,7 @@ export function Scanner() {
   useEffect(() => {
     let cancelled = false;
     let started: { stop: () => Promise<void>; clear: () => void } | undefined;
-    const previous = stopRef.current;
+    const previous = cameraReleased;
     setCamera("starting");
     const run = (async () => {
       await previous; // a switch must release the old camera before asking for the new one
@@ -252,7 +277,7 @@ export function Scanner() {
       cancelled = true;
       // Release the camera once its start has settled. html5-qrcode's stop() throws if it isn't
       // scanning yet, so stopping mid-start would leave the stream (and the camera light) on.
-      stopRef.current = run.then(async () => {
+      cameraReleased = run.then(async () => {
         if (!started) return;
         try {
           await started.stop();
@@ -361,10 +386,10 @@ export function Scanner() {
         </label>
         <button
           type="submit"
-          disabled={!code.trim()}
+          disabled={!code.trim() || sending || busy !== null}
           className="bg-primary text-primary-foreground min-h-12 w-full rounded-xl text-sm font-bold transition hover:brightness-110 disabled:opacity-40"
         >
-          + Stamp
+          {sending ? "Checking card…" : "+ Stamp"}
         </button>
       </form>
 
