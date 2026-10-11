@@ -136,9 +136,18 @@ describe("claimCard", () => {
     await expect(claimCard("t", "s")).resolves.toBe(false); // kept on the device
     stubFetch(() => Response.json({ message: "already linked" }, { status: 409 }));
     await expect(claimCard("t", "s")).resolves.toBe(true);
-    stubFetch(() => new Response("", { status: 404 }));
+    stubFetch(() => Response.json([]));
     await expect(claimCard("t", "s")).resolves.toBe(true);
     stubFetch(() => new Response("", { status: 503 }));
+    await expect(claimCard("t", "s")).resolves.toBe(false);
+  });
+
+  // This route never answers 404, and never with a page: either means the request went somewhere it
+  // shouldn't (a bad deploy). Dropping cards then would lose every signing-in customer's cards.
+  it("keeps the card when the answer can't be the claim route's", async () => {
+    stubFetch(() => new Response("", { status: 404 }));
+    await expect(claimCard("t", "s")).resolves.toBe(false);
+    stubFetch(() => new Response("<!doctype html><html></html>", { status: 200, headers: { "content-type": "text/html" } }));
     await expect(claimCard("t", "s")).resolves.toBe(false);
   });
 });

@@ -60,6 +60,37 @@ function writeLocal(serials: string[]): void {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(serials));
   localStorage.removeItem("qrew.card");
 }
+/**
+ * Add a card to the device's list, merged with what's stored now — another tab may have saved one
+ * since this one read the list, and writing this tab's copy back would erase it.
+ */
+function addLocal(serial: string): string[] {
+  const next = [...new Set([...readLocal(), serial])];
+  writeLocal(next);
+  return next;
+}
+
+/*
+ * Which programme each card on this device belongs to, remembered. A card that can't be checked
+ * right now (no signal, Qrew down) still counts as this shop's card when its counter code is
+ * scanned again — otherwise the landing would offer a second card, with a second head start.
+ */
+const PROGRAMS_KEY = "qrew.cards.programs";
+function readPrograms(): Record<string, string> {
+  try {
+    const o: unknown = JSON.parse(localStorage.getItem(PROGRAMS_KEY) ?? "{}");
+    return o && typeof o === "object" ? (o as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+function rememberPrograms(entries: Record<string, string>): void {
+  try {
+    localStorage.setItem(PROGRAMS_KEY, JSON.stringify({ ...readPrograms(), ...entries }));
+  } catch {
+    /* not remembered — the card is still checked when it loads */
+  }
+}
 
 // "Not now" on the save-your-card nudge, remembered for this device.
 const NUDGE_KEY = "qrew.saveNudge.dismissed";
@@ -92,7 +123,11 @@ export function App() {
   const [tiles, setTiles] = useState<CardTile[]>([]);
   const [tilesLoaded, setTilesLoaded] = useState(false);
   // Cards that couldn't be checked just now (missing: how many; null when it's the whole account list).
-  const [tilesProblem, setTilesProblem] = useState<{ kind: FailureKind; missing: number | null } | null>(null);
+  // `unknown`: how many of them this device can't place at a shop — while any can't, getting a new card
+  // waits, since one of them may be that shop's.
+  const [tilesProblem, setTilesProblem] = useState<{ kind: FailureKind; missing: number | null; unknown: number } | null>(
+    null,
+  );
   const [selected, setSelected] = useState<string | null>(() => param("card") || null);
   const [card, setCard] = useState<CardView | null>(null);
   // Why the open card hasn't loaded (before it ever has).
@@ -148,14 +183,17 @@ export function App() {
 
   // The grid: signed in → /me/cards; anonymous → each device-local serial via the public getCard.
   const loadTiles = useCallback(async () => {
+    // Not before sign-in has been restored: until then a signed-in person would look anonymous.
+    if (!auth.ready) return;
     try {
       if (auth.token) {
         try {
           setTiles((await getMyCards(auth.token)).map(tileFromMyCard));
           setTilesProblem(null);
         } catch (e) {
-          // Keep whatever is on screen, and say why it may be out of date.
-          setTilesProblem({ kind: failureKind(e), missing: null });
+          // Keep whatever is on screen, and say why it may be out of date. (The server dedupes a
+          // signed-in enrol, so nothing here needs to hold the enrol button.)
+          setTilesProblem({ kind: failureKind(e), missing: null, unknown: 0 });
         }
       } else if (!auth.stalled) {
         const settled = await Promise.allSettled(localSerials.map((s) => getCard(s)));
@@ -173,6 +211,7 @@ export function App() {
           // A card that answers 404 is hidden but stays stored: a misrouted deploy answers 404 for
           // everything, and pruning on it would wipe every customer's cards for good.
         });
+        rememberPrograms(Object.fromEntries([...fresh.values()].map((t) => [t.serial, t.programId])));
         // A card that couldn't be checked keeps the tile it had, rather than vanishing.
         setTiles((prev) =>
           localSerials.flatMap((s) => {
@@ -180,12 +219,16 @@ export function App() {
             return t ? [t] : [];
           }),
         );
-        setTilesProblem(unchecked.size ? { kind: offline ? "offline" : "server", missing: unchecked.size } : null);
+        const programs = readPrograms();
+        const unknown = [...unchecked].filter((s) => !programs[s]).length;
+        setTilesProblem(
+          unchecked.size ? { kind: offline ? "offline" : "server", missing: unchecked.size, unknown } : null,
+        );
       }
     } finally {
       setTilesLoaded(true);
     }
-  }, [auth.token, auth.stalled, localSerials]);
+  }, [auth.ready, auth.token, auth.stalled, localSerials]);
 
   useEffect(() => {
     if (auth.ready) void loadTiles();
@@ -215,10 +258,12 @@ export function App() {
     void (async () => {
       // Keep any serial that failed for a TRANSIENT reason (network / just-expired token) so the card
       // isn't wiped from the device before it lands on the account — claimCard returns false in that case.
-      const remaining: string[] = [];
+      const done = new Set<string>();
       for (const s of locals) {
-        if (!(await claimCard(auth.token!, s))) remaining.push(s);
+        if (await claimCard(auth.token!, s)) done.add(s);
       }
+      // Against what's stored now, not the list read above: another tab may have added a card since.
+      const remaining = readLocal().filter((s) => !done.has(s));
       writeLocal(remaining);
       setLocalSerials(remaining);
       await loadTiles().catch(() => {});
@@ -246,6 +291,9 @@ export function App() {
       inFlight = true;
       window.clearTimeout(timer);
       let next = POLL_MS;
+      // The token is minted before the answer is sent, so its age counts from when we asked — on a
+      // slow connection that answer can take seconds, and the code would look fresher than it is.
+      const askedAt = Date.now();
       try {
         const c = await getCard(selected);
         if (!alive) return;
@@ -253,8 +301,8 @@ export function App() {
         // Hold the QR steady: only adopt a fresh token when we have none or the current is near expiry.
         // Stamp counts still update every poll; the code just stops flickering every 4s.
         if (!qrRef.current || shouldAdoptToken(qrRef.current.at, qrRef.current.ttlMs, now)) {
-          qrRef.current = { token: c.qrToken, at: now, ttlMs: c.qrTtlMs ?? DEFAULT_QR_TTL_MS };
-          setQrHeld({ at: now, ttlMs: qrRef.current.ttlMs });
+          qrRef.current = { token: c.qrToken, at: askedAt, ttlMs: c.qrTtlMs ?? DEFAULT_QR_TTL_MS };
+          setQrHeld({ at: askedAt, ttlMs: qrRef.current.ttlMs });
         }
         setCard({ ...c, qrToken: qrRef.current.token });
         loaded = true;
@@ -314,9 +362,8 @@ export function App() {
    */
   useEffect(() => {
     if (!card || !auth.ready || auth.signedIn || auth.stalled || localSerials.includes(card.serial)) return;
-    const next = [...localSerials, card.serial];
-    writeLocal(next);
-    setLocalSerials(next);
+    rememberPrograms({ [card.serial]: card.programId });
+    setLocalSerials(addLocal(card.serial));
   }, [card, auth.ready, auth.signedIn, auth.stalled, localSerials]);
 
   /*
@@ -334,13 +381,15 @@ export function App() {
    * to the wallet rather than into this redirect again.
    */
   useEffect(() => {
-    if (!shop.p || !tilesLoaded) return;
-    const held = heldCardFor(tiles, shop.p);
+    // Only from the landing itself — never pull someone off a card they've opened since.
+    if (!shop.p || !tilesLoaded || selected) return;
+    const programs = auth.signedIn ? {} : readPrograms();
+    const held = heldCardFor(tiles, shop.p)?.serial ?? localSerials.find((s) => programs[s] === shop.p);
     if (!held) return;
     window.history.replaceState(null, "", window.location.pathname);
     setShop({ m: "", p: "" });
-    openCard(held.serial);
-  }, [shop.p, tilesLoaded, tiles, openCard]);
+    openCard(held);
+  }, [shop.p, tilesLoaded, selected, tiles, localSerials, auth.signedIn, openCard]);
 
   const backHome = useCallback(() => {
     if ((window.history.state as { card?: string } | null)?.card) {
@@ -366,8 +415,11 @@ export function App() {
   const addShopCard = () =>
     void run(async () => {
       let r: EnrollResult;
+      // A lapsed access token would be read as no sign-in at all, and the card saved nowhere: it would
+      // be on no account, and (signed in) not kept on the device either. Refresh it first.
+      const token = await auth.freshToken();
       try {
-        r = await enroll({ merchantId: shop.m, programId: shop.p }, auth.token);
+        r = await enroll({ merchantId: shop.m, programId: shop.p }, token);
       } catch (e) {
         // The shop's card went away between the preview and the tap.
         if (failureKind(e) === "not_found") {
@@ -377,10 +429,9 @@ export function App() {
         throw e;
       }
       setEnrollCtx({ serial: r.serial, enrollmentId: r.enrollmentId, merchantId: shop.m });
-      if (!auth.token) {
-        const next = [...new Set([...localSerials, r.serial])];
-        writeLocal(next);
-        setLocalSerials(next);
+      if (!token) {
+        rememberPrograms({ [r.serial]: shop.p });
+        setLocalSerials(addLocal(r.serial));
         // Ask the browser not to clear the only copy of this card. Quietly: most say yes or no unasked.
         void navigator.storage?.persist?.().catch(() => false);
       }
@@ -558,8 +609,9 @@ export function App() {
                       <CardPreview preview={preview.preview} />
                       <button
                         type="button"
-                        // Not while a signed-in session is waiting: this would make an anonymous card.
-                        disabled={busy || Boolean(auth.stalled)}
+                        // Not while a signed-in session is waiting (this would make an anonymous card), nor
+                        // while a card here that can't be checked might be this shop's.
+                        disabled={busy || Boolean(auth.stalled) || Boolean(tilesProblem?.unknown)}
                         onClick={addShopCard}
                         className="bg-primary text-primary-foreground min-h-13 w-full rounded-2xl text-[15px] font-extrabold transition active:scale-[0.98] disabled:opacity-50"
                       >

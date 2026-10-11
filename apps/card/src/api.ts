@@ -277,10 +277,10 @@ export function getMyCards(token: string): Promise<MyCard[]> {
 }
 
 // Fold an anonymous card into the account. Returns true when the serial is DONE and safe to drop from
-// the device — claimed, or definitively gone / not ours (404/409). Returns false on a TRANSIENT failure
-// (network, or a just-expired token → 401/5xx) so the caller keeps it and retries, never losing a card.
-// Also false when the account already has its own card at that shop: this one isn't joined to it, so
-// it stays on the device rather than vanish.
+// the device: claimed, or refused for good (409 — gone or someone else's; 400 — can never be valid).
+// Anything else keeps it, to try again at the next sign-in — never losing a card. That includes a 404
+// (this route never answers one, so it means a misrouted deploy) and a 200 that isn't the card list
+// (a fallback page). Also kept: a card the account can't take because it has its own at that shop.
 export async function claimCard(token: string, serial: string): Promise<boolean> {
   try {
     const res = await fetch(`${BASE}/me/claim`, {
@@ -288,12 +288,12 @@ export async function claimCard(token: string, serial: string): Promise<boolean>
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({ serial }),
     });
-    if (res.ok) return true;
+    if (res.ok) return Array.isArray(await res.json().catch(() => null));
     if (res.status === 409) {
       const body = (await res.json().catch(() => null)) as { code?: string } | null;
       return body?.code !== "has_own_card";
     }
-    return res.status === 404; // definitive → drop; else transient → keep
+    return res.status === 400;
   } catch {
     return false; // network error → keep and retry
   }
