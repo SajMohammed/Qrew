@@ -55,6 +55,14 @@ export class Forbidden extends Error {
   }
 }
 
+/** Too many wrong PINs on this shop: PIN entry is paused. The message says for how long. */
+export class PinLocked extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PinLocked";
+  }
+}
+
 // Threads the Clerk session token onto every API call (the api.ts functions are plain modules and
 // can't call the useAuth hook themselves). The server derives the merchant from the token — no
 // more x-merchant-id.
@@ -188,6 +196,7 @@ export function useApi() {
       },
       async verifyPin(pin: string): Promise<VerifiedCashier> {
         const res = await call("/staff/verify-pin", { method: "POST", body: JSON.stringify({ pin }) });
+        if (res.status === 429) throw new PinLocked(await describe(res, "Too many wrong PINs. Try again later."));
         if (!res.ok) throw new Error(`PIN failed (${res.status})`);
         return res.json();
       },

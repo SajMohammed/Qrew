@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useApi } from "./useApi";
+import { useApi, PinLocked } from "./useApi";
 import type { ScanResult, RedeemResult } from "./api";
 import { cn } from "@/lib/utils";
 
@@ -26,8 +26,8 @@ export function Scanner() {
       staffTokenRef.current = c.staffToken;
       setCashier(c.name);
       setPin("");
-    } catch {
-      setPinErr("PIN not recognized");
+    } catch (e) {
+      setPinErr(e instanceof PinLocked ? e.message : "PIN not recognized");
     }
   }
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useClerk } from "@clerk/react";
 import { Lock, X } from "lucide-react";
 import { Scanner } from "@/Scanner";
-import { useApi } from "@/useApi";
+import { useApi, PinLocked } from "@/useApi";
 import { Wordmark } from "@/components/AppShell";
 import { setCounterModeFlag } from "@/lib/counter-mode";
 
@@ -33,8 +33,8 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
       } else {
         setErr("That PIN belongs to a cashier. Ask an owner or manager to unlock.");
       }
-    } catch {
-      setErr("PIN not recognized.");
+    } catch (e) {
+      setErr(e instanceof PinLocked ? `${e.message} You can sign out instead.` : "PIN not recognized.");
     } finally {
       setChecking(false);
       setPin("");

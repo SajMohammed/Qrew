@@ -22,3 +22,15 @@ export class InvalidInputError extends DomainError {
     this.name = "InvalidInputError";
   }
 }
+
+/** Too many tries at something guessable → the API returns HTTP 429 with Retry-After. */
+export class TooManyAttemptsError extends DomainError {
+  constructor(
+    readonly code: string,
+    readonly retryAfterSeconds: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "TooManyAttemptsError";
+  }
+}

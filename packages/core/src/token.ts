@@ -83,14 +83,29 @@ export function verifyCardToken(token: string): string | null {
   return readSigned(CARD_SECRET, token);
 }
 
-/** Mint a shift-long token identifying the cashier, minted after a PIN check. */
-export function mintStaffToken(staffId: string, ttlMs: number = STAFF_TTL_MS): string {
-  return mintSigned(STAFF_SECRET, staffId, ttlMs);
+/**
+ * What a cashier's shift token vouches for: who, in which shop, and which PIN they proved. Binding
+ * the shop stops one shop's token attributing scans in another; binding the PIN (by a tag of its
+ * hash) means resetting it — or removing the person — revokes the token at once.
+ */
+export interface StaffClaims {
+  merchantId: string;
+  staffId: string;
+  pinTag: string;
 }
 
-/** Verify a staff token; return its staffId, or null if malformed / tampered / expired. */
-export function verifyStaffToken(token: string): string | null {
-  return readSigned(STAFF_SECRET, token);
+/** Mint a shift-long token for a cashier, after a PIN check. */
+export function mintStaffToken(claims: StaffClaims, ttlMs: number = STAFF_TTL_MS): string {
+  return mintSigned(STAFF_SECRET, `${claims.merchantId}:${claims.staffId}:${claims.pinTag}`, ttlMs);
+}
+
+/** Verify a staff token's signature and expiry; null if malformed, tampered, expired or old-format. */
+export function verifyStaffToken(token: string): StaffClaims | null {
+  const subject = readSigned(STAFF_SECRET, token);
+  const parts = subject?.split(":");
+  if (!parts || parts.length !== 3 || parts.some((p) => !p)) return null;
+  const [merchantId, staffId, pinTag] = parts as [string, string, string];
+  return { merchantId, staffId, pinTag };
 }
 
 /** Mint a short-lived customer access token (subject = customer account id). Rotated via refresh. */
