@@ -13,11 +13,13 @@ import type { Response } from "express";
 import { getCard, getCardStrip, stripFor, normalizeDesign } from "@qrew/core";
 import { StripPreviewRequest } from "@qrew/contracts";
 import { Public, Roles } from "../auth/auth.decorators";
+import { RateLimit } from "../rate-limit/rate-limit";
 
 @Controller("card")
 export class CardController {
   // Public: the customer's live card, fetched by its serial (a capability token).
   @Public()
+  @RateLimit("card-read")
   @Get(":serial")
   async card(@Param("serial") serial: string) {
     const card = await getCard(serial);
@@ -36,6 +38,7 @@ export class CardController {
    * stale strip to a card that has already moved on.
    */
   @Public()
+  @RateLimit("card-image")
   @Get(":serial/strip.png")
   async strip(
     @Param("serial") serial: string,
@@ -61,6 +64,7 @@ export class CardController {
    * anonymous callers. Only the designer uses it, and it already sends the owner's session.
    */
   @Roles("owner", "manager")
+  @RateLimit("strip-preview")
   @Post("strip/preview")
   @HttpCode(200) // renders, creates nothing — 201 would be a lie
   async preview(@Body() body: unknown, @Res() res: Response) {

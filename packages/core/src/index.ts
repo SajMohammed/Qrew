@@ -13,5 +13,6 @@ export * from "./lead";
 export * from "./staff";
 export * from "./token";
 export * from "./config";
+export * from "./rate-window";
 export * from "./social-auth";
 export * from "./errors";

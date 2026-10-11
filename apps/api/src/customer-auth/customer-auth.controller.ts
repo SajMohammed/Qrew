@@ -2,12 +2,14 @@ import { Controller, Post, Body, BadRequestException, UnauthorizedException } fr
 import { SocialAuthRequest, RefreshRequest, LogoutRequest } from "@qrew/contracts";
 import { signInWithProvider, refreshSession, logout } from "@qrew/core";
 import { Public } from "../auth/auth.decorators";
+import { RateLimit } from "../rate-limit/rate-limit";
 import { GoogleTokenVerifier } from "./google-verifier";
 
 /**
  * Consumer sign-in (separate from staff/Clerk). @Public() so the global ClerkAuthGuard steps aside;
  * these routes authenticate with the provider ID token / refresh token instead.
  */
+@RateLimit("customer-auth")
 @Controller("auth")
 export class CustomerAuthController {
   constructor(private readonly google: GoogleTokenVerifier) {}

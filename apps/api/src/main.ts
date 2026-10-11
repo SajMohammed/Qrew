@@ -1,12 +1,14 @@
 import "./load-env"; // must be first: populates env before @qrew/db loads
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { raw } from "express";
 import { assertDeployableConfig } from "@qrew/core";
 import { assertAppRoleIsolated } from "@qrew/db";
 import { AppModule } from "./app.module";
 import { ZodExceptionFilter } from "./common/zod-exception.filter";
 import { DomainExceptionFilter } from "./common/domain-exception.filter";
+import { securityHeaders } from "./common/security-headers";
 
 async function bootstrap(): Promise<void> {
   // Fail closed outside development: no public token secrets, fake wallet, open CORS or missing
@@ -14,7 +16,16 @@ async function bootstrap(): Promise<void> {
   assertDeployableConfig("api");
   await assertAppRoleIsolated();
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.disable("x-powered-by");
+  /*
+   * How many proxies sit in front of us (TRUST_PROXY_HOPS, required in production: 1 behind the
+   * ALB). Express then takes the client's address from that many X-Forwarded-For hops and no more,
+   * which is what the rate limiter keys on. 0 locally, so nobody can choose their own address by
+   * sending the header.
+   */
+  app.set("trust proxy", Number(process.env.TRUST_PROXY_HOPS ?? 0));
+  app.use(securityHeaders);
   /*
    * Design images are uploaded as the raw request body rather than multipart — one file, one field,
    * so a multipart parser would be a dependency earning nothing. The limit sits above the domain's

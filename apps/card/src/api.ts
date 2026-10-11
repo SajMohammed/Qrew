@@ -106,7 +106,7 @@ function rnd(): string {
 // ── public / opportunistically-authed ────────────────────────────────────────────
 // A Bearer (when signed in) links the new card to the account; omitted → anonymous walk-in.
 export async function enroll(
-  input: { merchantId: string; programId: string; phone?: string; name?: string },
+  input: { merchantId: string; programId: string; name?: string },
   token?: string | null,
 ): Promise<EnrollResult> {
   const res = await fetch(`${BASE}/enroll`, {
@@ -114,6 +114,8 @@ export async function enroll(
     headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(input),
   });
+  // Rate-limited per connection: on a busy café's Wi-Fi this is the shop's network, not this person.
+  if (res.status === 429) throw new Error("Lots of sign-ups from this connection just now — please try again in a minute.");
   if (!res.ok) throw new Error(`Enroll failed (${res.status})`);
   return res.json();
 }

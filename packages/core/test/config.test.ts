@@ -20,6 +20,7 @@ const DEPLOYED = {
   CLERK_SECRET_KEY: "sk_live_abc",
   GOOGLE_CLIENT_ID: "123.apps.googleusercontent.com",
   CORS_ORIGINS: "https://app.qrewclub.com,https://my.qrewclub.com",
+  TRUST_PROXY_HOPS: "1",
 };
 
 const without = (name: keyof typeof DEPLOYED) => ({ ...DEPLOYED, [name]: undefined });
@@ -49,6 +50,7 @@ describe("deployable config (fail-closed)", () => {
     "CORS_ORIGINS",
     "GOOGLE_WALLET_SA_PRIVATE_KEY",
     "GOOGLE_WALLET_ORIGINS",
+    "TRUST_PROXY_HOPS",
   ] as const)("refuses an API without %s", (name) => {
     expect(configProblems("api", without(name)).join("\n")).toContain(name);
   });
@@ -74,12 +76,24 @@ describe("deployable config (fail-closed)", () => {
     );
   });
 
+  it("needs the proxy hop count to be a whole number", () => {
+    expect(configProblems("api", { ...DEPLOYED, TRUST_PROXY_HOPS: "true" }).join()).toContain(
+      "TRUST_PROXY_HOPS must be a whole number",
+    );
+  });
+
   it("refuses the auth dev bypass outside development", () => {
     expect(configProblems("api", { ...DEPLOYED, AUTH_DEV_BYPASS: "true" }).join()).toContain("AUTH_DEV_BYPASS");
   });
 
   it("asks the worker only for what the worker uses", () => {
-    const workerEnv = { ...DEPLOYED, CLERK_SECRET_KEY: undefined, GOOGLE_CLIENT_ID: undefined, CORS_ORIGINS: undefined };
+    const workerEnv = {
+      ...DEPLOYED,
+      CLERK_SECRET_KEY: undefined,
+      GOOGLE_CLIENT_ID: undefined,
+      CORS_ORIGINS: undefined,
+      TRUST_PROXY_HOPS: undefined,
+    };
     expect(configProblems("worker", workerEnv)).toEqual([]);
   });
 
