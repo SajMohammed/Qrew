@@ -77,7 +77,7 @@ export function PullToRefresh({
       >
         <span
           className={cn(
-            "text-faint size-6 rounded-full border-2 border-current border-t-transparent transition-opacity",
+            "text-ink-3 size-6 rounded-full border-2 border-current border-t-transparent transition-opacity",
             busy && "animate-spin",
             pull > 8 ? "opacity-100" : "opacity-0",
           )}

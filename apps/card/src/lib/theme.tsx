@@ -42,7 +42,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.classList.toggle("dark", resolved === "dark");
     // Keep the iOS status bar and Android address bar in step with the app's own ground.
     const meta = document.querySelector('meta[name="theme-color"]:not([media])');
-    if (meta) meta.setAttribute("content", resolved === "dark" ? "#0c0e11" : "#f4f5f7");
+    if (meta) meta.setAttribute("content", resolved === "dark" ? "#0d0f0d" : "#eceeea");
   }, [resolved]);
 
   const setTheme = useCallback((next: Theme) => {
