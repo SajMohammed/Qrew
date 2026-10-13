@@ -56,6 +56,13 @@ export function configProblems(role: ServiceRole, env: Env = process.env): strin
     need("CLERK_SECRET_KEY", "no shop owner could sign in");
     need("GOOGLE_CLIENT_ID", "no customer could sign in with Google");
     need("CORS_ORIGINS", "the API would accept browser requests from any website");
+    need(
+      "TRUST_PROXY_HOPS",
+      "the rate limiter would see every customer as the load balancer (1 behind the ALB, 0 with nothing in front)",
+    );
+    if (set("TRUST_PROXY_HOPS") && !/^\d+$/.test(env.TRUST_PROXY_HOPS!.trim())) {
+      problems.push("TRUST_PROXY_HOPS must be a whole number of proxy hops");
+    }
     if (provider === "google") need("GOOGLE_WALLET_ORIGINS", "Google only shows the save button on listed origins");
     if (env.AUTH_DEV_BYPASS === "true") problems.push("AUTH_DEV_BYPASS must not be set outside development");
   }

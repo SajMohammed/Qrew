@@ -9,6 +9,8 @@ import { Team } from "@/screens/Team";
 import { CounterMode } from "@/screens/CounterMode";
 import { CounterQR } from "./CounterQR";
 import { CardScreen } from "@/screens/Card";
+import { CreateShop } from "@/screens/CreateShop";
+import { Settings } from "@/screens/Settings";
 import { Card } from "@/components/ui/card";
 import { isCounterMode, setCounterModeFlag } from "@/lib/counter-mode";
 
@@ -49,10 +51,13 @@ function ShopApp() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+  // Signed in, but no shop yet: the owner names it before anything is created.
+  const [needsShop, setNeedsShop] = useState(false);
 
-  // The poll must not overlap a slow first login: a re-entrant call would fire POST /onboarding a
-  // second time while the first is still provisioning.
+  // Polls must not overlap a slow load and stack up requests.
   const inFlight = useRef(false);
+  // A rename made while a poll was out: that poll's answer still carries the old name.
+  const renamed = useRef<{ name: string; at: number } | null>(null);
 
   const load = useCallback(async () => {
     if (inFlight.current) return;
@@ -60,16 +65,14 @@ function ShopApp() {
     setErr(null);
     setLoading(true);
     try {
-      setData(await api.getAnalytics(range));
+      const askedAt = Date.now();
+      const fresh = await api.getAnalytics(range);
+      const r = renamed.current;
+      setData(r && r.at >= askedAt ? { ...fresh, merchantName: r.name } : fresh);
     } catch (e) {
       if (e instanceof NeedsOnboarding) {
-        // First login: no merchant yet — provision one, then retry.
-        try {
-          await api.onboard();
-          setData(await api.getAnalytics(range));
-        } catch (e2) {
-          setErr(e2 instanceof Error ? e2.message : String(e2));
-        }
+        // First sign-in: there is no shop yet. Ask for its name; nothing is provisioned until then.
+        setNeedsShop(true);
       } else if (e instanceof Forbidden) {
         setForbidden(true);
       } else {
@@ -82,10 +85,21 @@ function ShopApp() {
   }, [api, range]);
 
   useEffect(() => {
+    // Nothing is worth polling until the shop exists — and a poll landing while the owner is naming
+    // it would only answer "no shop" again. Creating the shop flips this and loads straight away.
+    if (needsShop) return;
     void load();
     const timer = window.setInterval(() => void load(), POLL_MS);
     return () => window.clearInterval(timer);
-  }, [load]);
+  }, [load, needsShop]);
+
+  const createShop = useCallback(
+    async (name: string) => {
+      await api.onboard(name);
+      setNeedsShop(false);
+    },
+    [api],
+  );
 
   const enterCounter = useCallback(() => {
     setCounterModeFlag(true);
@@ -101,6 +115,10 @@ function ShopApp() {
     setCustomerFilter(filter);
     setView("customers");
   }, []);
+
+  // Before counter mode: a device left in counter mode with no shop behind it would land in a scanner
+  // that can't work, with no way to create the shop.
+  if (needsShop) return <CreateShop onCreate={createShop} />;
 
   if (counterMode) {
     return <CounterMode shopName={data?.merchantName} onExit={exitCounter} />;
@@ -157,6 +175,16 @@ function ShopApp() {
         {view === "customers" && <Customers key={customerFilter} initialFilter={customerFilter} />}
         {view === "team" && <Team />}
         {view === "card" && <CardScreen merchantName={data?.merchantName} />}
+        {view === "settings" && (
+          <Settings
+            merchantName={data?.merchantName}
+            // Update everything that shows the name now, rather than at the next poll.
+            onRenamed={(name) => {
+              renamed.current = { name, at: Date.now() };
+              setData((d) => (d ? { ...d, merchantName: name } : d));
+            }}
+          />
+        )}
         {view === "counterqr" &&
           (data ? (
             <CounterQR merchantId={data.merchantId} merchantName={data.merchantName} />

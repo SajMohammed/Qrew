@@ -1,4 +1,5 @@
 import { inflateSync } from "node:zlib";
+import { fetchArtwork } from "./artwork-fetch";
 
 /**
  * A minimal PNG decoder — the other half of the encoder next door.
@@ -16,6 +17,22 @@ export interface DecodedImage {
   height: number;
   /** Straight (non-premultiplied) RGBA, 4 bytes per pixel. */
   rgba: Buffer;
+}
+
+/**
+ * The largest side we will decode. Both wallet strips fit well inside it (1032×812, 1125×369), and
+ * it caps one decode at 16 MB of pixels. Without a cap the header alone decides the allocation: a
+ * few hundred bytes declaring 65535×65535 would ask for 17 GB.
+ */
+export const MAX_PNG_DIMENSION = 2048;
+
+/** A PNG's declared size, read from its header without decoding anything. */
+export function readPngSize(buf: Buffer): { width: number; height: number } {
+  if (buf.length < 24 || buf.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") {
+    throw new Error("not a PNG (bad signature)");
+  }
+  if (buf.subarray(12, 16).toString("ascii") !== "IHDR") throw new Error("not a PNG (no IHDR)");
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
 
 /** Undo a PNG row filter. Each scanline picks its own, so all five must be supported. */
@@ -68,8 +85,9 @@ export function decodePng(buf: Buffer): DecodedImage {
   const idat: Buffer[] = [];
 
   let pos = 8;
-  while (pos < buf.length) {
+  while (pos + 8 <= buf.length) {
     const len = buf.readUInt32BE(pos);
+    if (pos + 12 + len > buf.length) throw new Error("truncated PNG");
     const type = buf.subarray(pos + 4, pos + 8).toString("ascii");
     const data = buf.subarray(pos + 8, pos + 8 + len);
     if (type === "IHDR") {
@@ -92,9 +110,18 @@ export function decodePng(buf: Buffer): DecodedImage {
   const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[colorType];
   if (!channels) throw new Error(`unsupported PNG colour type ${colorType}`);
 
-  const raw = inflateSync(Buffer.concat(idat));
+  // Checked before inflating or allocating anything — see MAX_PNG_DIMENSION.
+  if (width < 1 || height < 1 || width > MAX_PNG_DIMENSION || height > MAX_PNG_DIMENSION) {
+    throw new Error(`PNG is ${width}×${height} — the most we read is ${MAX_PNG_DIMENSION}×${MAX_PNG_DIMENSION}`);
+  }
+
   const bpp = channels;
   const stride = width * bpp;
+  // The exact size of the image data: one filter byte per row plus its pixels. Capping the inflate
+  // there means a small file that decompresses to gigabytes (a "zip bomb") stops at that size.
+  const expected = height * (stride + 1);
+  const raw = inflateSync(Buffer.concat(idat), { maxOutputLength: expected });
+  if (raw.length < expected) throw new Error("truncated PNG image data");
   const rgba = Buffer.alloc(width * height * 4);
 
   let prev = Buffer.alloc(stride);
@@ -151,6 +178,9 @@ export function decodePng(buf: Buffer): DecodedImage {
  * shop's icon. Keyed on the URL, so changing the artwork changes the key and the new image is
  * picked up without any invalidation step.
  *
+ * Bounded by bytes, least recently used out first. The keys are URLs a shop chose, so an unbounded
+ * cache would grow for as long as anyone kept feeding it new links.
+ *
  * Never throws: artwork is decoration on top of a strip that already works. A broken link, a JPEG,
  * or a slow host degrades to the plain discs rather than failing the customer's card.
  */
@@ -159,16 +189,50 @@ interface CachedImage {
   decoded: DecodedImage;
 }
 
+/** Where the bytes come from. Defaults to the guarded fetch; callers may read their own storage. */
+export type ArtworkSource = (url: string) => Promise<Buffer>;
+
+const CACHE_BUDGET_BYTES = 64 * 1024 * 1024;
+const MAX_REMEMBERED_FAILURES = 1000;
+
+/** Map iteration order is insertion order, so the first key is always the least recently used. */
 const imageCache = new Map<string, CachedImage>();
+let cachedBytes = 0;
 /** Failures are remembered only briefly — see below. */
 const failedUntil = new Map<string, number>();
 const FAILURE_COOLDOWN_MS = 60_000;
 
-async function load(url: string | undefined): Promise<CachedImage | undefined> {
+function weight(entry: CachedImage): number {
+  return entry.bytes.length + entry.decoded.rgba.length;
+}
+
+function remember(url: string, entry: CachedImage): void {
+  if (weight(entry) > CACHE_BUDGET_BYTES) return; // would evict everything else and still not fit
+  // Two loads of one URL at once both land here: the second replaces the first, so its weight goes.
+  const replaced = imageCache.get(url);
+  if (replaced) {
+    imageCache.delete(url);
+    cachedBytes -= weight(replaced);
+  }
+  imageCache.set(url, entry);
+  cachedBytes += weight(entry);
+  for (const [oldest, old] of imageCache) {
+    if (cachedBytes <= CACHE_BUDGET_BYTES) break;
+    imageCache.delete(oldest);
+    cachedBytes -= weight(old);
+  }
+}
+
+async function load(url: string | undefined, source: ArtworkSource): Promise<CachedImage | undefined> {
   if (!url) return undefined;
 
   const hit = imageCache.get(url);
-  if (hit) return hit;
+  if (hit) {
+    // Re-insert to mark it most recently used.
+    imageCache.delete(url);
+    imageCache.set(url, hit);
+    return hit;
+  }
 
   /*
    * Failures are cached too, or a dead link would be re-fetched on every single strip render — but
@@ -179,27 +243,34 @@ async function load(url: string | undefined): Promise<CachedImage | undefined> {
   if (cooling !== undefined && Date.now() < cooling) return undefined;
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) throw new Error(`fetch ${res.status}`);
-    const bytes = Buffer.from(await res.arrayBuffer());
+    const bytes = await source(url);
     // Decoded even when only the bytes are wanted: it is the proof this really is a PNG we can
     // serve as one, and it is what makes a broken image fail here rather than on someone's phone.
     const entry: CachedImage = { bytes, decoded: decodePng(bytes) };
-    imageCache.set(url, entry);
+    remember(url, entry);
     failedUntil.delete(url);
     return entry;
   } catch (err) {
     console.error(`[wallet] could not load artwork ${url}:`, err instanceof Error ? err.message : err);
+    if (failedUntil.size >= MAX_REMEMBERED_FAILURES) {
+      failedUntil.delete(failedUntil.keys().next().value!); // the oldest
+    }
     failedUntil.set(url, Date.now() + FAILURE_COOLDOWN_MS);
     return undefined;
   }
 }
 
-export async function loadIcon(url: string | undefined): Promise<DecodedImage | undefined> {
-  return (await load(url))?.decoded;
+export async function loadIcon(
+  url: string | undefined,
+  source: ArtworkSource = fetchArtwork,
+): Promise<DecodedImage | undefined> {
+  return (await load(url, source))?.decoded;
 }
 
 /** The original PNG bytes, for a strip a shop drew themselves and we pass through untouched. */
-export async function loadRawImage(url: string | undefined): Promise<Buffer | undefined> {
-  return (await load(url))?.bytes;
+export async function loadRawImage(
+  url: string | undefined,
+  source: ArtworkSource = fetchArtwork,
+): Promise<Buffer | undefined> {
+  return (await load(url, source))?.bytes;
 }

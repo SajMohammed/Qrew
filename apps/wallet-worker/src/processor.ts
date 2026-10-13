@@ -1,84 +1,17 @@
-import { eq } from "drizzle-orm";
-import { withTenant, loyaltyPrograms, enrollments } from "@qrew/db";
-import { getWalletProvider, stripUrlFor } from "@qrew/wallet-core";
-import { cardTypeModule, isCardType } from "@qrew/core";
+import { syncPass, syncProgramTemplate } from "@qrew/core";
 import type { WalletJobData } from "@qrew/queue";
 
 /**
- * Handle one wallet-sync job.
+ * Handle one wallet job.
  *
- * The job payload is just an id + kind, so we RE-READ the enrollment here: the DB is the truth,
- * the wallet is a cache catching up. This is what makes late/retried/out-of-order jobs safe —
- * every run pushes the enrollment's *current* stamp count, not a stale snapshot.
+ * Jobs carry only ids, so every handler RE-READS the database: the DB is the truth, the wallet is a
+ * cache catching up. That is what makes late, retried, deduplicated or out-of-order jobs safe — each
+ * run pushes the CURRENT state, never a stale snapshot. The logic itself lives in @qrew/core, beside
+ * the domain it reads and under its tests; this only routes.
  *
  * The return string is stored by BullMQ as the job's `returnvalue` and logged by main.ts, so a
- * completed job leaves a human-readable trail of exactly what it synced.
+ * completed job leaves a human-readable trail of exactly what it did.
  */
-export async function processWalletSync(data: WalletJobData): Promise<string> {
-  const provider = getWalletProvider();
-
-  const ctx = await withTenant(data.merchantId, async (db) => {
-    const [enrollment] = await db
-      .select()
-      .from(enrollments)
-      .where(eq(enrollments.id, data.enrollmentId));
-    if (!enrollment) return null;
-    const [program] = await db
-      .select({
-        stampsRequired: loyaltyPrograms.stampsRequired,
-        rewardText: loyaltyPrograms.rewardText,
-        type: loyaltyPrograms.type,
-        mechanics: loyaltyPrograms.mechanics,
-      })
-      .from(loyaltyPrograms)
-      .where(eq(loyaltyPrograms.id, enrollment.programId));
-    return {
-      enrollment,
-      stampsRequired: program?.stampsRequired ?? 0,
-      rewardText: program?.rewardText,
-      card: cardTypeModule(isCardType(program?.type) ? program!.type : "stamp"),
-      mechanics: program?.mechanics,
-    };
-  });
-
-  if (!ctx) return `enrollment ${data.enrollmentId} gone — skipped`;
-
-  const { enrollment, stampsRequired, rewardText, card, mechanics } = ctx;
-  if (!enrollment.applePassId && !enrollment.googleObjectId) {
-    return `${enrollment.cardSerial} has no wallet pass — skipped`;
-  }
-
-  const ref = {
-    serial: enrollment.cardSerial,
-    applePassId: enrollment.applePassId ?? undefined,
-    googleObjectId: enrollment.googleObjectId ?? undefined,
-  };
-
-  // 1) reflect the current count on the pass, then 2) nudge the lock screen. With a real
-  // provider these are the slow external calls we moved off the request path.
-  await provider.updateStamps(ref, {
-    serial: enrollment.cardSerial,
-    stampsRequired,
-    rewardText,
-    currentStamps: enrollment.currentProgress,
-    // The strip URL embeds the count, so this is what actually redraws the stamps on the pass —
-    // for the one product that is drawn as stamps. The rest carry a balance and no image.
-    stripUrl: card.drawsStampStrip
-      ? stripUrlFor(enrollment.cardSerial, enrollment.currentProgress)
-      : undefined,
-    pointsLabel: card.unitLabel(card.normalize(mechanics) as never),
-  });
-  const message = walletMessage(data.kind, enrollment.currentProgress, stampsRequired);
-  await provider.pushUpdate(ref, message);
-
-  return `synced ${enrollment.cardSerial} → ${enrollment.currentProgress}/${stampsRequired} (${message})`;
-}
-
-/** The lock-screen nudge. Moved here from the domain layer — it's a wallet-presentation concern. */
-function walletMessage(kind: WalletJobData["kind"], currentStamps: number, stampsRequired: number): string {
-  if (kind === "redeem") return "Reward redeemed — see you next time!";
-  const remaining = stampsRequired - currentStamps;
-  if (remaining <= 0) return "Reward ready 🎉";
-  if (remaining === 1) return "1 stamp to go";
-  return `${remaining} stamps to go`;
+export function processWalletSync(data: WalletJobData): Promise<string> {
+  return data.kind === "template" ? syncProgramTemplate(data) : syncPass(data);
 }

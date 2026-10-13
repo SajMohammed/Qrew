@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { generateKeyPairSync, createVerify } from "node:crypto";
 import { GoogleWalletProvider } from "../src/google/provider";
 import { signJwtRs256 } from "../src/google/auth";
@@ -6,7 +6,9 @@ import type { PassContent } from "../src/types";
 
 /**
  * Everything here is offline: id derivation, payload mapping and JWT signing are pure. The network
- * calls (class/object CRUD) are exercised against Google itself, not mocked into a false green.
+ * calls' semantics (class/object CRUD) are exercised against Google itself by the selftest script,
+ * not mocked into a false green. Only the transport wrapper — deadlines, error naming, reading a
+ * 404 as "no pass" — is unit-tested here, against a stubbed fetch.
  */
 
 let publicKey: string;
@@ -90,6 +92,13 @@ describe("GoogleWalletProvider", () => {
     expect(obj.accountName).toBe("Sara M.");
   });
 
+  it("shows the card's typeable code under the barcode, when it has one", () => {
+    const withCode = withEnv().toObject({ ...CONTENT, shortCode: "K7M 4QX" }) as Record<string, any>;
+    expect(withCode.barcode).toEqual({ type: "QR_CODE", value: CONTENT.serial, alternateText: "K7M 4QX" });
+    const without = withEnv().toObject(CONTENT) as Record<string, any>;
+    expect(without.barcode.alternateText).toBeUndefined();
+  });
+
   it("builds the class from the merchant's own branding", () => {
     const cls = withEnv().toClass(CONTENT) as Record<string, any>;
     expect(cls.issuerName).toBe("Nadia's Coffee");
@@ -142,13 +151,94 @@ describe("GoogleWalletProvider", () => {
     expect(payload.aud).toBe("google");
     expect(payload.origins).toEqual(["https://my.qrew.ae"]);
 
-    // "Fat" JWT: the object travels inside it, so Google creates the pass on save and we never
-    // provision passes for the many customers who never add one.
+    // "Fat" JWT: the object travels inside it, so saving works even before the worker has created
+    // the object, and the card page never waits on Google to build the link.
     const object = payload.payload.loyaltyObjects[0];
     expect(object.id).toBe(`3388000000022222222.${CONTENT.serial}`);
     expect(object.classId).toBe(`3388000000022222222.${CONTENT.programId}`);
     expect(object.barcode.value).toBe(CONTENT.serial);
     expect(object.loyaltyPoints.balance.int).toBe(3);
+  });
+});
+
+describe("transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** A Google that issues a token and answers every Wallet API call with `api(url)`. */
+  function stubGoogle(api: (url: string) => Response): ReturnType<typeof vi.fn> {
+    const fetch = vi.fn(async (url: string) =>
+      url.startsWith("https://oauth2.googleapis.com/")
+        ? Response.json({ access_token: "tok", expires_in: 3600 })
+        : api(url),
+    );
+    vi.stubGlobal("fetch", fetch);
+    return fetch;
+  }
+
+  const UPDATE = { serial: CONTENT.serial, currentStamps: 4, stampsRequired: 10 };
+
+  it("reports a missing pass as absent, so the worker can create it", async () => {
+    stubGoogle(() => new Response("not found", { status: 404 }));
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe("absent");
+  });
+
+  it("puts the card's code under the barcode on every update, and clears it when there is none", async () => {
+    const fetch = stubGoogle(() => Response.json({ id: "x" }));
+    await withEnv().updateStamps({ serial: CONTENT.serial }, { ...UPDATE, shortCode: "K7M 4QX" });
+    await withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE);
+    const barcodes = fetch.mock.calls
+      .filter(([, init]) => (init as RequestInit | undefined)?.method === "PATCH")
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)).barcode);
+    expect(barcodes).toEqual([
+      { type: "QR_CODE", value: CONTENT.serial, alternateText: "K7M 4QX" },
+      // PATCH merges, so a caption left out would survive — it is cleared by name instead.
+      { type: "QR_CODE", value: CONTENT.serial, alternateText: null },
+    ]);
+  });
+
+  it("tells a saved pass from one nobody has saved, by Google's hasUsers", async () => {
+    stubGoogle(() => Response.json({ id: "x", hasUsers: true }));
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe("in_wallet");
+    vi.unstubAllGlobals();
+    stubGoogle(() => Response.json({ id: "x" }));
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).resolves.toBe("not_saved");
+  });
+
+  it("replaces an existing class with PUT, so removed rows and locations disappear", async () => {
+    const fetch = stubGoogle(() => Response.json({ id: "class" }));
+    await withEnv().syncTemplate(CONTENT);
+    const methods = fetch.mock.calls.slice(1).map(([url, init]) => `${(init as RequestInit).method} ${String(url).split("/v1")[1]}`);
+    expect(methods).toEqual([
+      `GET /loyaltyClass/3388000000022222222.${CONTENT.programId}`,
+      `PUT /loyaltyClass/3388000000022222222.${CONTENT.programId}`,
+    ]);
+  });
+
+  it("sends a notification Google will actually push", async () => {
+    const fetch = stubGoogle(() => Response.json({}));
+    await withEnv().pushUpdate({ serial: CONTENT.serial }, { id: "reward-1", header: "Nadia's Coffee", body: "Ready" });
+    const body = JSON.parse(String((fetch.mock.calls[1]![1] as RequestInit).body));
+    expect(body.message).toEqual({ id: "reward-1", header: "Nadia's Coffee", body: "Ready", messageType: "TEXT_AND_NOTIFY" });
+  });
+
+  it("gives every call — the token exchange included — a deadline", async () => {
+    const fetch = stubGoogle(() => Response.json({ id: "x" }));
+    await withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetch.mock.calls) {
+      expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it("names the call that timed out", async () => {
+    stubGoogle(() => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    });
+    await expect(withEnv().updateStamps({ serial: CONTENT.serial }, UPDATE)).rejects.toThrow(
+      /Google Wallet PATCH \/loyaltyObject\/.+ timed out after 5000ms/,
+    );
   });
 });
 

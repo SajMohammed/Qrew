@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { m } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
-import type { CardView } from "./api";
+import type { CardView, FailureKind } from "./api";
+import type { QrState } from "@/lib/connection";
+import { isIos } from "@/lib/platform";
 import { textOn } from "./contrast";
 import { Confetti } from "@/components/Confetti";
 import { buzz } from "@/lib/haptics";
@@ -14,6 +16,9 @@ export function StampCard({
   onBack,
   onStamp,
   onRedeem,
+  connection = { qr: "live", failing: null },
+  onRetry,
+  footer,
 }: {
   card: CardView;
   busy: boolean;
@@ -21,7 +26,13 @@ export function StampCard({
   onBack?: () => void;
   onStamp?: () => void;
   onRedeem?: () => void;
+  /** Whether the QR can still be scanned, and why not if the card can't be reached. */
+  connection?: { qr: QrState; failing: FailureKind | null };
+  onRetry?: () => void;
+  /** Shown under the card — e.g. the nudge to save it. */
+  footer?: ReactNode;
 }) {
+  const expired = connection.qr === "expired";
   const total = card.stampsRequired;
   const remaining = Math.max(0, total - card.currentStamps);
   const cells = Array.from({ length: total }, (_, i) => i < card.currentStamps);
@@ -155,30 +166,63 @@ export function StampCard({
           or a light theme made it unreadable.
         */}
         <div className="relative z-10 mt-6 flex flex-col items-center gap-2">
-          <div className="rounded-2xl bg-white p-3 shadow-lg">
-            <QRCodeSVG
-              value={card.qrToken || card.serial}
-              size={124}
-              bgColor="#ffffff"
-              fgColor="#0c2712"
-              level="M"
-            />
+          <div className="relative rounded-2xl bg-white p-3 shadow-lg">
+            {/*
+              A lapsed code fails at the till, so it must not look scannable: faded under a notice
+              on the same white panel (Qrew's words, never on the shop's colour). The card and its
+              count stay — the customer's progress is still theirs to see.
+            */}
+            <div className={cn(expired && "opacity-25 blur-[3px]")} aria-hidden={expired}>
+              <QRCodeSVG
+                value={card.qrToken || card.serial}
+                size={124}
+                bgColor="#ffffff"
+                fgColor="#0c2712"
+                level="M"
+              />
+            </div>
+            {expired && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-2xl p-2 text-center text-[#0c2712]">
+                <span className="text-sm font-extrabold">QR expired</span>
+                {/* The typed code below doesn't expire — staff can still stamp the card by it. */}
+                <span className="text-[11px] leading-tight">Reconnect for a fresh one, or give staff the code below</span>
+                {onRetry && (
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="mt-1 rounded-full bg-[#0c2712] px-3 py-1 text-[12px] font-bold text-white"
+                  >
+                    Try again
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <span className="text-[12px] font-medium opacity-80">
-            Show this to staff to earn a stamp
-          </span>
+          {!expired && (
+            <span className="text-[12px] font-medium opacity-80">
+              Show this to staff to earn a stamp
+            </span>
+          )}
+          {/* The code a cashier types when the QR won't read — a glare, a cracked screen. */}
+          {card.shortCode && (
+            <span className="text-[12px] opacity-80">
+              Can't scan? Code{" "}
+              <span className="font-mono text-sm font-bold tracking-[0.15em]">{card.shortCode}</span>
+            </span>
+          )}
         </div>
       </m.div>
 
       {/*
         Shown only when the provider actually produced a save link, so a wallet outage or an
-        unconfigured environment simply omits it rather than offering a dead button.
+        unconfigured environment simply omits it rather than offering a dead button. Never on iOS:
+        there is no Google Wallet there.
 
         NOTE before launch: Google's brand guidelines require their official "Add to Google Wallet"
         badge asset. This is a faithful stand-in; drop the downloaded asset into public/ and swap it
         in when publishing access is requested.
       */}
-      {card.wallet.google && (
+      {card.wallet.google && !isIos() && (
         <a
           href={card.wallet.google}
           target="_blank"
@@ -219,9 +263,25 @@ export function StampCard({
         </div>
       )}
 
-      <p className="text-faint flex items-center justify-center gap-2 text-xs">
-        <span className="live-dot bg-success inline-block size-2 rounded-full" aria-hidden />
-        Live — updates as staff stamp your card
+      {footer}
+
+      <p className="text-faint flex items-center justify-center gap-2 text-xs" aria-live="polite">
+        {connection.qr === "live" ? (
+          <>
+            <span className="live-dot bg-success inline-block size-2 rounded-full" aria-hidden />
+            Live — updates as staff stamp your card
+          </>
+        ) : connection.qr === "reconnecting" ? (
+          <>
+            <span className="bg-faint inline-block size-2 rounded-full" aria-hidden />
+            {connection.failing === "offline" ? "No connection — reconnecting…" : "Can't reach Qrew — retrying…"}
+          </>
+        ) : (
+          <>
+            <span className="bg-destructive inline-block size-2 rounded-full" aria-hidden />
+            Your code needs a connection to refresh
+          </>
+        )}
       </p>
 
       {err && <p className="text-destructive text-center text-sm">{err}</p>}

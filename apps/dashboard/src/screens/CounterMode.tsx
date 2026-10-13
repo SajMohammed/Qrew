@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useClerk } from "@clerk/react";
 import { Lock, X } from "lucide-react";
 import { Scanner } from "@/Scanner";
-import { useApi } from "@/useApi";
+import { useApi, PinLocked, CounterError } from "@/useApi";
 import { Wordmark } from "@/components/AppShell";
 import { setCounterModeFlag } from "@/lib/counter-mode";
+import { useWakeLock } from "@/lib/device";
+import { unlockAudio } from "@/lib/feedback";
 
 /**
  * The counter surface. Management is hidden while this is on, and leaving needs an owner/manager
@@ -22,6 +24,12 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
   const [err, setErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
+  // A counter screen stays on between customers, and beeps on a scan. Browsers allow sound only
+  // after a tap or key press, so any touch on the screen unlocks it (and mounting tries, in case
+  // this page already had one).
+  useWakeLock();
+  useEffect(unlockAudio, []);
+
   async function tryExit() {
     if (pin.length < 4 || checking) return;
     setChecking(true);
@@ -33,8 +41,14 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
       } else {
         setErr("That PIN belongs to a cashier. Ask an owner or manager to unlock.");
       }
-    } catch {
-      setErr("PIN not recognized.");
+    } catch (e) {
+      setErr(
+        e instanceof PinLocked
+          ? `${e.message} You can sign out instead.`
+          : e instanceof CounterError && e.kind === "offline"
+            ? e.message
+            : "PIN not recognized.",
+      );
     } finally {
       setChecking(false);
       setPin("");
@@ -42,7 +56,7 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
   }
 
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-dvh" onPointerDownCapture={unlockAudio} onKeyDownCapture={unlockAudio}>
       <header className="border-border bg-card/95 sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-3 backdrop-blur">
         <Wordmark compact />
         <span className="bg-primary/12 text-primary ml-1 hidden rounded-full px-2.5 py-1 text-[11px] font-bold sm:inline">

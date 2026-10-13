@@ -20,15 +20,31 @@ function png(w: number, h: number): Buffer {
 }
 
 function serve(body: Buffer) {
-  return vi.spyOn(globalThis, "fetch").mockResolvedValue({
-    ok: true,
-    arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
-  } as Response);
+  // A fresh Response per call: the guarded fetch streams the body, and a body reads only once.
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(new Uint8Array(body)));
 }
 
 let n = 0;
-/** A fresh URL per test — the artwork cache is module-level and deliberately never cleared. */
-const url = () => `https://shop.test/art-${n++}.png`;
+/**
+ * A fresh URL per test — the artwork cache is module-level and deliberately never cleared. A public
+ * IP literal, so the guarded fetch has nothing to resolve; fetch itself is stubbed above.
+ */
+const url = () => `https://1.1.1.1/art-${n++}.png`;
+
+describe("design image links", () => {
+  it("keeps http(s) links and drops anything else, or a half-typed one", () => {
+    const d = normalizeDesign({
+      logoUrl: "https://cdn.example.com/logo.png",
+      stampImageUrl: "javascript:alert(1)",
+      emptyStampImageUrl: "data:image/png;base64,AAAA",
+      customStripUrl: "https://cdn.exa", // still being typed — parses, kept; the fetch decides
+    });
+    expect(d.logoUrl).toBe("https://cdn.example.com/logo.png");
+    expect(d.stampImageUrl).toBeUndefined();
+    expect(d.emptyStampImageUrl).toBeUndefined();
+    expect(normalizeDesign({ logoUrl: "htt" }).logoUrl).toBeUndefined();
+  });
+});
 
 describe("rendering a design", () => {
   afterEach(() => vi.restoreAllMocks());

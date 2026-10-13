@@ -12,6 +12,7 @@ import { ProgramModule } from "./program/program.module";
 import { AssetModule } from "./asset/asset.module";
 import { LeadsModule } from "./leads/leads.module";
 import { OnboardingModule } from "./onboarding/onboarding.module";
+import { MerchantModule } from "./merchant/merchant.module";
 import { StaffModule } from "./staff/staff.module";
 import { CustomerAuthModule } from "./customer-auth/customer-auth.module";
 
@@ -29,6 +30,7 @@ import { CustomerAuthModule } from "./customer-auth/customer-auth.module";
     AssetModule,
     LeadsModule,
     OnboardingModule,
+    MerchantModule,
     StaffModule,
     CustomerAuthModule,
   ],

@@ -13,6 +13,7 @@ import type { Response } from "express";
 import { AssetUploadQuery } from "@qrew/contracts";
 import { getAsset, storeAsset, InvalidInputError } from "@qrew/core";
 import { Merchant, Public, Roles } from "../auth/auth.decorators";
+import { RateLimit } from "../rate-limit/rate-limit";
 
 @Controller("asset")
 export class AssetController {
@@ -24,6 +25,7 @@ export class AssetController {
    * Owner/manager only, exactly like editing the design it feeds.
    */
   @Roles("owner", "manager")
+  @RateLimit("asset-upload")
   @Post()
   async upload(@Merchant() merchantId: string, @Query() query: unknown, @Body() body: unknown) {
     const { kind } = AssetUploadQuery.parse(query);
@@ -40,6 +42,7 @@ export class AssetController {
    * put on a wallet pass. The random id is the capability — the same rule the card serial follows.
    */
   @Public()
+  @RateLimit("card-image")
   @Get(":id.png")
   async serve(@Param("id", ParseUUIDPipe) id: string, @Res() res: Response) {
     const asset = await getAsset(id);

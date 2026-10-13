@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { friendlyError } from "./api";
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
+/**
+ * Whether this build can sign anyone in. The email form is a stand-in for Google that only a
+ * development API accepts, so a production build without a client id offers no sign-in rather than
+ * one that cannot work.
+ */
+export const SIGN_IN_AVAILABLE = Boolean(CLIENT_ID) || import.meta.env.DEV;
 
 // Minimal typing for Google Identity Services (loaded from their script, only when a client id exists).
 interface GsiId {
@@ -17,10 +25,13 @@ export function SignInPanel({
   onGoogle,
   onDev,
   compact,
+  bare,
 }: {
   onGoogle: (idToken: string) => Promise<void>;
   onDev: (email: string) => Promise<void>;
   compact?: boolean;
+  /** Just the sign-in control and its error, for embedding in another panel. */
+  bare?: boolean;
 }) {
   const btnRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState("");
@@ -34,7 +45,7 @@ export function SignInPanel({
     try {
       await fn();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(friendlyError(e));
     } finally {
       setBusy(false);
     }
@@ -72,21 +83,22 @@ export function SignInPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved]);
 
-  // The email form below is a stand-in for Google that only a development API accepts. A production
-  // build without a client id offers no sign-in rather than one that cannot work.
-  if (!CLIENT_ID && !import.meta.env.DEV) return null;
+  if (!SIGN_IN_AVAILABLE) return null;
 
   return (
     <div
       className={cn(
-        "border-border bg-surface/70 flex flex-col items-center gap-2 rounded-2xl border p-5 text-center backdrop-blur",
-        compact ? "mt-2" : "mt-auto",
+        "flex flex-col items-center gap-2",
+        !bare && "border-border bg-surface/70 rounded-2xl border p-5 text-center backdrop-blur",
+        !bare && (compact ? "mt-2" : "mt-auto"),
       )}
     >
-      {!compact && <h2 className="text-lg font-extrabold tracking-tight">Save your cards</h2>}
-      <p className="text-muted-foreground text-[13.5px] leading-relaxed">
-        Sign in to keep every shop's card in one place — on any device.
-      </p>
+      {!bare && !compact && <h2 className="text-lg font-extrabold tracking-tight">Save your cards</h2>}
+      {!bare && (
+        <p className="text-muted-foreground text-[13.5px] leading-relaxed">
+          Sign in to keep every shop's card in one place — on any device.
+        </p>
+      )}
 
       {CLIENT_ID ? (
         <div ref={btnRef} className="mt-1 min-h-11" />

@@ -73,11 +73,29 @@ describe("customer cards — enroll linking + claim", () => {
     const anon = await enroll({ merchantId, programId, phone: `+9715${sfx}0003` });
 
     expect((await getMyCards(accountId)).map((c) => c.serial)).not.toContain(anon.serial);
-    expect(await claimCardBySerial(accountId, anon.serial)).toBe(true);
-    expect((await getMyCards(accountId)).map((c) => c.serial)).toContain(anon.serial);
+    expect(await claimCardBySerial(accountId, anon.serial)).toBe("claimed");
+    const mine = (await getMyCards(accountId)).find((c) => c.serial === anon.serial);
+    expect(mine?.programId).toBe(programId);
 
-    expect(await claimCardBySerial(other, anon.serial)).toBe(false); // already owned — refused
-    expect(await claimCardBySerial(accountId, anon.serial)).toBe(true); // idempotent for the owner
+    expect(await claimCardBySerial(other, anon.serial)).toBe("refused"); // already owned — refused
+    expect(await claimCardBySerial(accountId, anon.serial)).toBe("claimed"); // idempotent for the owner
+  });
+
+  // An account can hold one card per shop. A second, anonymous one used to break the unique index
+  // and answer 500 on every sign-in; now it is declined and left exactly as it was.
+  it("declines a card from a shop where the account already has one, leaving it untouched", async () => {
+    const accountId = await newAccount(5);
+    await enroll({ merchantId, programId, customerAccountId: accountId });
+    const anon = await enroll({ merchantId, programId, phone: `+9715${sfx}0005` });
+
+    expect(await claimCardBySerial(accountId, anon.serial)).toBe("has_own");
+    expect((await getMyCards(accountId)).map((c) => c.serial)).not.toContain(anon.serial);
+    const [row] = await adminDb
+      .select({ accountId: customers.customerAccountId })
+      .from(customers)
+      .innerJoin(enrollments, eq(enrollments.customerId, customers.id))
+      .where(eq(enrollments.cardSerial, anon.serial));
+    expect(row?.accountId).toBeNull();
   });
 
   // Security regression (S2): a signed-in caller must not reach another person's row via a phone

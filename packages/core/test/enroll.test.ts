@@ -37,13 +37,11 @@ describe("enroll", () => {
   const phone = "+971500000001";
   let firstEnrollmentId: string;
 
-  it("creates a customer + enrollment, seeds bonus stamps, issues a pass", async () => {
+  it("creates a customer + enrollment and seeds bonus stamps", async () => {
     const res = await enroll({ merchantId, programId, phone, name: "Aya" });
     firstEnrollmentId = res.enrollmentId;
     expect(res.alreadyEnrolled).toBe(false);
     expect(res.currentStamps).toBe(2); // endowed-progress bonus
-    expect(res.applePassId).toBeTruthy();
-    expect(res.googleObjectId).toBeTruthy();
   });
 
   it("is idempotent per customer + program (no new card, no double bonus)", async () => {
@@ -91,6 +89,14 @@ describe("enroll", () => {
   });
 
   // C2: an unknown program is a domain NotFoundError (→ the API maps it to 404, not a 500).
+  it("gives each card a short code from the unambiguous alphabet, and keeps it on re-enrol", async () => {
+    const first = await enroll({ merchantId, programId, phone: "+971500000099" });
+    const again = await enroll({ merchantId, programId, phone: "+971500000099" });
+    const [row] = await adminDb.select().from(enrollments).where(eq(enrollments.id, first.enrollmentId));
+    expect(row!.shortCode).toMatch(/^[2-9A-HJKMNP-TV-Z]{6}$/);
+    expect(again.enrollmentId).toBe(first.enrollmentId);
+  });
+
   it("throws NotFoundError for an unknown program", async () => {
     await expect(
       enroll({ merchantId, programId: "00000000-0000-0000-0000-000000000000" }),

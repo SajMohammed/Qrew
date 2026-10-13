@@ -52,8 +52,6 @@ export default defineConfig({
         // Database 1, so a running dev worker never picks up the suite's wallet jobs.
         REDIS_URL: process.env.E2E_REDIS_URL ?? "redis://localhost:6379/1",
         WALLET_PROVIDER: "fake",
-        // The test scans a card three times in a row; the anti-double-tap window would eat two.
-        STAMP_COOLDOWN_SECONDS: "0",
         AUTH_DEV_BYPASS: "false",
         CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? "",
       },

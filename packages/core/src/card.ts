@@ -3,23 +3,35 @@ import { adminDb, merchants, loyaltyPrograms, enrollments, customers } from "@qr
 import {
   getWalletProvider,
   renderStampStrip,
-  stripUrlFor,
   loadIcon,
   loadRawImage,
   GOOGLE_STRIP,
   APPLE_STRIP,
+  fetchArtwork,
 } from "@qrew/wallet-core";
-import { mintCardToken } from "./token";
-import { normalizeDesign, type CardDesign } from "./program";
+import { getAsset, ownAssetId } from "./asset";
+import { CARD_TTL_MS, mintCardToken } from "./token";
+import { normalizeDesign, type CardDesign } from "./design";
+import { isWalletIssuable, passContentFor, type PassSource } from "./wallet-pass";
 import { cardTypeModule, isCardType } from "./card-types";
+import { formatShortCode } from "./short-code";
 
 /** Which wallet the strip is being drawn for — they want different aspect ratios. */
 export type StripPlatform = "google" | "apple";
 
 export interface CardView {
   serial: string;
+  /**
+   * The programme this card belongs to. Public — the counter QR already carries it — and how the app
+   * spots that it already holds this shop's card when that QR is scanned again.
+   */
+  programId: string;
   /** Short-lived signed token to render in the QR (rotates as the card polls). */
   qrToken: string;
+  /** How long qrToken stays valid, in ms — after that the app shows the code as expired. */
+  qrTtlMs: number;
+  /** What a cashier types when the QR won't scan, formatted: "K7M 4QX". */
+  shortCode: string;
   merchantName: string;
   programName: string;
   rewardText: string;
@@ -37,14 +49,19 @@ export interface CardView {
 }
 
 /**
- * Public read of a card by its serial. The serial is an unguessable capability token
- * (a random UUID = the card's bearer secret), so this reads via adminDb filtered strictly
- * by serial — the serial itself is the authorization, no tenant/session needed.
+ * How long a card read waits for the Add-to-Wallet link. The link needs the programme's Google
+ * class, which on a cold process is a token exchange plus a lookup — fine normally, but during a
+ * Google slowdown it would hold the customer's card page (and every poll of it) for seconds. Past
+ * this the card renders without the button, and the next poll tries again.
  */
-export async function getCard(serial: string): Promise<CardView | null> {
+export const SAVE_LINK_DEADLINE_MS = 2_000;
+
+/** The card's row, joined to everything a card page or a wallet pass shows. */
+async function readCard(serial: string) {
   const [row] = await adminDb
     .select({
       serial: enrollments.cardSerial,
+      shortCode: enrollments.shortCode,
       programId: enrollments.programId,
       customerName: customers.name,
       currentStamps: enrollments.currentProgress,
@@ -62,53 +79,55 @@ export async function getCard(serial: string): Promise<CardView | null> {
     .innerJoin(customers, eq(customers.id, enrollments.customerId))
     .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
     .where(eq(enrollments.cardSerial, serial));
+  return row;
+}
 
+type CardRow = NonNullable<Awaited<ReturnType<typeof readCard>>>;
+
+/** The card row as the shared pass builders read it. */
+function passSource(row: CardRow): PassSource {
+  return { ...row, currentProgress: row.currentStamps };
+}
+
+/** Resolve to `fallback` if `work` hasn't settled within `ms`. The work itself carries on. */
+function withDeadline<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([work, late]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Public read of a card by its serial. The serial is an unguessable capability token
+ * (a random UUID = the card's bearer secret), so this reads via adminDb filtered strictly
+ * by serial — the serial itself is the authorization, no tenant/session needed.
+ *
+ * Never by short code: that is six guessable characters, accepted only by a shop's own scan.
+ */
+export async function getCard(serial: string): Promise<CardView | null> {
+  const row = await readCard(serial);
   if (!row) return null;
 
   const design = normalizeDesign(row.cardDesign);
   const qrToken = mintCardToken(row.serial);
-  const card = cardTypeModule(isCardType(row.type) ? row.type : "stamp");
-  const mechanics = card.normalize(row.mechanics) as never;
-
-  /*
-   * Only a loyalty-mapped product can be issued today. A discount card maps to a Google OFFER, a
-   * different resource with its own class shape, and there is no adapter for it yet. Issuing it as
-   * a loyalty pass instead would put a stamp counter on a card that has nothing to count — and an
-   * object cannot be moved between class types afterwards, so every customer would have to re-save.
-   * No button is better than the wrong pass.
-   */
-  const issuable = card.wallet.google === "loyalty";
 
   /*
    * The save link embeds the card's CURRENT state, so it is built per read rather than stored — a
    * customer who adds the card after earning three stamps gets a pass showing three, not zero.
-   * getSaveUrl answers null on any failure, so a wallet outage costs the button, never the card.
+   * getSaveUrl answers null on any failure, and the deadline caps a slow one, so a wallet outage
+   * costs the button, never the card.
    */
-  const google = issuable
-    ? await getWalletProvider().getSaveUrl({
-        serial: row.serial,
-        programId: row.programId,
-        customerName: row.customerName,
-        merchantName: row.merchantName,
-        programName: row.programName,
-        rewardText: row.rewardText,
-        currentStamps: row.currentStamps,
-        stampsRequired: row.stampsRequired,
-        qrToken,
-        brandColor: design.brandColor,
-        logoUrl: design.logoUrl, // the shop's own mark, when they've set one
-        // Omitted unless this product is drawn as stamps — a points balance renders natively, so a
-        // strip would put a row of stamps on a card that does not work that way.
-        stripUrl: card.drawsStampStrip ? stripUrlFor(row.serial, row.currentStamps) : undefined,
-        pointsLabel: card.unitLabel(mechanics),
-        details: design.details,
-        location: design.location,
-      })
+  const google = isWalletIssuable(row.type)
+    ? await withDeadline(getWalletProvider().getSaveUrl(passContentFor(passSource(row), qrToken)), SAVE_LINK_DEADLINE_MS, null)
     : null;
 
   return {
     serial: row.serial,
+    programId: row.programId,
     qrToken,
+    qrTtlMs: CARD_TTL_MS,
+    shortCode: formatShortCode(row.shortCode),
     merchantName: row.merchantName,
     programName: row.programName,
     rewardText: row.rewardText,
@@ -151,6 +170,18 @@ export async function getCardStrip(
 }
 
 /**
+ * Where a design's artwork bytes come from: our own uploads straight from Postgres, anything a shop
+ * pasted through the guarded fetch (https only, public hosts only, size-capped — see fetchArtwork).
+ */
+async function artworkBytes(url: string): Promise<Buffer> {
+  const id = ownAssetId(url);
+  if (!id) return fetchArtwork(url);
+  const asset = await getAsset(id);
+  if (!asset) throw new Error(`asset ${id} not found`);
+  return asset.bytes;
+}
+
+/**
  * Draw a design's strip. Shared by the live card and the designer's preview, so what a shop sees
  * while editing is the same code path the wallet fetches — not a mock that can drift from it.
  */
@@ -165,14 +196,14 @@ export async function stripFor(
    * count for full control of the artwork, so compositing on top would defeat the choice.
    */
   if (design.customStripUrl) {
-    const custom = await loadRawImage(design.customStripUrl);
+    const custom = await loadRawImage(design.customStripUrl, artworkBytes);
     if (custom) return custom;
     // Unreachable artwork falls through to a generated strip rather than leaving the pass blank.
   }
 
   const [icon, emptyIcon] = await Promise.all([
-    loadIcon(design.stampImageUrl),
-    loadIcon(design.emptyStampImageUrl),
+    loadIcon(design.stampImageUrl, artworkBytes),
+    loadIcon(design.emptyStampImageUrl, artworkBytes),
   ]);
 
   return renderStampStrip({

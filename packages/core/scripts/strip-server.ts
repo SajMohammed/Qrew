@@ -14,13 +14,13 @@ import { config } from "dotenv";
 import { resolve } from "node:path";
 import { createServer } from "node:http";
 
-config({ path: resolve(import.meta.dirname, "../../../.env") });
+config({ path: resolve(__dirname, "../../../.env") });
 
 const PORT = Number(process.env.STRIP_PORT ?? 4100);
 
 async function main() {
-  const { getCardStrip } = await import("../src/card");
-  const { getAsset } = await import("../src/asset");
+  const { getCardStrip } = await import("../src/card.js");
+  const { getAsset } = await import("../src/asset.js");
 
   const server = createServer(async (req, res) => {
     if (req.method !== "GET") {

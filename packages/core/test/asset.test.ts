@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { adminDb, closeDb, merchants } from "@qrew/db";
 import { encodePng } from "@qrew/wallet-core";
-import { storeAsset, getAsset, assetUrlFor, MAX_ASSET_BYTES, MAX_ASSET_DIMENSION } from "../src/index";
+import { storeAsset, getAsset, assetUrlFor, ownAssetId, MAX_ASSET_BYTES, MAX_ASSET_DIMENSION } from "../src/index";
 import { InvalidInputError } from "../src/errors";
 
 let merchantId: string;
@@ -83,6 +83,21 @@ describe("design image uploads", () => {
     await expect(storeAsset(merchantId, "stamp", wide)).rejects.toThrow(
       new RegExp(`${MAX_ASSET_DIMENSION + 1}`),
     );
+  });
+
+  it("rejects a huge declared size from the header alone, before decoding allocates for it", async () => {
+    const lying = png(2, 2);
+    lying.writeUInt32BE(50_000, 16);
+    lying.writeUInt32BE(50_000, 20);
+    await expect(storeAsset(merchantId, "stamp", lying)).rejects.toThrow(/50000×50000 — the limit is 1024×1024/);
+  });
+
+  it("recognises its own upload links, whatever host they were saved under", () => {
+    const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+    expect(ownAssetId(`https://api.qrewclub.com/asset/${id}.png`)).toBe(id);
+    expect(ownAssetId(`https://old-tunnel.trycloudflare.com/asset/${id}.png`)).toBe(id);
+    expect(ownAssetId(`https://example.com/art/${id}.png`)).toBeNull();
+    expect(ownAssetId("not a url")).toBeNull();
   });
 
   /*

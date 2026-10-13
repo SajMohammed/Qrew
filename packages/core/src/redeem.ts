@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { withTenant, loyaltyPrograms, enrollments, loyaltyProgressEvents, redemptions } from "@qrew/db";
 import { cardTypeModule } from "./card-types";
 import { enqueueWalletSync } from "@qrew/queue";
-import { NotFoundError } from "./errors";
+import { ConflictError, NotFoundError } from "./errors";
 
 export interface RedeemInput {
   merchantId: string;
@@ -29,6 +29,15 @@ export interface RedeemResult {
  *      resets current_progress.
  *   4. enqueue a wallet-sync job — the wallet-worker resets the pass off the request path.
  */
+/** A unique-index violation on `constraint`, however deep the driver wraps it. */
+function violates(err: unknown, constraint: string): boolean {
+  for (let e: unknown = err; e && typeof e === "object"; e = (e as { cause?: unknown }).cause) {
+    const pg = e as { code?: string; constraint_name?: string };
+    if (pg.code === "23505" && pg.constraint_name === constraint) return true;
+  }
+  return false;
+}
+
 export async function redeem(input: RedeemInput): Promise<RedeemResult> {
   const outcome = await withTenant(input.merchantId, async (db) => {
     // Lock the card row so two simultaneous redeems serialize — otherwise both pass the ledger
@@ -52,6 +61,11 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
       .from(redemptions)
       .where(and(eq(redemptions.merchantId, input.merchantId), eq(redemptions.idempotencyKey, input.idempotencyKey)));
     if (existing) {
+      // A key is one redemption of one card. Answering "redeemed" for a different card would report
+      // a reward that was never taken off it.
+      if (existing.enrollmentId !== input.enrollmentId) {
+        throw new ConflictError("this redeem key was already used for a different card");
+      }
       return { redeemed: true, reason: "duplicate" as RedeemReason, enrollment, currentStamps: enrollment.currentProgress, rewardText: existing.rewardText };
     }
 
@@ -96,15 +110,19 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
       currentStamps: after?.currentStamps ?? balance - program.stampsRequired,
       rewardText: program.rewardText,
     };
+  }).catch((err: unknown) => {
+    // The same key redeemed on another card at the same moment: each locked only its own card, so
+    // both got past the key check, and the index caught the second. Same answer as when they don't race.
+    if (violates(err, "redemptions_idem_uq")) {
+      throw new ConflictError("this redeem key was already used for a different card");
+    }
+    throw err;
   });
 
   // Wallet propagation runs off the request path (see apps/wallet-worker). Best-effort: the
-  // redemption is already committed, so a queue outage must not fail the customer's reward.
-  if (
-    outcome.redeemed &&
-    outcome.reason === "redeemed" &&
-    (outcome.enrollment.applePassId || outcome.enrollment.googleObjectId)
-  ) {
+  // redemption is already committed, so a queue outage must not fail the customer's reward — and,
+  // bounded, must not delay it either.
+  if (outcome.redeemed && outcome.reason === "redeemed") {
     try {
       await enqueueWalletSync({
         merchantId: input.merchantId,

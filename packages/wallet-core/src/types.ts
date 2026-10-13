@@ -33,6 +33,8 @@ export interface PassContent {
   currentStamps: number;
   stampsRequired: number;
   qrToken: string; // encoded into the pass barcode; the staff app scans it to stamp
+  /** The card's typeable code, already formatted — shown under the barcode for manual entry. */
+  shortCode?: string;
   brandColor?: string; // hex; tempered for legibility per platform guidelines
   logoUrl?: string;
   /**
@@ -58,6 +60,8 @@ export interface PassUpdate {
   stampsRequired: number;
   /** The card serial — a wallet barcode is static, so it carries this rather than a token. */
   serial: string;
+  /** The card's typeable code, already formatted — shown under the barcode for manual entry. */
+  shortCode?: string;
   /**
    * The programme this card belongs to. Supplying it re-points the pass at the correct template,
    * which matters for passes issued before the template was keyed on the programme id.
@@ -71,6 +75,21 @@ export interface PassUpdate {
   rewardText?: string;
 }
 
+/**
+ * Where a card's pass stands after an update:
+ * - in_wallet — at least one person has it saved;
+ * - not_saved — the pass exists (we created it) but nobody has saved it yet;
+ * - absent — there is no such pass at all, so the caller should create one.
+ */
+export type PassSyncOutcome = "in_wallet" | "not_saved" | "absent";
+
+/** A lock-screen notification. The id must be unique per pass — Google rejects a repeat. */
+export interface PassMessage {
+  id: string;
+  header: string;
+  body: string;
+}
+
 export interface WalletProvider {
   /**
    * A link that adds this card to the customer's wallet, or null when the provider has none.
@@ -78,21 +97,31 @@ export interface WalletProvider {
    */
   getSaveUrl(content: PassContent): Promise<string | null>;
   /**
-   * Push the shop's current card design onto the wallet TEMPLATE (Google calls it a class), so
-   * editing the card in the console is reflected on every pass already in a customer's wallet.
-   * Best-effort: the design is saved in our DB regardless.
+   * Replace the wallet TEMPLATE (Google calls it a class) with the shop's current design, so editing
+   * the card in the console reaches every pass already in a customer's wallet. A full replacement:
+   * anything the design no longer has — a removed row, a cleared location — disappears. Throws on
+   * failure; the wallet worker that calls it owns the retries.
    */
   syncTemplate(content: PassContent): Promise<void>;
-  /** Create a pass for a new enrollment; returns platform ids to persist. */
+  /**
+   * Create the pass if it does not exist yet (idempotent). Called by the wallet worker, never on a
+   * request path, so a slow or failing vendor can't hold up a signup.
+   */
   issuePass(content: PassContent): Promise<PassRef>;
   /**
    * Update an existing pass after a scan. Takes the whole change, not just a number: the stamp
    * strip is a URL carrying the count, so re-pointing it is part of what "the count changed"
    * means — patch only the number and the pass keeps showing yesterday's stamps.
+   *
+   * Resolves "absent" when there is no pass to update, so the caller can create one from the card's
+   * current state instead of silently dropping the change.
    */
-  updateStamps(ref: PassRef, update: PassUpdate): Promise<void>;
-  /** Send a lock-screen push (the changeMessage-style nudge). Rate-limited by the caller. */
-  pushUpdate(ref: PassRef, message: string): Promise<void>;
+  updateStamps(ref: PassRef, update: PassUpdate): Promise<PassSyncOutcome>;
+  /**
+   * A lock-screen notification. Google allows only a few per pass per day, so the caller sends one
+   * only at a milestone (a reward becoming ready), never on every scan.
+   */
+  pushUpdate(ref: PassRef, message: PassMessage): Promise<void>;
   /** Void a pass (e.g. on PDPL erasure). */
   revoke(ref: PassRef): Promise<void>;
 }

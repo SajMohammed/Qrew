@@ -1,51 +1,12 @@
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import { withTenant, merchants, loyaltyPrograms, enrollments } from "@qrew/db";
-import { getWalletProvider, type StampLayout } from "@qrew/wallet-core";
 import { cardTypeModule, normalizeMechanics, isCardType, type CardType } from "./card-types";
 import { InvalidInputError } from "./errors";
+import { DEFAULT_DESIGN, normalizeDesign, type CardDesign } from "./design";
+import { isWalletIssuable } from "./wallet-pass";
+import { markTemplateSyncRequested, queueTemplateSyncs, walletSyncView, type WalletSyncView } from "./wallet-sync";
 
-/**
- * The shop's design INTENT. Deliberately platform-agnostic: every field here is expressible on the
- * app card, a Google loyalty class, an Apple store card AND the printed poster. Adapters translate;
- * this never mentions heroImage, strip.png or textModulesData.
- */
-export interface CardDesign {
-  brandColor: string; // hex, e.g. "#146A2E"
-  stampIcon: string; // emoji, e.g. "☕"
-  /** Public https image — the shop's mark on the card, the passes and the poster. */
-  logoUrl?: string;
-  /**
-   * The shop's stamp artwork (square transparent PNG). Drawn into the wallet stamp strip so a pass
-   * shows their cup or pastry filling up rather than generic discs.
-   */
-  stampImageUrl?: string;
-  /**
-   * Artwork for a stamp not yet earned. Without one the earned artwork is drawn faded, which keeps
-   * the row reading as one set filling up; with one, the shop controls both states.
-   */
-  emptyStampImageUrl?: string;
-  /**
-   * A finished strip the shop drew themselves, used verbatim instead of anything we compose.
-   *
-   * The escape hatch for a shop with a designer: whatever we generate will never beat artwork made
-   * for the exact card. It costs them the live stamp count — the image cannot change as they earn —
-   * which is why it is opt-in rather than the default.
-   */
-  customStripUrl?: string;
-  /** How the stamps are arranged on the pass. */
-  stampLayout?: StampLayout;
-  /** Stamp size within its cell; 1 is the default. */
-  stampScale?: number;
-  /** Share of each cell left empty, horizontally and vertically. */
-  stampGapX?: number;
-  stampGapY?: number;
-  /** How strongly a not-yet-earned stamp shows. Ignored once emptyStampImageUrl is set. */
-  unearnedOpacity?: number;
-  /** Extra rows shown on the pass (Google text modules / Apple back fields). Max 4. */
-  details?: { label: string; value: string }[];
-  /** Shop location, for the "you're nearby" lock-screen reminder both wallets support. */
-  location?: { lat: number; lng: number; label?: string } | null;
-}
+export { DEFAULT_DESIGN, normalizeDesign, type CardDesign } from "./design";
 
 export interface ProgramView {
   id: string;
@@ -59,45 +20,8 @@ export interface ProgramView {
   bonusStamps: number;
   active: boolean;
   cardDesign: CardDesign;
-}
-
-// Qrew forest green — an un-customized card is on-brand out of the box.
-export const DEFAULT_DESIGN: CardDesign = { brandColor: "#146A2E", stampIcon: "☕" };
-
-const LAYOUTS: StampLayout[] = ["row", "grid", "top-heavy", "diamond"];
-
-/** A stored number is only kept when it is a real number in range — a bad one falls back silently. */
-function num(v: unknown, lo: number, hi: number): number | undefined {
-  return typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined;
-}
-
-export function normalizeDesign(raw: unknown): CardDesign {
-  const d = (raw ?? {}) as Partial<CardDesign>;
-  const details = Array.isArray(d.details)
-    ? d.details
-        .filter((r): r is { label: string; value: string } => Boolean(r?.label && r?.value))
-        .slice(0, 4)
-    : undefined;
-  const scale = num(d.stampScale, 0.5, 1.4);
-  const gapX = num(d.stampGapX, 0, 0.6);
-  const gapY = num(d.stampGapY, 0, 0.6);
-  const unearned = num(d.unearnedOpacity, 0.05, 1);
-  return {
-    brandColor: typeof d.brandColor === "string" ? d.brandColor : DEFAULT_DESIGN.brandColor,
-    stampIcon: typeof d.stampIcon === "string" ? d.stampIcon : DEFAULT_DESIGN.stampIcon,
-    // An empty string means "cleared" — store it as absent so adapters fall back cleanly.
-    ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
-    ...(d.stampImageUrl ? { stampImageUrl: d.stampImageUrl } : {}),
-    ...(d.emptyStampImageUrl ? { emptyStampImageUrl: d.emptyStampImageUrl } : {}),
-    ...(d.customStripUrl ? { customStripUrl: d.customStripUrl } : {}),
-    ...(d.stampLayout && LAYOUTS.includes(d.stampLayout) ? { stampLayout: d.stampLayout } : {}),
-    ...(scale !== undefined ? { stampScale: scale } : {}),
-    ...(gapX !== undefined ? { stampGapX: gapX } : {}),
-    ...(gapY !== undefined ? { stampGapY: gapY } : {}),
-    ...(unearned !== undefined ? { unearnedOpacity: unearned } : {}),
-    ...(details && details.length ? { details } : {}),
-    ...(d.location ? { location: d.location } : {}),
-  };
+  /** Whether the last design change has reached the passes already in customers' phones. */
+  walletSync: WalletSyncView;
 }
 
 export interface ShopPreview {
@@ -148,6 +72,7 @@ function toView(p: typeof loyaltyPrograms.$inferSelect): ProgramView {
     bonusStamps: p.bonusStamps,
     active: p.active,
     cardDesign: normalizeDesign(p.cardDesign),
+    walletSync: walletSyncView(p),
   };
 }
 
@@ -235,47 +160,33 @@ export async function updateProgram(
 
     if (!updated) return null;
 
-    const [merchant] = await db.select({ name: merchants.name }).from(merchants);
-    return { view: toView(updated), merchantName: merchant?.name ?? "", updated };
-  }).then(async (result) => {
-    if (!result) return null;
-    const { view, merchantName, updated } = result;
-
+    // Passes already in customers' phones need the new design. Marked inside this transaction, so
+    // the view returned to the owner already reads "pending"; the push itself runs on the worker.
+    if (!isWalletIssuable(updated.type)) return toView(updated);
+    await markTemplateSyncRequested(db, [updated.id]);
+    const [marked] = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.id, updated.id));
+    return toView(marked!);
+  }).then(async (view) => {
+    if (!view || !isWalletIssuable(view.type)) return view;
     /*
-     * Push the new design onto the wallet template, so a card already sitting in a customer's
-     * wallet picks up the shop's new colour, name and logo — that is what makes the card designer
-     * mean anything beyond our own app.
-     *
-     * Best-effort and deliberately after the commit: the design is saved either way, and a wallet
-     * outage must not fail the owner's save.
+     * After the commit, and never waiting on Google: the save is done either way. The worker pushes
+     * the template and reports back through the wallet_sync columns, which is how the owner learns
+     * whether the passes in customers' phones changed. A push that couldn't even be queued shows as
+     * failed now rather than as a "pending" that never resolves.
      */
-    try {
-      const design = normalizeDesign(updated.cardDesign);
-      await getWalletProvider().syncTemplate({
-        serial: "",
-        programId: updated.id,
-        merchantName,
-        programName: updated.name,
-        rewardText: updated.rewardText,
-        currentStamps: 0,
-        stampsRequired: updated.stampsRequired,
-        qrToken: "",
-        brandColor: design.brandColor,
-        logoUrl: design.logoUrl,
-        details: design.details,
-        location: design.location,
-      });
-    } catch (err) {
-      console.error("[wallet] could not sync the card design to the wallet template:", err);
-    }
-
-    return view;
+    const queued = await queueTemplateSyncs(merchantId, [view.id]);
+    return queued ? view : { ...view, walletSync: { state: "failed" as const, failedPasses: view.walletSync.failedPasses } };
   });
 }
 
 /** Seed a merchant's first loyalty program (idempotent) — used at onboarding after provisioning. */
 export async function createDefaultProgram(merchantId: string): Promise<ProgramView> {
   return withTenant(merchantId, async (db) => {
+    // Two onboarding calls at once (two tabs) both get past provisioning, which is idempotent, and
+    // would each seed a programme here. The lock serialises them so the second sees the first's row.
+    // Not a unique index: a shop may run several programmes. The prefix keeps this key apart from
+    // provisioning's per-user lock (packages/db/src/auth.ts).
+    await db.execute(sql`select pg_advisory_xact_lock(hashtext(${`default-program:${merchantId}`}))`);
     const [existing] = await db
       .select()
       .from(loyaltyPrograms)

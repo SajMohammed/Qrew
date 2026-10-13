@@ -13,11 +13,11 @@ import {
 import { StaffCreate, StaffPinUpdate, VerifyPinRequest } from "@qrew/contracts";
 import {
   verifyStaffPin,
-  mintStaffToken,
   listStaff,
   addStaffPin,
   setStaffPin,
   removeStaff,
+  STAFF_TTL_MS,
 } from "@qrew/core";
 import { Merchant, Roles } from "../auth/auth.decorators";
 
@@ -28,9 +28,17 @@ export class StaffController {
   @Post("verify-pin")
   async verifyPin(@Merchant() merchantId: string, @Body() body: unknown) {
     const { pin } = VerifyPinRequest.parse(body);
+    // A paused counter (too many wrong PINs) surfaces as a 429 via the domain filter.
     const staff = await verifyStaffPin(merchantId, pin);
     if (!staff) throw new UnauthorizedException("invalid PIN");
-    return { staffToken: mintStaffToken(staff.staffId), name: staff.name, role: staff.role };
+    // How long the token lasts, not when it ends: the counter counts down from when it got the
+    // answer, so a tablet with a wrong clock still asks for the PIN on time.
+    return {
+      staffToken: staff.staffToken,
+      name: staff.name,
+      role: staff.role,
+      expiresInSeconds: STAFF_TTL_MS / 1000,
+    };
   }
 
   /*

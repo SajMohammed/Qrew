@@ -38,8 +38,9 @@ export function unsafeTokenSecrets(env: Record<string, string | undefined> = pro
     .map(([name]) => name);
 }
 
-const CARD_TTL_MS = 120_000; // 2 minutes — refreshed as the card polls
-const STAFF_TTL_MS = 8 * 60 * 60 * 1000; // one shift
+// 2 minutes — refreshed as the card polls. Exported so the card read can tell the app how long its QR lives.
+export const CARD_TTL_MS = 120_000;
+export const STAFF_TTL_MS = 8 * 60 * 60 * 1000; // one shift — the counter asks for the PIN again when it ends
 export const CUSTOMER_ACCESS_TTL_MS = 15 * 60 * 1000; // 15 min — the refresh token rotates it
 
 /** A signed, expiring token: base64url(subject.expiry).base64url(hmac). */
@@ -83,14 +84,29 @@ export function verifyCardToken(token: string): string | null {
   return readSigned(CARD_SECRET, token);
 }
 
-/** Mint a shift-long token identifying the cashier, minted after a PIN check. */
-export function mintStaffToken(staffId: string, ttlMs: number = STAFF_TTL_MS): string {
-  return mintSigned(STAFF_SECRET, staffId, ttlMs);
+/**
+ * What a cashier's shift token vouches for: who, in which shop, and which PIN they proved. Binding
+ * the shop stops one shop's token attributing scans in another; binding the PIN (by a tag of its
+ * hash) means resetting it — or removing the person — revokes the token at once.
+ */
+export interface StaffClaims {
+  merchantId: string;
+  staffId: string;
+  pinTag: string;
 }
 
-/** Verify a staff token; return its staffId, or null if malformed / tampered / expired. */
-export function verifyStaffToken(token: string): string | null {
-  return readSigned(STAFF_SECRET, token);
+/** Mint a shift-long token for a cashier, after a PIN check. */
+export function mintStaffToken(claims: StaffClaims, ttlMs: number = STAFF_TTL_MS): string {
+  return mintSigned(STAFF_SECRET, `${claims.merchantId}:${claims.staffId}:${claims.pinTag}`, ttlMs);
+}
+
+/** Verify a staff token's signature and expiry; null if malformed, tampered, expired or old-format. */
+export function verifyStaffToken(token: string): StaffClaims | null {
+  const subject = readSigned(STAFF_SECRET, token);
+  const parts = subject?.split(":");
+  if (!parts || parts.length !== 3 || parts.some((p) => !p)) return null;
+  const [merchantId, staffId, pinTag] = parts as [string, string, string];
+  return { merchantId, staffId, pinTag };
 }
 
 /** Mint a short-lived customer access token (subject = customer account id). Rotated via refresh. */

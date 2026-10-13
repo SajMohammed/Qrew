@@ -1,0 +1,7 @@
+{
+  // Typechecks the scripts alongside the source they import, without changing the build output
+  // (tsconfig.json keeps rootDir at src). Scripts were drifting from the code they call unnoticed.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "rootDir": "." },
+  "include": ["scripts/**/*", "src/**/*"]
+}

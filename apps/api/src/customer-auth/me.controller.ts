@@ -22,8 +22,17 @@ export class MeController {
   @Post("claim")
   async claim(@CustomerAccount() accountId: string, @Body() body: unknown) {
     const { serial } = ClaimCardRequest.parse(body);
-    const ok = await claimCardBySerial(accountId, serial);
-    if (!ok) throw new ConflictException("card not found or already linked to another account");
+    const outcome = await claimCardBySerial(accountId, serial);
+    if (outcome === "has_own") {
+      // Its own code, so the app keeps this card on the device rather than dropping it.
+      throw new ConflictException({
+        statusCode: 409,
+        error: "Conflict",
+        code: "has_own_card",
+        message: "this account already has a card at this shop",
+      });
+    }
+    if (outcome === "refused") throw new ConflictException("card not found or already linked to another account");
     return getMyCards(accountId);
   }
 }

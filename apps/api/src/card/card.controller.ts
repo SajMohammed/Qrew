@@ -12,12 +12,14 @@ import {
 import type { Response } from "express";
 import { getCard, getCardStrip, stripFor, normalizeDesign } from "@qrew/core";
 import { StripPreviewRequest } from "@qrew/contracts";
-import { Public } from "../auth/auth.decorators";
+import { Public, Roles } from "../auth/auth.decorators";
+import { RateLimit } from "../rate-limit/rate-limit";
 
-// Public: the customer's live card, fetched by its serial (a capability token).
-@Public()
 @Controller("card")
 export class CardController {
+  // Public: the customer's live card, fetched by its serial (a capability token).
+  @Public()
+  @RateLimit("card-read")
   @Get(":serial")
   async card(@Param("serial") serial: string) {
     const card = await getCard(serial);
@@ -35,6 +37,8 @@ export class CardController {
    * Cached only briefly: the image changes the moment a stamp lands, so a long TTL would pin a
    * stale strip to a card that has already moved on.
    */
+  @Public()
+  @RateLimit("card-image")
   @Get(":serial/strip.png")
   async strip(
     @Param("serial") serial: string,
@@ -55,10 +59,12 @@ export class CardController {
    * what a wallet actually shows — the reason light artwork looked blank in the preview and correct
    * on the phone. This returns the real image, from the same function the wallet fetches.
    *
-   * Public and side-effect-free: it takes a design in the body, touches no card and writes nothing,
-   * so there is no tenant to scope it to.
+   * Side-effect-free — it touches no card and writes nothing — but NOT public: rendering makes the
+   * server fetch artwork links from the design in the body, and that is not something to offer
+   * anonymous callers. Only the designer uses it, and it already sends the owner's session.
    */
-  @Public()
+  @Roles("owner", "manager")
+  @RateLimit("strip-preview")
   @Post("strip/preview")
   @HttpCode(200) // renders, creates nothing — 201 would be a lie
   async preview(@Body() body: unknown, @Res() res: Response) {

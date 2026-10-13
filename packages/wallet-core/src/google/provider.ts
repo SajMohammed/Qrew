@@ -1,6 +1,8 @@
-import type { WalletProvider, PassContent, PassRef, PassUpdate } from "../types";
+import type { WalletProvider, PassContent, PassMessage, PassRef, PassSyncOutcome, PassUpdate } from "../types";
 import {
+  GOOGLE_TIMEOUT_MS,
   ServiceAccountTokens,
+  namedTimeout,
   serviceAccountFromEnv,
   signJwtRs256,
   type ServiceAccount,
@@ -17,9 +19,9 @@ const SAVE_LINK = "https://pay.google.com/gp/v/save/";
  * `<issuer>.<programId>` and `<issuer>.<serial>` — so nothing extra has to be persisted and a retry
  * always addresses the same pass.
  *
- * The save link is a "fat" JWT carrying the whole object: Google creates the object when the
- * customer taps Save. That means we never create passes for the many customers who never add one,
- * and updates simply address the id we already know they'd have.
+ * The save link is a "fat" JWT carrying the whole object, so the card page never waits on an
+ * object being created. The wallet worker creates each object ahead of time anyway (see issuePass),
+ * so a stamp that lands before the customer taps Save still has a pass to update.
  */
 export class GoogleWalletProvider implements WalletProvider {
   private readonly sa: ServiceAccount;
@@ -95,9 +97,13 @@ export class GoogleWalletProvider implements WalletProvider {
   }
 
   /**
-   * Create the object server-side. The save-link flow doesn't need this — Google creates the object
-   * on save — but issuing eagerly is what the port promises, and a pre-existing object is simply
-   * adopted when the customer saves.
+   * Create the object server-side, if it isn't there yet.
+   *
+   * The save link alone would let Google create the object when the customer taps Save, but only
+   * with the state baked into the link when the card page built it. A stamp landing between that
+   * read and the tap would PATCH an object that doesn't exist yet, and be lost until the next visit.
+   * Creating it ahead of time, from the worker, means every later sync has something to update; a
+   * pre-existing object is simply adopted when the customer saves.
    */
   async issuePass(content: PassContent): Promise<PassRef> {
     await this.ensureClass(content);
@@ -108,12 +114,13 @@ export class GoogleWalletProvider implements WalletProvider {
   }
 
   /**
-   * Reflect the current count. A 404 means the customer has not added this card to their wallet —
-   * the overwhelmingly common case, and not an error worth failing a stamp over.
+   * Reflect the current count. A 404 means no object exists for this card yet — not an error worth
+   * failing a stamp over, and reported as "absent" so the worker can create it instead.
    */
-  async updateStamps(ref: PassRef, update: PassUpdate): Promise<void> {
+  async updateStamps(ref: PassRef, update: PassUpdate): Promise<PassSyncOutcome> {
     const id = this.resolveObjectId(ref);
-    await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
+    // A successful PATCH answers 200 with the object, so undefined can only mean the 404.
+    const updated = await this.request("PATCH", `/loyaltyObject/${encodeURIComponent(id)}`, {
       loyaltyPoints: { balance: { int: update.currentStamps }, label: update.pointsLabel ?? "Stamps" },
       /*
        * Re-point the pass at its programme's class.
@@ -127,9 +134,9 @@ export class GoogleWalletProvider implements WalletProvider {
       /*
        * PATCH MERGES nested objects rather than replacing them, so a field left out simply survives
        * — an old caption or a stale row will sit on the pass forever unless it is explicitly
-       * nulled. That is why alternateText is cleared by name rather than by omission.
+       * nulled. That is why alternateText is set by name: to the card's code, or cleared, never left.
        */
-      barcode: { type: "QR_CODE", value: update.serial, alternateText: null },
+      barcode: { type: "QR_CODE", value: update.serial, alternateText: update.shortCode ?? null },
       ...(update.rewardText
         ? { textModulesData: [{ header: "Reward", body: update.rewardText, id: "reward" }] }
         : {}),
@@ -137,16 +144,22 @@ export class GoogleWalletProvider implements WalletProvider {
       // customer looking at the picture drawn before this scan.
       ...(update.stripUrl ? { heroImage: { sourceUri: { uri: update.stripUrl } } } : {}),
     });
+    if (!updated) return "absent";
+    // Google sets hasUsers once anyone has saved the object — the only way to know a person will see it.
+    return updated.hasUsers === true ? "in_wallet" : "not_saved";
   }
 
   /**
-   * A lock-screen nudge. Google delivers this to everyone holding the pass when the message is
-   * added to the object, so this is the free push channel the wallet buys us.
+   * A lock-screen notification to everyone holding the pass — the free push channel the wallet buys.
+   *
+   * TEXT_AND_NOTIFY is what makes it a notification. Without a messageType Google files a silent
+   * TEXT message on the back of the pass, which is how per-scan messages used to pile up there
+   * without anyone ever being nudged.
    */
-  async pushUpdate(ref: PassRef, message: string): Promise<void> {
+  async pushUpdate(ref: PassRef, message: PassMessage): Promise<void> {
     const id = this.resolveObjectId(ref);
     await this.request("POST", `/loyaltyObject/${encodeURIComponent(id)}/addMessage`, {
-      message: { header: "Qrew", body: message },
+      message: { id: message.id, header: message.header, body: message.body, messageType: "TEXT_AND_NOTIFY" },
     });
   }
 
@@ -235,11 +248,12 @@ export class GoogleWalletProvider implements WalletProvider {
        * and then tells the customer "card not found" at the till. The serial is already the card's
        * capability — the same value the app's QR falls back to — so this loses nothing.
        */
-      // No alternateText: it is meant as a fallback for manual entry, and a UUID serial is not
-      // something a cashier can type. Filling it with the count just repeated the points field.
+      // alternateText is the fallback for manual entry: the card's short code, which a cashier can
+      // type when the barcode won't read. (A UUID serial was no use there.)
       barcode: {
         type: "QR_CODE",
         value: content.serial,
+        ...(content.shortCode ? { alternateText: content.shortCode } : {}),
       },
       // The count already appears as the points field AND on the stamp strip. A third copy in a
       // "Progress" row is what made the pass feel cluttered, so only the reward lives here.
@@ -261,14 +275,18 @@ export class GoogleWalletProvider implements WalletProvider {
   // ── transport ────────────────────────────────────────────────────────────────
 
   /**
-   * Push the current design onto the class. Unlike ensureClass this always writes, because it is
+   * Replace the class with the current design. Unlike ensureClass this always writes, because it is
    * called when the owner has just changed something and expects to see it.
+   *
+   * PUT, not PATCH: PATCH merges, keeping any field the body leaves out (see the note in
+   * updateStamps), so a detail row or location the shop removed would stay on every pass forever.
+   * A full replacement drops it.
    */
   async syncTemplate(content: PassContent): Promise<void> {
     const id = this.classId(content.programId);
     const body = this.toClass(content);
     const existing = await this.request("GET", `/loyaltyClass/${encodeURIComponent(id)}`);
-    if (existing) await this.request("PATCH", `/loyaltyClass/${encodeURIComponent(id)}`, body);
+    if (existing) await this.request("PUT", `/loyaltyClass/${encodeURIComponent(id)}`, body);
     else await this.request("POST", "/loyaltyClass", body);
     this.ensuredClasses.add(id);
   }
@@ -288,17 +306,23 @@ export class GoogleWalletProvider implements WalletProvider {
     body?: unknown,
   ): Promise<Record<string, unknown> | undefined> {
     const token = await this.tokens.get();
-    const res = await fetch(`${API}${path}`, {
-      method,
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (res.status === 404) return undefined;
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`Google Wallet ${method} ${path} -> ${res.status} ${detail.slice(0, 300)}`);
+    // One deadline per call, covering the body read too: the signal aborts that as well.
+    try {
+      const res = await fetch(`${API}${path}`, {
+        method,
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
+      });
+      if (res.status === 404) return undefined;
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(`Google Wallet ${method} ${path} -> ${res.status} ${detail.slice(0, 300)}`);
+      }
+      return res.status === 204 ? undefined : ((await res.json()) as Record<string, unknown>);
+    } catch (err) {
+      throw namedTimeout(err, `Google Wallet ${method} ${path}`);
     }
-    return res.status === 204 ? undefined : ((await res.json()) as Record<string, unknown>);
   }
 }
 

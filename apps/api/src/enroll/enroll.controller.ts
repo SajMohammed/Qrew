@@ -3,6 +3,7 @@ import type { Request } from "express";
 import { EnrollRequest, PreviewQuery } from "@qrew/contracts";
 import { enroll, getShopPreview, verifyCustomerToken } from "@qrew/core";
 import { Public } from "../auth/auth.decorators";
+import { RateLimit } from "../rate-limit/rate-limit";
 
 // Public endpoint: a customer enrolls from the merchant's QR landing. The merchant is
 // identified by the (public) QR context in the body — this is routing, not authentication.
@@ -10,6 +11,7 @@ import { Public } from "../auth/auth.decorators";
 @Controller("enroll")
 export class EnrollController {
   // Pre-enrollment card preview — public shop branding for the landing page (no customer data).
+  @RateLimit("public-read")
   @Get("preview")
   async preview(@Query() query: unknown) {
     const { m, p } = PreviewQuery.parse(query);
@@ -18,6 +20,7 @@ export class EnrollController {
     return preview;
   }
 
+  @RateLimit("enroll")
   @Post()
   enroll(@Req() req: Request, @Body() body: unknown) {
     const input = EnrollRequest.parse(body); // zod validation at the boundary

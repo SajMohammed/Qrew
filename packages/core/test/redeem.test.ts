@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { adminDb, closeDb, merchants, loyaltyPrograms, redemptions } from "@qrew/db";
-import { enroll, addStamp, redeem, NotFoundError } from "../src/index";
+import { enroll, addStamp, redeem, ConflictError, NotFoundError } from "../src/index";
 
 let merchantId: string;
 let programId: string;
@@ -81,6 +81,48 @@ describe("redeem", () => {
       .from(redemptions)
       .where(and(eq(redemptions.merchantId, merchantId), eq(redemptions.enrollmentId, enrollmentId)));
     expect(rows).toHaveLength(1); // exactly one reward handed out
+  });
+
+  it("refuses a key already used on a different card, rather than calling it redeemed", async () => {
+    const a = await enrolledWith3Stamps("+971500000024");
+    const b = await enrolledWith3Stamps("+971500000025");
+    await redeem({ merchantId, enrollmentId: a, idempotencyKey: "rd-shared" });
+    await expect(redeem({ merchantId, enrollmentId: b, idempotencyKey: "rd-shared" })).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+    const rows = await adminDb.select().from(redemptions).where(eq(redemptions.enrollmentId, b));
+    expect(rows).toHaveLength(0); // card B still holds its reward
+  });
+
+  it("refuses a key raced onto two cards at once with a 409, not a 500", async () => {
+    const a = await enrolledWith3Stamps("+971500000027");
+    const b = await enrolledWith3Stamps("+971500000028");
+    const results = await Promise.allSettled([
+      redeem({ merchantId, enrollmentId: a, idempotencyKey: "rd-raced" }),
+      redeem({ merchantId, enrollmentId: b, idempotencyKey: "rd-raced" }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled" && r.value.reason === "redeemed")).toHaveLength(1);
+    const lost = results.find((r) => r.status === "rejected");
+    expect(lost?.status === "rejected" && lost.reason instanceof ConflictError).toBe(true);
+  });
+
+  // A points balance can hold two rewards' worth, so the ledger check alone would pass twice. The
+  // counter sends the same key for one reward-ready result, and that is what stops a double tap.
+  it("a double tap on a points card holding two rewards redeems once", async () => {
+    const [p] = await adminDb
+      .insert(loyaltyPrograms)
+      .values({ merchantId, name: "Points", type: "points", stampsRequired: 2, mechanics: { perVisit: 1 } })
+      .returning();
+    const { enrollmentId } = await enroll({ merchantId, programId: p!.id, phone: "+971500000026" });
+    for (const k of ["pt-1", "pt-2", "pt-3", "pt-4"]) await addStamp({ merchantId, enrollmentId, idempotencyKey: k });
+
+    const results = await Promise.all([
+      redeem({ merchantId, enrollmentId, idempotencyKey: "rd-tap" }),
+      redeem({ merchantId, enrollmentId, idempotencyKey: "rd-tap" }),
+    ]);
+    expect(results.map((r) => r.reason).sort()).toEqual(["duplicate", "redeemed"]);
+    const rows = await adminDb.select().from(redemptions).where(eq(redemptions.enrollmentId, enrollmentId));
+    expect(rows).toHaveLength(1);
   });
 
   // C2: an unknown enrollment is a domain NotFoundError (→ 404, not a 500).

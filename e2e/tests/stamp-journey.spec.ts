@@ -6,6 +6,9 @@ import { CARDS, SHOP } from "../servers";
 
 let ownerId: string | undefined;
 
+const SHOP_NAME = "E2E Roasters";
+const RENAMED = "E2E Roasters & Bakery";
+
 // The owner is a real user in the Clerk development instance; don't leave one behind per run.
 test.afterAll(async () => {
   if (ownerId) await createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY }).users.deleteUser(ownerId);
@@ -31,9 +34,20 @@ test("a new owner sets up a stamp card, and a customer earns and redeems the rew
     );
   });
 
-  await test.step("the first sign-in provisions their shop", async () => {
-    // Lazy onboarding: the dashboard's first call 409s, it provisions a shop, then loads.
-    await expect(page.getByText("My Shop").first()).toBeVisible({ timeout: 30_000 });
+  await test.step("the first sign-in asks them to name their shop", async () => {
+    // The dashboard's first call 409s (no shop yet); nothing is created until the owner names it.
+    await expect(page.getByRole("heading", { name: "Name your shop" })).toBeVisible({ timeout: 30_000 });
+    await page.getByLabel("Shop name").fill(SHOP_NAME);
+    await page.getByRole("button", { name: "Create my shop" }).click();
+    await expect(page.getByText(SHOP_NAME, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  });
+
+  await test.step("they rename it in settings", async () => {
+    await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+    await expect(page.getByLabel("Shop name")).toHaveValue(SHOP_NAME);
+    await page.getByLabel("Shop name").fill(RENAMED);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   });
 
   await test.step("they design a three-stamp card with no head start", async () => {
@@ -47,6 +61,7 @@ test("a new owner sets up a stamp card, and a customer earns and redeems the rew
 
   const enroll = await test.step("their counter code links to the shop's card", async () => {
     await page.getByRole("button", { name: "Counter QR", exact: true }).first().click();
+    await expect(page.locator(".print-poster").getByText(RENAMED)).toBeVisible(); // the new name, on print
     const link = await page.locator("code").filter({ hasText: "?m=" }).innerText();
     return new URL(link);
   });
@@ -54,25 +69,61 @@ test("a new owner sets up a stamp card, and a customer earns and redeems the rew
   // The customer is a separate device: its own storage, no Clerk session.
   const phone = await (await browser.newContext()).newPage();
 
-  const serial = await test.step("a customer scans it and gets the card", async () => {
+  const { code, serial } = await test.step("a customer scans it and gets the card", async () => {
     await phone.goto(`${CARDS}/${enroll.search}`);
+    await expect(phone.getByText(RENAMED).first()).toBeVisible();
     await phone.getByRole("button", { name: /Get this shop's card/ }).click();
     await expect(phone).toHaveURL(/\?card=/);
     await expect(phone.getByText("0/3", { exact: true })).toBeVisible();
-    return new URL(phone.url()).searchParams.get("card")!;
+    return {
+      serial: new URL(phone.url()).searchParams.get("card")!,
+      // The code printed under the QR, for when it won't scan — what this test types at the counter.
+      code: await phone.getByText(/^[2-9A-HJKMNP-TV-Z]{3} [2-9A-HJKMNP-TV-Z]{3}$/).innerText(),
+    };
   });
 
-  await test.step("the counter stamps the card three times", async () => {
+  await test.step("scanning the counter code again opens the same card, not a second one", async () => {
+    await phone.goto(`${CARDS}/${enroll.search}`);
+    await expect(phone).toHaveURL(new RegExp(`card=${serial}`));
+    await expect(phone.getByRole("button", { name: /Get this shop's card/ })).toHaveCount(0);
+    // Back lands on the wallet, which holds exactly one card from this shop.
+    await phone.getByRole("button", { name: "‹ All cards" }).click();
+    const tile = phone.getByRole("button", { name: new RegExp(RENAMED) });
+    await expect(tile).toHaveCount(1);
+    await tile.click();
+    await expect(phone).toHaveURL(new RegExp(`card=${serial}`));
+  });
+
+  await test.step("the card says when the phone is offline, and recovers on its own", async () => {
+    await phone.context().setOffline(true);
+    await expect(phone.getByText("No connection — reconnecting…")).toBeVisible({ timeout: 15_000 });
+    await phone.context().setOffline(false);
+    await expect(phone.getByText("Live — updates as staff stamp your card")).toBeVisible({ timeout: 15_000 });
+  });
+
+  await test.step("the counter stamps it by its code, once per visit unless asked for more", async () => {
     await page.getByRole("button", { name: "Counter mode" }).first().click();
-    const serialBox = page.getByPlaceholder("paste the card serial");
+    const box = page.getByLabel(/^Card code/);
     const stamp = page.getByRole("button", { name: "+ Stamp" });
-    for (const expected of ["✓ Stamp added · 1/3", "✓ Stamp added · 2/3", "🎉 Reward ready! · 3/3"]) {
-      await serialBox.fill(serial);
-      await stamp.click();
-      await expect(page.getByText(expected)).toBeVisible();
-      // The scanner ignores input for 1.2s after each scan, its guard against a double read.
-      await page.waitForTimeout(1300);
-    }
+
+    await box.fill(code);
+    await stamp.click();
+    await expect(page.getByText("✓ Stamp added · 1/3")).toBeVisible();
+    await expect(page.getByText(`Card ${code}`)).toBeVisible(); // which card the buttons act on
+
+    // The same card again inside the cooldown: a double read, so nothing is added.
+    await box.fill(code);
+    await stamp.click();
+    await expect(page.getByText("⏳ Already stamped just now · 1/3")).toBeVisible();
+
+    // A second purchase on the same visit is asked for on purpose.
+    const again = page.getByRole("button", { name: "+ Add another stamp" });
+    await again.click();
+    await expect(page.getByText("✓ Stamp added · 2/3")).toBeVisible();
+    await again.click(); // waits out the button's rest after each stamp
+    await expect(page.getByText("🎉 Reward ready! · 3/3")).toBeVisible();
+    await expect(again).toBeHidden(); // a full card takes no more until it is redeemed
+
     // The card polls the API every few seconds, so the customer watches it fill.
     await expect(phone.getByText("3/3", { exact: true })).toBeVisible({ timeout: 15_000 });
   });
