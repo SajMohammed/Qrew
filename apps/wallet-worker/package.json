@@ -16,7 +16,7 @@
     "@qrew/wallet-core": "workspace:*",
     "bullmq": "^5.0.0",
     "dotenv": "^16.4.5",
-    "drizzle-orm": "^0.44.0"
+    "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {
     "@swc/cli": "^0.4.0",

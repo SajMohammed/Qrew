@@ -2,14 +2,17 @@ import "./load-env"; // must be first: populates env before @qrew/db loads
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { raw } from "express";
-import { assertTokenSecretsConfigured } from "@qrew/core";
+import { assertDeployableConfig } from "@qrew/core";
+import { assertAppRoleIsolated } from "@qrew/db";
 import { AppModule } from "./app.module";
 import { ZodExceptionFilter } from "./common/zod-exception.filter";
 import { DomainExceptionFilter } from "./common/domain-exception.filter";
 
 async function bootstrap(): Promise<void> {
-  // Fail closed in production: never sign tokens with the public dev-default secrets.
-  if (process.env.NODE_ENV === "production") assertTokenSecretsConfigured();
+  // Fail closed outside development: no public token secrets, fake wallet, open CORS or missing
+  // keys — and never a database role that would see every shop's data.
+  assertDeployableConfig("api");
+  await assertAppRoleIsolated();
 
   const app = await NestFactory.create(AppModule);
   /*
@@ -32,4 +35,7 @@ async function bootstrap(): Promise<void> {
   console.log(`Qrew API listening on :${port}`);
 }
 
-void bootstrap();
+bootstrap().catch((err: unknown) => {
+  console.error(err instanceof Error ? err.message : err);
+  process.exit(1);
+});

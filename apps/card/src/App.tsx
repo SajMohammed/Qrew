@@ -213,7 +213,8 @@ export function App() {
       openCard(r.serial);
     });
 
-  // DEV self-test controls (only for a card we just enrolled, so we hold its ids).
+  // DEV self-test controls (only for a card we just enrolled, so we hold its ids). Development builds
+  // only: they call the API with x-merchant-id, which a deployed API rejects.
   const devStamp = () => {
     if (!enrollCtx) return;
     void run(async () => {
@@ -242,8 +243,8 @@ export function App() {
             busy={busy}
             err={err}
             onBack={backHome}
-            onStamp={enrollCtx?.serial === selected ? devStamp : undefined}
-            onRedeem={enrollCtx?.serial === selected ? devRedeem : undefined}
+            onStamp={import.meta.env.DEV && enrollCtx?.serial === selected ? devStamp : undefined}
+            onRedeem={import.meta.env.DEV && enrollCtx?.serial === selected ? devRedeem : undefined}
           />
         )}
 

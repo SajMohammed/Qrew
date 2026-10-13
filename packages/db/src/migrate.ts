@@ -15,6 +15,21 @@ if (!url) {
   process.exit(1);
 }
 
+// 0000 creates the app role with a development password that is public in this repo. Anywhere
+// but a developer's machine or a test run, the real one must be supplied, and is (re)applied on
+// every run so the role never keeps the default. Restricted to a charset that needs no quoting,
+// because ALTER ROLE takes the password as a literal, not a bind parameter.
+const appPassword = process.env.QREW_APP_PASSWORD;
+const devLike = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+if (appPassword !== undefined && !/^[A-Za-z0-9_\-+=/.]{24,128}$/.test(appPassword)) {
+  console.error("QREW_APP_PASSWORD must be 24-128 characters of A-Z a-z 0-9 _ - + = / .");
+  process.exit(1);
+}
+if (!appPassword && !devLike) {
+  console.error("QREW_APP_PASSWORD is required outside development and test (the default is public).");
+  process.exit(1);
+}
+
 const dir = join(__dirname, "..", "migrations");
 
 async function main(): Promise<void> {
@@ -44,6 +59,10 @@ async function main(): Promise<void> {
       await client.unsafe(wrapped);
     }
     console.log("✓ migrations up to date");
+    if (appPassword) {
+      await client.unsafe(`alter role qrew_app with password '${appPassword}'`);
+      console.log("✓ qrew_app password set from QREW_APP_PASSWORD");
+    }
   } finally {
     await client.end();
   }

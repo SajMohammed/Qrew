@@ -1,8 +1,18 @@
 import "./load-env"; // must be first: populates env before @qrew/db loads
 import { Worker } from "bullmq";
 import { WALLET_QUEUE, createWorkerConnection, type WalletJobData } from "@qrew/queue";
-import { closeDb } from "@qrew/db";
+import { assertDeployableConfig } from "@qrew/core";
+import { assertAppRoleIsolated, closeDb } from "@qrew/db";
 import { processWalletSync } from "./processor";
+
+// Fail closed outside development: a deployed worker with the fake provider or no public URL would
+// "succeed" at every job while no pass ever changed.
+try {
+  assertDeployableConfig("worker");
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
+}
 
 const connection = createWorkerConnection();
 
@@ -19,8 +29,18 @@ const worker = new Worker<WalletJobData>(
   (job) => processWalletSync(job.data),
   {
     connection,
+    // Started below, once the database role is known to be the row-level-security one.
+    autorun: false,
     concurrency: Number(process.env.WALLET_WORKER_CONCURRENCY ?? 5),
     limiter: { max: 5, duration: 1000 },
+  },
+);
+
+assertAppRoleIsolated().then(
+  () => void worker.run(),
+  (err: Error) => {
+    console.error(err.message);
+    process.exit(1);
   },
 );
 

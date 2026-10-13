@@ -22,15 +22,20 @@ const CUSTOMER_SECRET = process.env.CUSTOMER_TOKEN_SECRET ?? TOKEN_SECRET_DEFAUL
  * (customer sessions, staff shift tokens, card QRs) with a publicly-known key.
  */
 export function assertTokenSecretsConfigured(): void {
-  const unsafe = Object.entries(TOKEN_SECRET_DEFAULTS)
-    .filter(([name, dflt]) => {
-      const v = process.env[name];
-      return !v || v === dflt;
-    })
-    .map(([name]) => name);
+  const unsafe = unsafeTokenSecrets();
   if (unsafe.length > 0) {
     throw new Error(`Refusing to start: set a strong secret for ${unsafe.join(", ")} (the dev default is public).`);
   }
+}
+
+/** The token-secret variables that are unset or still the public dev default. */
+export function unsafeTokenSecrets(env: Record<string, string | undefined> = process.env): string[] {
+  return Object.entries(TOKEN_SECRET_DEFAULTS)
+    .filter(([name, dflt]) => {
+      const v = env[name];
+      return !v || v === dflt;
+    })
+    .map(([name]) => name);
 }
 
 const CARD_TTL_MS = 120_000; // 2 minutes — refreshed as the card polls

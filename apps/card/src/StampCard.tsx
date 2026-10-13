@@ -197,7 +197,7 @@ export function StampCard({
         </a>
       )}
 
-      {onStamp && onRedeem && (
+      {import.meta.env.DEV && onStamp && onRedeem && (
         <div className="border-border bg-surface flex items-center gap-2 rounded-xl border p-2.5">
           <span className="text-faint font-mono text-[10px] tracking-[0.12em] uppercase">Dev</span>
           <button

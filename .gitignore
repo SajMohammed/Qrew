@@ -20,6 +20,10 @@ coverage/
 .next/
 out/
 
+# playwright
+test-results/
+playwright-report/
+
 # terraform
 infra/terraform/.terraform/
 *.tfstate
