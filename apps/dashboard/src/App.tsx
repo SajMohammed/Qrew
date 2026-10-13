@@ -23,7 +23,7 @@ export function App() {
   if (!isLoaded) {
     return (
       <div className="grid min-h-dvh place-items-center p-6">
-        <p className="text-muted-foreground text-sm">Loading…</p>
+        <p className="text-ink-3 text-sm">Loading…</p>
       </div>
     );
   }
@@ -32,7 +32,9 @@ export function App() {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-6 p-6">
         <Wordmark />
-        <h1 className="text-center text-2xl font-extrabold tracking-tight">Sign in to your shop</h1>
+        <h1 className="sf-title sf-twotone text-center">
+          <span className="sf-lead">Sign in to</span> <strong>your shop</strong>
+        </h1>
         <SignIn />
       </div>
     );
@@ -128,18 +130,16 @@ function ShopApp() {
   if (forbidden) {
     return (
       <div className="grid min-h-dvh place-items-center p-6">
-        <Card className="max-w-sm items-center gap-2 p-8 text-center">
+        <Card className="max-w-sm items-center gap-3 p-8 text-center">
           <Wordmark />
-          <h1 className="mt-2 text-lg font-bold">Counter access only</h1>
-          <p className="text-muted-foreground text-sm">
+          <h1 className="sf-title sf-twotone mt-2">
+            <span className="sf-lead">Counter access</span> <strong>only</strong>
+          </h1>
+          <p className="text-ink-2 m-0 text-sm">
             Your account can stamp cards but can't open the shop's dashboard or customer list. Ask
             the owner if you need access.
           </p>
-          <button
-            type="button"
-            onClick={enterCounter}
-            className="bg-primary text-primary-foreground mt-3 min-h-11 w-full rounded-xl text-sm font-bold"
-          >
+          <button type="button" onClick={enterCounter} className="sf-btn sf-btn--primary sf-btn--block mt-2">
             Open counter mode
           </button>
         </Card>
@@ -155,9 +155,9 @@ function ShopApp() {
       shopName={data?.merchantName}
     >
       {err && (
-        <Card className="border-destructive/40 mb-3 p-4">
-          <p className="text-destructive text-sm">{err}</p>
-        </Card>
+        <div className="sf-card sf-card--compact bg-danger-soft mb-4 shadow-none">
+          <p className="text-danger-ink m-0 text-sm">{err}</p>
+        </div>
       )}
 
       {/* Keyed on the view so each screen replays its entrance instead of swapping abruptly. */}
@@ -189,7 +189,7 @@ function ShopApp() {
           (data ? (
             <CounterQR merchantId={data.merchantId} merchantName={data.merchantName} />
           ) : (
-            <p className="text-muted-foreground text-sm">Loading…</p>
+            <p className="text-ink-3 text-sm">Loading…</p>
           ))}
       </div>
     </AppShell>

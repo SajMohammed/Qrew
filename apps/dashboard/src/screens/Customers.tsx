@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Users, X } from "lucide-react";
 import type { CustomerFilter, CustomerList, CustomerRow, CustomerStatus } from "@/api";
 import { useApi } from "@/useApi";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -78,37 +77,34 @@ export function Customers({ initialFilter = "all" }: { initialFilter?: CustomerF
   }, [data, offset]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Customers</h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-[15px]">
-            Everyone who has taken a card at your shop.
-          </p>
-        </div>
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="sf-display sf-twotone">
+          <strong>Customers</strong>
+        </h1>
+        <p className="text-ink-3 mt-2 mb-0 text-[15px] sm:text-[17px]">Everyone who has taken a card at your shop.</p>
       </header>
 
       <div className="flex flex-col gap-3">
-        <div className="border-border bg-card flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5">
-          <Search className="text-faint size-4 shrink-0" aria-hidden />
+        <label className="sf-search">
+          <Search aria-hidden />
           <input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search name, email or phone…"
             aria-label="Search customers"
-            className="placeholder:text-faint min-w-0 flex-1 bg-transparent text-sm outline-none"
           />
           {searchInput && (
             <button
               type="button"
               onClick={() => setSearchInput("")}
               aria-label="Clear search"
-              className="text-faint hover:text-foreground"
+              className="sf-bubble sf-bubble--sm"
             >
-              <X className="size-4" />
+              <X />
             </button>
           )}
-        </div>
+        </label>
 
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
           {FILTERS.map((f) => (
@@ -120,12 +116,7 @@ export function Customers({ initialFilter = "all" }: { initialFilter?: CustomerF
                 setOffset(0);
               }}
               aria-pressed={filter === f.id}
-              className={cn(
-                "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition",
-                filter === f.id
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground",
-              )}
+              className="sf-chip shrink-0"
             >
               {f.label}
             </button>
@@ -134,114 +125,118 @@ export function Customers({ initialFilter = "all" }: { initialFilter?: CustomerF
       </div>
 
       {err && (
-        <Card className="border-destructive/40 p-4">
-          <p className="text-destructive text-sm">{err}</p>
-        </Card>
+        <div className="sf-card sf-card--compact bg-danger-soft shadow-none">
+          <p className="text-danger-ink m-0 text-sm">{err}</p>
+        </div>
       )}
 
       {loading && !data ? (
-        <Skeleton className="h-72 rounded-xl" />
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-[68px] rounded-lg" />
+          ))}
+        </div>
       ) : !data || data.rows.length === 0 ? (
-        <Card className="items-center gap-1.5 p-10 text-center">
-          <p className="font-bold">Nobody here</p>
-          <p className="text-muted-foreground text-sm">
-            {search
-              ? `No customer matches “${search}”.`
-              : filter === "all"
-                ? "No customers yet — print your Counter QR to get the first card out."
-                : "No customers in this segment right now."}
-          </p>
-        </Card>
+        <div className="sf-card">
+          <div className="sf-empty">
+            <span className="sf-bubble sf-bubble--lens sf-bubble--lg pointer-events-none" aria-hidden>
+              <Users />
+            </span>
+            <p className="sf-title sf-twotone">
+              <span className="sf-lead">Nobody</span> <strong>here</strong>
+            </p>
+            <p>
+              {search
+                ? `No customer matches “${search}”.`
+                : filter === "all"
+                  ? "No customers yet — print your Counter QR to get the first card out."
+                  : "No customers in this segment right now."}
+            </p>
+          </div>
+        </div>
       ) : (
         <>
-          {/* Phone/tablet: a table cannot honestly fit 375px, so each customer becomes a card. */}
-          <ul className="flex flex-col gap-2.5 lg:hidden">
+          {/* Phone/tablet: a table cannot honestly fit 375px, so each customer becomes a well row. */}
+          <ul className="sf-rows sf-rows--wells lg:hidden">
             {data.rows.map((c) => (
-              <li key={c.id}>
-                <Card className="gap-2 p-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar row={c} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{displayName(c)}</p>
-                      <p className="text-faint truncate text-[11.5px]">
-                        {c.email ?? c.phone ?? "Walk-in"}
-                      </p>
-                    </div>
-                    <StatusPill status={c.status} />
-                  </div>
-                  <dl className="text-muted-foreground grid grid-cols-3 gap-2 text-[12px]">
-                    <Facet term="Card" value={cardText(c)} />
-                    <Facet term="Visits" value={String(c.visits)} />
-                    <Facet term="Last seen" value={c.lastVisit ? relativeTime(c.lastVisit) : "Never"} />
-                  </dl>
-                </Card>
+              <li
+                key={c.id}
+                // On a sunken well, the avatar and a neutral pill lift to white or they vanish into it.
+                className="sf-row sf-row--well gap-y-3 py-3 [&_.sf-avatar]:bg-surface [&_.sf-status:not([class*=sf-status--])]:bg-surface"
+              >
+                <Avatar row={c} />
+                <div className="sf-row__main">
+                  <p className="sf-row__title">{displayName(c)}</p>
+                  <p className="sf-row__meta">{c.email ?? c.phone ?? "Walk-in"}</p>
+                </div>
+                <StatusPill status={c.status} />
+                <dl className="col-span-full m-0 grid grid-cols-3 gap-2 text-[12.5px]">
+                  <Facet term="Card" value={cardText(c)} />
+                  <Facet term="Visits" value={String(c.visits)} />
+                  <Facet term="Last seen" value={c.lastVisit ? relativeTime(c.lastVisit) : "Never"} />
+                </dl>
               </li>
             ))}
           </ul>
 
-          <Card className="hidden overflow-hidden p-0 lg:block">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Card</TableHead>
-                    <TableHead className="text-right">Visits</TableHead>
-                    <TableHead className="text-right">Rewards</TableHead>
-                    <TableHead>Last seen</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.rows.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2.5">
-                          <Avatar row={c} />
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold">{displayName(c)}</p>
-                            <p className="text-faint truncate text-[11.5px]">
-                              {c.email ?? c.phone ?? "Walk-in"}
-                            </p>
-                          </div>
+          <div className="sf-card hidden p-3 lg:flex">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="text-right">Card</TableHead>
+                  <TableHead className="text-right">Visits</TableHead>
+                  <TableHead className="text-right">Rewards</TableHead>
+                  <TableHead>Last seen</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.rows.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar row={c} />
+                        <div className="min-w-0">
+                          <p className="m-0 truncate">{displayName(c)}</p>
+                          <p className="text-ink-3 m-0 truncate text-[12.5px]">{c.email ?? c.phone ?? "Walk-in"}</p>
                         </div>
-                      </TableCell>
-                      <TableCell className="tabular text-right font-mono">{cardText(c)}</TableCell>
-                      <TableCell className="tabular text-right font-mono">{c.visits}</TableCell>
-                      <TableCell className="tabular text-right font-mono">{c.redemptions}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {c.lastVisit ? relativeTime(c.lastVisit) : "Never"}
-                      </TableCell>
-                      <TableCell>
-                        <StatusPill status={c.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
+                      </div>
+                    </TableCell>
+                    <TableCell className="tabular text-right">{cardText(c)}</TableCell>
+                    <TableCell className="tabular text-right">{c.visits}</TableCell>
+                    <TableCell className="tabular text-right">{c.redemptions}</TableCell>
+                    <TableCell className="text-ink-2">{c.lastVisit ? relativeTime(c.lastVisit) : "Never"}</TableCell>
+                    <TableCell>
+                      <StatusPill status={c.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-faint text-xs">{showing}</p>
+            <p className="text-ink-3 m-0 text-[12.5px]">{showing}</p>
             {pages > 1 && (
-              <div className="flex items-center gap-2">
+              <div className="sf-pager">
                 <PageButton
                   disabled={offset === 0 || loading}
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   label="Previous page"
                 >
-                  <ChevronLeft className="size-4" />
+                  <ChevronLeft />
                 </PageButton>
-                <span className="text-muted-foreground tabular text-xs font-semibold">
-                  {page} / {pages}
+                <span className="sf-pager__count">
+                  {page}
+                  <span className="sf-pager__total">/{pages}</span>
                 </span>
                 <PageButton
                   disabled={page >= pages || loading}
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   label="Next page"
                 >
-                  <ChevronRight className="size-4" />
+                  <ChevronRight />
                 </PageButton>
               </div>
             )}
@@ -259,37 +254,33 @@ function cardText(c: CustomerRow): string {
 
 function Avatar({ row }: { row: CustomerRow }) {
   return (
-    <span className="bg-muted text-primary grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold">
-      {initial(displayName(row))}
-    </span>
+    <span className="sf-avatar">{initial(displayName(row))}</span>
   );
 }
 
 function Facet({ term, value }: { term: string; value: string }) {
   return (
     <div>
-      <dt className="text-faint font-mono text-[9.5px] tracking-[0.08em] uppercase">{term}</dt>
-      <dd className="tabular text-foreground mt-0.5 font-semibold">{value}</dd>
+      <dt className="text-ink-3">{term}</dt>
+      <dd className="tabular text-ink m-0 mt-0.5">{value}</dd>
     </div>
   );
 }
 
-/** State is carried by shape and text as well as colour, so it survives a colour-blind read. */
+/**
+ * State is carried by text as well as colour, so it survives a colour-blind read. One fixed mapping:
+ * ready is lime (the positive state), at risk is warning, regulars teal, new lavender, active neutral.
+ */
+const STATUS_TONE: Record<CustomerStatus, string> = {
+  reward_ready: "sf-status--positive",
+  at_risk: "sf-status--warning",
+  regular: "sf-status--shared",
+  new: "sf-status--info",
+  active: "",
+};
+
 function StatusPill({ status }: { status: CustomerStatus }) {
-  return (
-    <span
-      className={cn(
-        "inline-block shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold whitespace-nowrap",
-        status === "reward_ready" && "bg-lime/25 text-primary",
-        status === "at_risk" && "bg-warning/15 text-warning",
-        status === "regular" && "bg-success/13 text-success",
-        status === "new" && "bg-muted text-muted-foreground",
-        status === "active" && "bg-muted text-muted-foreground",
-      )}
-    >
-      {statusLabel(status)}
-    </span>
-  );
+  return <span className={cn("sf-status shrink-0", STATUS_TONE[status])}>{statusLabel(status)}</span>;
 }
 
 function PageButton({
@@ -309,7 +300,7 @@ function PageButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="border-border bg-card text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-lg border transition disabled:opacity-40"
+      className="sf-bubble sf-bubble--raised disabled:opacity-40"
     >
       {children}
     </button>

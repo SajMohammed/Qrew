@@ -14,10 +14,12 @@ export function CreateShop({ onCreate }: { onCreate: (name: string) => Promise<v
   const { signOut } = useClerk();
   return (
     <div className="grid min-h-dvh place-items-center p-6">
-      <Card className="w-full max-w-sm gap-3 p-8">
+      <Card className="w-full max-w-sm gap-4 p-8">
         <Wordmark />
-        <h1 className="mt-2 text-lg font-bold">Name your shop</h1>
-        <p className="text-muted-foreground text-sm">
+        <h1 className="sf-title sf-twotone mt-2">
+          <span className="sf-lead">Name</span> <strong>your shop</strong>
+        </h1>
+        <p className="text-ink-2 m-0 text-sm">
           Customers see this on their card, in Google Wallet and on your counter poster. You can change
           it later in Settings.
         </p>
@@ -25,7 +27,7 @@ export function CreateShop({ onCreate }: { onCreate: (name: string) => Promise<v
         <button
           type="button"
           onClick={() => void signOut()}
-          className="text-muted-foreground hover:text-foreground self-start text-[13px] font-semibold underline-offset-2 hover:underline"
+          className="sf-btn sf-btn--ghost sf-btn--sm -ml-3 self-start"
         >
           Not your shop? Sign out
         </button>

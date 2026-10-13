@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 
 /** The shared controls the card sections are built from. Nothing here knows about card types. */
 
-export const FIELD =
-  "border-border bg-card placeholder:text-faint focus-visible:ring-ring w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus-visible:ring-2";
+/** Softform's field: a sunken rounded well that brightens on focus. */
+export const FIELD = "sf-input";
 
 export function Labelled({
   label,
@@ -18,9 +18,9 @@ export function Labelled({
 }) {
   return (
     <label className="block">
-      <span className="text-[13px] font-semibold">{label}</span>
+      <span className="sf-field__label block">{label}</span>
       {children}
-      {hint && <span className="text-muted-foreground mt-1 block text-[12px] leading-snug">{hint}</span>}
+      {hint && <span className="sf-field__hint mt-1.5 block leading-snug">{hint}</span>}
     </label>
   );
 }
@@ -35,9 +35,9 @@ export function Labelled({
 export function Group({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div role="group" aria-label={label}>
-      <span className="text-[13px] font-semibold">{label}</span>
+      <span className="sf-field__label block">{label}</span>
       {children}
-      {hint && <span className="text-muted-foreground mt-1 block text-[12px] leading-snug">{hint}</span>}
+      {hint && <span className="sf-field__hint mt-1.5 block leading-snug">{hint}</span>}
     </div>
   );
 }
@@ -65,7 +65,7 @@ export function NumberField({
         onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
         className={FIELD}
       />
-      {suffix && <span className="text-muted-foreground shrink-0 text-[13px]">{suffix}</span>}
+      {suffix && <span className="text-ink-2 shrink-0 text-[13px]">{suffix}</span>}
     </div>
   );
 }
@@ -91,8 +91,8 @@ export function Slider({
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <span className="text-[13px] font-semibold">{label}</span>
-        <span className="text-muted-foreground text-[12px] tabular-nums">
+        <span className="sf-field__label">{label}</span>
+        <span className="text-ink-2 text-[12.5px] tabular-nums">
           {format ? format(value) : `${Math.round(value * 100)}%`}
         </span>
       </div>
@@ -103,7 +103,7 @@ export function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="accent-primary mt-1.5 w-full cursor-pointer"
+        className="accent-ink mt-1.5 w-full cursor-pointer"
       />
     </div>
   );
@@ -119,17 +119,14 @@ export function Segmented<T extends string>({
   options: { id: T; label: string }[];
 }) {
   return (
-    <div className="border-border bg-card mt-1.5 flex gap-1 rounded-xl border p-1">
+    <div className="sf-tabs mt-1.5 w-full">
       {options.map((o) => (
         <button
           key={o.id}
           type="button"
           onClick={() => onChange(o.id)}
           aria-pressed={value === o.id}
-          className={cn(
-            "flex-1 cursor-pointer rounded-lg px-2 py-1.5 text-[12px] font-semibold transition",
-            value === o.id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
-          )}
+          className="sf-tabs__tab h-auto min-h-9 flex-1 px-3 py-1.5 text-[13px] leading-tight"
         >
           {o.label}
         </button>
@@ -178,13 +175,13 @@ export function ImageField({
 
   return (
     <div>
-      <span className="text-[13px] font-semibold">{label}</span>
-      <div className="mt-1.5 flex items-center gap-2">
-        <div className="border-border bg-card grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl border">
+      <span className="sf-field__label block">{label}</span>
+      <div className="mt-1.5 flex items-center gap-3">
+        <div className="bg-surface-sunken grid size-14 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-md)]">
           {value ? (
             <img src={value} alt="" className="size-full object-contain" />
           ) : (
-            <span className="text-faint text-[11px]">none</span>
+            <span className="text-ink-3 text-[12px]">none</span>
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -193,7 +190,7 @@ export function ImageField({
               type="button"
               onClick={() => input.current?.click()}
               disabled={busy}
-              className="border-border bg-card hover:bg-accent inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-[13px] font-semibold disabled:cursor-wait"
+              className="sf-btn sf-btn--soft px-4 text-[14px] disabled:cursor-wait"
             >
               {busy ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -207,7 +204,7 @@ export function ImageField({
                 type="button"
                 onClick={() => onChange(undefined)}
                 aria-label={`Remove ${label}`}
-                className="border-border bg-card hover:bg-accent grid cursor-pointer place-items-center rounded-xl border px-2.5"
+                className="sf-bubble"
               >
                 <X className="size-3.5" aria-hidden />
               </button>
@@ -224,14 +221,12 @@ export function ImageField({
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value || undefined)}
             placeholder="…or paste an https link"
-            className={cn(FIELD, "py-1.5 text-[12px]")}
+            className={cn(FIELD, "h-10 text-[13px]")}
           />
         </div>
       </div>
-      {error && <p className="text-destructive mt-1.5 text-[12px]">{error}</p>}
-      {hint && !error && (
-        <p className="text-muted-foreground mt-1.5 text-[12px] leading-snug">{hint}</p>
-      )}
+      {error && <p className="sf-field__error mt-1.5 mb-0">{error}</p>}
+      {hint && !error && <p className="sf-field__hint mt-1.5 mb-0 leading-snug">{hint}</p>}
     </div>
   );
 }

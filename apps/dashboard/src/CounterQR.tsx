@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Printer } from "lucide-react";
 import { useApi } from "./useApi";
@@ -39,18 +39,14 @@ export function CounterQR({ merchantId, merchantName }: { merchantId: string; me
   if (error) {
     return (
       <div className="mx-auto flex w-full max-w-[460px] flex-col items-center gap-3">
-        <p className="text-muted-foreground text-sm">Couldn't load your card.</p>
-        <button
-          type="button"
-          onClick={() => setReloadKey((k) => k + 1)}
-          className="border-border bg-card min-h-11 rounded-xl border px-4 text-sm font-bold"
-        >
+        <p className="text-ink-2 text-sm">Couldn't load your card.</p>
+        <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="sf-btn">
           Retry
         </button>
       </div>
     );
   }
-  if (!program) return <p className="text-muted-foreground text-sm">Loading your card…</p>;
+  if (!program) return <p className="text-ink-3 text-sm">Loading your card…</p>;
 
   // The static "enroll" deep-link — scanning it opens the customer app on this shop's card.
   const enrollUrl = `${CARD_ORIGIN}/?m=${merchantId}&p=${program.id}`;
@@ -66,30 +62,30 @@ export function CounterQR({ merchantId, merchantName }: { merchantId: string; me
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[460px] flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-[460px] flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-extrabold tracking-tight">Your counter code</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <h1 className="sf-title sf-twotone">
+          <span className="sf-lead">Your</span> <strong>counter code</strong>
+        </h1>
+        <p className="text-ink-2 mt-2 mb-0 text-sm">
           Print this and put it on your counter. Customers scan it with their phone camera to get
           your stamp card — no app install needed.
         </p>
       </header>
 
-      {/* The printable poster. `print-poster` is what the @media print rule keeps on the page. */}
-      <div
-        className="print-poster border-border flex flex-col items-center gap-3 rounded-3xl border bg-white px-6 py-7 text-center shadow-lg"
-        style={{ "--brand": program.cardDesign.brandColor } as CSSProperties}
-      >
-        <div className="font-display text-2xl tracking-wide text-[#0c2712]">
-          <span className="text-[var(--brand)]">Q</span>rew
+      {/*
+        The printable poster. `print-poster` is what the @media print rule keeps on the page. It is
+        paper in both themes, so its words use the fixed pastel ink and the QR stays near-black on white.
+      */}
+      <div className="print-poster bg-paper text-on-pastel shadow-sf-2 flex flex-col items-center gap-3 rounded-[var(--radius-xl)] px-6 py-8 text-center">
+        <span className="qrew-wordmark text-on-pastel">Qrew</span>
+        <div className="text-xl font-medium">{merchantName}</div>
+        <div className="bg-paper rounded-[var(--radius-md)] p-3">
+          <QRCodeSVG value={enrollUrl} size={232} level="M" bgColor="#ffffff" fgColor="#121512" />
         </div>
-        <div className="text-lg font-extrabold text-[#0c2712]">{merchantName}</div>
-        <div className="rounded-2xl border border-[#e8eaee] bg-white p-3">
-          <QRCodeSVG value={enrollUrl} size={232} level="M" bgColor="#ffffff" fgColor="#0c2712" />
-        </div>
-        <div className="text-base font-bold text-[#0c2712]">Scan to collect stamps</div>
-        <div className="text-sm text-[#4f5864]">
-          Collect {program.stampsRequired} · earn <strong>{program.rewardText}</strong>
+        <div className="text-base font-medium">Scan to collect stamps</div>
+        <div className="text-sm opacity-70">
+          Collect {program.stampsRequired} · earn <strong className="font-medium">{program.rewardText}</strong>
         </div>
       </div>
 
@@ -97,20 +93,20 @@ export function CounterQR({ merchantId, merchantName }: { merchantId: string; me
         <button
           type="button"
           onClick={() => window.print()}
-          className="bg-primary text-primary-foreground inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-bold transition hover:brightness-110"
+          className="sf-btn sf-btn--primary sf-btn--lg sm:flex-1"
         >
-          <Printer className="size-4" aria-hidden />
+          <Printer aria-hidden />
           Print poster
         </button>
         <button
           type="button"
           onClick={copyLink}
-          className="border-border bg-card min-h-12 flex-1 rounded-xl border text-sm font-bold"
+          className="sf-btn sf-btn--lg sm:flex-1"
         >
           {copied ? "Copied ✓" : "Copy link"}
         </button>
       </div>
-      <code className="bg-muted text-muted-foreground overflow-x-auto rounded-lg px-3 py-2 font-mono text-[11px] break-all">
+      <code className="bg-surface-sunken text-ink-2 overflow-x-auto rounded-[var(--radius-sm)] px-4 py-3 font-mono text-[12px] break-all">
         {enrollUrl}
       </code>
     </div>

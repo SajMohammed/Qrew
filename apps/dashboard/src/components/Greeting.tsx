@@ -18,13 +18,6 @@ const SALUTATIONS: Record<Slot, string[]> = {
   night: ["Still up", "Burning the midnight oil", "Late one", "Night owl"],
 };
 
-const EMOJI: Record<Slot, string> = {
-  morning: "☕",
-  afternoon: "👋",
-  evening: "🌆",
-  night: "🌙",
-};
-
 function slotFor(hour: number): Slot {
   if (hour >= 5 && hour < 12) return "morning";
   if (hour >= 12 && hour < 17) return "afternoon";
@@ -78,17 +71,13 @@ export function Greeting({ data }: { data: Analytics | null }) {
   const pool = SALUTATIONS[slot];
   const salutation = pool[dayIndex(now) % pool.length] ?? pool[0];
 
+  // Softform's two-tone headline: the faded salutation sets the scene, the name is the point.
   return (
     <div className="min-w-0">
-      <h1 className="flex flex-wrap items-baseline gap-x-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
-        <span>
-          {salutation}, <span className="text-primary">{name}</span>
-        </span>
-        <span aria-hidden className="text-xl sm:text-2xl">
-          {EMOJI[slot]}
-        </span>
+      <h1 className="sf-display sf-twotone">
+        <span className="sf-lead">{salutation},</span> <strong>{name}</strong>
       </h1>
-      <p className="text-muted-foreground mt-1 text-sm sm:text-[15px]">{subline(data)}</p>
+      <p className="text-ink-2 mt-2 mb-0 text-[15px] sm:text-[17px]">{subline(data)}</p>
     </div>
   );
 }

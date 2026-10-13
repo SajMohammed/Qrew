@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Smartphone, Wallet, Apple, Printer } from "lucide-react";
 import { useApi } from "@/useApi";
 import type { CardDesign } from "@/api";
@@ -58,7 +58,7 @@ export function SurfacePreview(props: PreviewInput) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="border-border bg-card flex gap-1 rounded-xl border p-1">
+      <div className="sf-tabs w-full">
         {SURFACES.map((s) => (
           <button
             key={s.id}
@@ -66,12 +66,7 @@ export function SurfacePreview(props: PreviewInput) {
             onClick={() => setSurface(s.id)}
             aria-pressed={surface === s.id}
             aria-label={s.label}
-            className={cn(
-              "flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-semibold transition",
-              surface === s.id
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:text-foreground",
-            )}
+            className="sf-tabs__tab flex flex-1 items-center justify-center gap-1.5 px-2 text-[13px]"
           >
             <s.icon className="size-3.5" aria-hidden />
             <span className="hidden sm:inline">{s.label}</span>
@@ -97,90 +92,68 @@ function AppCard({
   showsStamps,
   stampsRequired,
 }: PreviewInput) {
-  const ink = textOn(design.brandColor);
   const shown = Math.min(stampsRequired, 10);
   const filled = Math.ceil(shown * 0.7);
+  const part = Math.ceil(stampsRequired * 0.7);
   return (
     <figure className="m-0">
+      {/*
+       * Mirrors apps/card/src/StampCard.tsx: the shop's card is a Softform tinted aura grown from their
+       * brand colour, its count in dot-matrix at the top, stamps as dots in up to five columns, and the
+       * foot's words on light glass tags. Inventing a layout here makes the preview a picture of a card
+       * that does not exist. Qrew's own lime never appears on it.
+       */}
       <div
-        className="overflow-hidden rounded-2xl p-4 shadow-lg"
-        style={{ background: design.brandColor, color: ink }}
+        className="sf-aura sf-aura--tint qrew-card aspect-auto"
+        style={{ "--card-color": design.brandColor, "--card-ink": textOn(design.brandColor) } as CSSProperties}
       >
-        <div className="flex items-center gap-2">
-          <span
-            className="grid size-7 place-items-center overflow-hidden rounded-full text-[11px] font-extrabold"
-            style={{ background: `${ink}26` }}
-          >
-            {design.logoUrl ? (
-              <img src={design.logoUrl} alt="" className="size-full object-cover" />
-            ) : (
-              shopName.charAt(0)
-            )}
-          </span>
-          <span className="truncate text-[13px] font-semibold">{shopName}</span>
+        <div className="qrew-card__top">
+          <div className="qrew-card__shop">
+            <span className="qrew-card__logo">
+              {design.logoUrl ? <img src={design.logoUrl} alt="" /> : shopName.charAt(0)}
+            </span>
+            <div className="min-w-0">
+              <p className="qrew-card__name truncate">{shopName}</p>
+              <p className="qrew-card__program truncate">{title || "Loyalty Card"}</p>
+            </div>
+          </div>
           {/* A stamp card needs the count beside the row; the others print it large below, and
               showing it twice just reads as a mistake. */}
-          {showsStamps && <span className="ml-auto text-[12px] opacity-80">{progressLabel}</span>}
+          {showsStamps && (
+            <p className="sf-figure sf-figure-xl shrink-0">
+              {part}
+              <span className="sf-figure__sup">/{stampsRequired}</span>
+            </p>
+          )}
         </div>
 
-        <div className="mt-1 text-[15px] font-bold">{title || "Loyalty Card"}</div>
-
         {showsStamps ? (
-          /*
-           * Mirrors apps/card/src/StampCard.tsx exactly: a five-column grid, white discs for what
-           * is earned, dashed outlines for what is not. Inventing a layout here — it used to be a
-           * flex-wrap, which put eight stamps on one line and two on the next — makes the preview
-           * a picture of a card that does not exist.
-           */
-          <div
-            className="mt-3 grid gap-2"
-            style={{ gridTemplateColumns: `repeat(${Math.min(shown, 5)}, minmax(0, 1fr))` }}
+          <ol
+            className="sf-steps qrew-stamps"
+            style={{ "--cols": Math.min(shown, 5) } as CSSProperties}
+            aria-hidden
           >
             {Array.from({ length: shown }, (_, i) => {
               const on = i < filled;
               const art = on ? design.stampImageUrl : (design.emptyStampImageUrl ?? design.stampImageUrl);
               return (
-                <span
-                  key={i}
-                  className={cn(
-                    "grid aspect-square place-items-center rounded-full text-sm",
-                    on ? "shadow" : "border-[1.5px] border-dashed",
-                  )}
-                  style={
-                    on
-                      ? { background: ink, color: design.brandColor }
-                      : { borderColor: `${ink}66` }
-                  }
-                >
-                  {design.stampImageUrl ? (
-                    <img src={art} alt="" className="size-[72%] object-contain" />
-                  ) : on ? (
-                    design.stampIcon
-                  ) : (
-                    ""
-                  )}
-                </span>
+                <li key={i} className={cn("sf-steps__dot", on && "sf-steps__dot--done")}>
+                  {design.stampImageUrl ? <img src={art} alt="" /> : on ? design.stampIcon : ""}
+                </li>
               );
             })}
-          </div>
+          </ol>
         ) : (
-          showsProgress && (
-            <div className="mt-3 text-center text-2xl font-extrabold">{progressLabel}</div>
-          )
+          // A balance, a discount or a tier reads as words, so it is set in the grotesk, not dot-matrix.
+          showsProgress && <p className="sf-figure sf-figure-md">{progressLabel}</p>
         )}
 
-        <div className="mt-3 flex items-end justify-between gap-2">
-          <span className="text-[10px] tracking-wide uppercase opacity-75">
-            Reward
-            <b className="block text-[13px] tracking-normal normal-case opacity-100">
-              {rewardText || "reward"}
-            </b>
-          </span>
+        <div className="qrew-card__foot flex-wrap items-center">
+          {showsStamps && <span className="sf-tag">{stampsRequired - part} to your reward</span>}
+          <span className="sf-tag">{rewardText || "reward"}</span>
         </div>
       </div>
-      <figcaption className="text-muted-foreground mt-2 text-[12px]">
-        Their card in the Qrew app.
-      </figcaption>
+      <figcaption className="text-ink-3 mt-2 text-[12.5px]">Their card in the Qrew app.</figcaption>
     </figure>
   );
 }
@@ -248,9 +221,9 @@ function WalletPass({
 
   if (!issuable) {
     return (
-      <figure className="border-border bg-card m-0 rounded-2xl border border-dashed p-5 text-center">
-        <p className="text-[13px] font-semibold">No pass for this card yet</p>
-        <p className="text-muted-foreground mt-1 text-[12px] leading-snug">
+      <figure className="sf-card sf-card--sunken m-0 gap-1 text-center">
+        <p className="m-0 text-sm font-medium">No pass for this card yet</p>
+        <p className="text-ink-2 m-0 text-[12.5px] leading-snug">
           {platform === "google" ? "Google" : "Apple"} files this kind of card under offers, which we
           have not built an adapter for. The card still works — customers just cannot add it to their
           wallet, so no button is shown.
@@ -262,7 +235,7 @@ function WalletPass({
   return (
     <figure className="m-0">
       <div
-        className="overflow-hidden rounded-2xl shadow-lg"
+        className="shadow-sf-2 overflow-hidden rounded-[var(--radius-md)]"
         style={{ background: design.brandColor, color: ink }}
       >
         <div className="flex items-center gap-2 px-4 pt-4">
@@ -319,7 +292,7 @@ function WalletPass({
           </div>
         )}
       </div>
-      <figcaption className="text-muted-foreground mt-2 text-[12px]">
+      <figcaption className="text-ink-3 mt-2 text-[12.5px]">
         {showsStamps
           ? platform === "google"
             ? "The real image Google downloads — 1032×812."
@@ -335,7 +308,7 @@ function Poster({ design, shopName, rewardText, progressLabel }: PreviewInput) {
   return (
     <figure className="m-0">
       <div
-        className="grid aspect-[3/4] place-items-center rounded-2xl p-6 text-center shadow-lg"
+        className="shadow-sf-2 grid aspect-[3/4] place-items-center rounded-[var(--radius-md)] p-6 text-center"
         style={{ background: design.brandColor, color: ink }}
       >
         <div>
@@ -360,7 +333,7 @@ function Poster({ design, shopName, rewardText, progressLabel }: PreviewInput) {
           <p className="mt-3 text-[11px] opacity-75">Scan to start · {progressLabel}</p>
         </div>
       </div>
-      <figcaption className="text-muted-foreground mt-2 text-[12px]">
+      <figcaption className="text-ink-3 mt-2 text-[12.5px]">
         The counter poster customers scan to join.
       </figcaption>
     </figure>

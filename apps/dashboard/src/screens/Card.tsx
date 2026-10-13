@@ -136,11 +136,11 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
 
   if (!program) {
     return err ? (
-      <p className="text-destructive text-sm">{err}</p>
+      <p className="text-danger-ink text-sm">{err}</p>
     ) : (
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-        <Skeleton className="h-96 rounded-2xl lg:order-1" />
-        <Skeleton className="h-80 rounded-2xl lg:order-2" />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+        <Skeleton className="h-96 rounded-lg lg:order-1" />
+        <Skeleton className="h-80 rounded-xl lg:order-2" />
       </div>
     );
   }
@@ -152,10 +152,12 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
   const upload = async (kind: "stamp" | "logo", file: File) => (await api.uploadAsset(kind, file)).url;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Cards</h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-[15px]">
+        <h1 className="sf-display sf-twotone">
+          <strong>Cards</strong>
+        </h1>
+        <p className="text-ink-3 mt-2 mb-0 text-[15px] sm:text-[17px]">
           One design, everywhere your customers meet it.
         </p>
       </header>
@@ -165,11 +167,10 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
         then ordered to the right column on a wide screen, where it sticks as the editor scrolls.
         Reordering with CSS rather than markup keeps both arrangements right from one source.
       */}
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-        <div className="lg:order-2 lg:sticky lg:top-4">
-          <p className="text-faint mb-2 text-[11px] font-semibold tracking-[0.12em] uppercase">
-            Everywhere it appears
-          </p>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+        {/* The screen's one vivid surface: the shop's own card, live as it is edited. */}
+        <div className="lg:order-2 lg:sticky lg:top-6">
+          <p className="text-ink-3 mt-0 mb-2 text-[12.5px]">Everywhere it appears</p>
           <SurfacePreview
             design={design}
             shopName={shopName}
@@ -195,12 +196,13 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
                     onClick={() => selectType(t)}
                     aria-pressed={active}
                     className={cn(
-                      "cursor-pointer rounded-xl border p-3 text-left transition",
-                      active ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-accent",
+                      "sf-press cursor-pointer rounded-[var(--radius-md)] p-3 text-left transition-colors",
+                      // Chosen goes ink, like a pressed chip; lime stays for Save.
+                      active ? "bg-surface-inverse text-on-inverse" : "bg-surface-sunken hover:text-ink",
                     )}
                   >
-                    <span className="block text-[13px] font-semibold">{t.label}</span>
-                    <span className="text-muted-foreground mt-0.5 block text-[11px] leading-snug">
+                    <span className="block text-sm font-medium">{t.label}</span>
+                    <span className={cn("mt-0.5 block text-[12px] leading-snug", active ? "opacity-75" : "text-ink-2")}>
                       {t.blurb}
                     </span>
                   </button>
@@ -237,7 +239,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
 
           <Section icon={Palette} title="Colour">
             <Group label="Brand colour" hint="Backs the app card and both passes.">
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
                 {PRESET_COLORS.map((c) => (
                   <button
                     key={c}
@@ -247,10 +249,9 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
                     aria-pressed={c.toLowerCase() === design.brandColor.toLowerCase()}
                     style={{ background: c }}
                     className={cn(
-                      "size-11 cursor-pointer rounded-xl border-2 transition",
-                      c.toLowerCase() === design.brandColor.toLowerCase()
-                        ? "border-foreground scale-105"
-                        : "border-transparent",
+                      "sf-press size-11 cursor-pointer rounded-full transition-shadow",
+                      c.toLowerCase() === design.brandColor.toLowerCase() &&
+                        "shadow-[0_0_0_3px_var(--surface),0_0_0_5px_var(--ink)]",
                     )}
                   />
                 ))}
@@ -259,11 +260,11 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
                   value={design.brandColor}
                   onChange={(e) => patch({ brandColor: e.target.value })}
                   aria-label="custom colour"
-                  className="border-border size-11 cursor-pointer rounded-xl border bg-transparent"
+                  className="bg-surface-sunken size-11 cursor-pointer overflow-hidden rounded-full p-1 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch-wrapper]:p-0"
                 />
               </div>
             </Group>
-            <p className="text-muted-foreground text-[12px]">
+            <p className="text-ink-2 m-0 text-[12.5px]">
               Text and stamps are drawn in{" "}
               {textOn(design.brandColor) === "#fbfbf7" ? "white" : "near-black"} against this, picked
               for contrast.
@@ -313,7 +314,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
                   type="button"
                   onClick={() => patch({ details: details.filter((_, j) => j !== i) })}
                   aria-label={`Remove ${row.label || "row"}`}
-                  className="border-border bg-card hover:bg-accent grid size-10 shrink-0 cursor-pointer place-items-center rounded-xl border"
+                  className="sf-bubble shrink-0"
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </button>
@@ -323,9 +324,9 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
               <button
                 type="button"
                 onClick={() => patch({ details: [...details, { label: "", value: "" }] })}
-                className="border-border bg-card hover:bg-accent inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-[13px] font-semibold"
+                className="sf-btn sf-btn--soft w-fit px-4"
               >
-                <Plus className="size-3.5" aria-hidden /> Add a row
+                <Plus className="size-4" aria-hidden /> Add a row
               </button>
             )}
           </Section>
@@ -358,7 +359,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
                 <button
                   type="button"
                   onClick={() => patch({ location: null })}
-                  className="text-muted-foreground hover:text-foreground w-fit cursor-pointer text-[12px] underline"
+                  className="sf-btn sf-btn--ghost sf-btn--sm -ml-3 w-fit"
                 >
                   Turn the reminder off
                 </button>
@@ -368,28 +369,29 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
               <button
                 type="button"
                 onClick={() => patch({ location: { lat: 25.2048, lng: 55.2708 } })}
-                className="border-border bg-card hover:bg-accent inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-[13px] font-semibold"
+                className="sf-btn sf-btn--soft w-fit px-4"
               >
-                <MapPin className="size-3.5" aria-hidden /> Set your shop's location
+                <MapPin className="size-4" aria-hidden /> Set your shop's location
               </button>
             )}
           </Section>
 
-          <div className="border-border bg-card sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t px-4 py-3 sm:mx-0 sm:rounded-2xl sm:border sm:px-4">
+          {/* Floats over the form as it scrolls — above the phone dock, which sits at the bottom there. */}
+          <div className="sf-glass sf-glass--strong sticky bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] p-2 pr-4 lg:bottom-4">
             <button
               type="button"
               onClick={() => void save()}
               disabled={status === "saving"}
-              className="bg-primary text-primary-foreground cursor-pointer rounded-xl px-5 py-2.5 text-sm font-bold disabled:cursor-wait disabled:opacity-70"
+              className="sf-btn sf-btn--primary disabled:cursor-wait"
             >
               {status === "saving" ? "Saving…" : "Save card"}
             </button>
             {status === "saved" && (
-              <span className="text-primary inline-flex items-center gap-1 text-[13px] font-semibold">
+              <span className="text-signature-ink inline-flex items-center gap-1 text-[13px] font-medium">
                 <Check className="size-4" aria-hidden /> Saved
               </span>
             )}
-            {err && <span className="text-destructive text-[13px]">{err}</span>}
+            {err && <span className="text-danger-ink text-[13px]">{err}</span>}
             {!err && status !== "saved" && <WalletSyncNote sync={program.walletSync} />}
           </div>
         </div>
@@ -410,13 +412,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <Panel className="gap-3.5 p-4">
-      <div className="flex items-start gap-2">
-        <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+    <Panel>
+      <div className="sf-card__head">
         <div>
-          <h2 className="text-[15px] font-bold">{title}</h2>
-          {hint && <p className="text-muted-foreground mt-0.5 text-[12px] leading-snug">{hint}</p>}
+          <h2 className="sf-heading m-0">{title}</h2>
+          {hint && <p className="sf-card__meta mt-0.5 leading-snug">{hint}</p>}
         </div>
+        <span className="sf-bubble pointer-events-none" aria-hidden>
+          <Icon />
+        </span>
       </div>
       {children}
     </Panel>
@@ -456,13 +460,13 @@ function previewLabel(type: CardType, target: number, mechanics: Record<string, 
 
 /** What happened to the passes already in customers' phones after the last save. */
 function WalletSyncNote({ sync }: { sync: WalletSync }) {
-  const muted = "text-muted-foreground text-[13px]";
+  const muted = "text-ink-2 text-[13px]";
   switch (sync.state) {
     case "pending":
       return <span className={muted}>Updating passes already in customers' phones…</span>;
     case "failed":
       return (
-        <span className="text-destructive text-[13px]">
+        <span className="text-danger-ink text-[13px]">
           Your card is saved, but passes already in customers' phones weren't updated. Save again to retry.
         </span>
       );

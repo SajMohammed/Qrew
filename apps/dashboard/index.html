@@ -3,11 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#146A2E" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#eceeea" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0f0d" />
     <link rel="icon" href="/icon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:ital,wght@0,300..900;1,400..700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wdth,wght@62..125,100..900&family=Doto:ROND,wght@0..100,100..900&display=swap" rel="stylesheet" />
     <title>Qrew · Shop</title>
     <script>
       // Apply the saved theme before first paint, or a light flash precedes every dark-mode load.
@@ -24,7 +25,7 @@
       })();
     </script>
   </head>
-  <body>
+  <body class="sf-app sf-canvas">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -17,7 +17,8 @@ function Separator({
       decorative={decorative}
       orientation={orientation}
       className={cn(
-        "shrink-0 bg-border data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px",
+        // Softform separates with space and tone, never a rule: this keeps the role and draws a gap.
+        "shrink-0 bg-transparent data-[orientation=horizontal]:my-2 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:mx-2 data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px",
         className
       )}
       {...props}

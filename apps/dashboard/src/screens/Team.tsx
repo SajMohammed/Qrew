@@ -7,8 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { initial } from "@/lib/format";
 
-const FIELD =
-  "border-border bg-card placeholder:text-faint focus-visible:ring-ring w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus-visible:ring-2";
+/** Softform's field: a sunken rounded well that brightens on focus. */
+const FIELD = "sf-input";
 
 /**
  * The team screen. A shop's counter PIN is created here — without one, counter mode can only be
@@ -56,20 +56,24 @@ export function Team() {
   const withPin = team?.filter((s) => s.hasPin).length ?? 0;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Team</h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-[15px]">
+        <h1 className="sf-display sf-twotone">
+          <strong>Team</strong>
+        </h1>
+        <p className="text-ink-3 mt-2 mb-0 text-[15px] sm:text-[17px]">
           Who works your counter, and the PINs they use to unlock it.
         </p>
       </header>
 
       {team && withPin === 0 && (
-        <Card className="border-warning/40 bg-warning/8 flex-row items-start gap-3 p-4">
-          <ShieldCheck className="text-warning mt-0.5 size-5 shrink-0" aria-hidden />
-          <p className="text-sm">
-            <b>No counter PINs yet.</b>{" "}
-            <span className="text-muted-foreground">
+        <Card className="sf-card--compact bg-warning-soft flex-row items-start gap-3 shadow-none">
+          <span className="sf-bubble sf-bubble--sm bg-surface text-warning-ink pointer-events-none" aria-hidden>
+            <ShieldCheck />
+          </span>
+          <p className="text-warning-ink m-0 text-sm">
+            <b className="font-medium">No counter PINs yet.</b>{" "}
+            <span>
               Until someone has one, leaving counter mode means signing out. Add a manager below and
               that becomes a PIN instead.
             </span>
@@ -78,16 +82,16 @@ export function Team() {
       )}
 
       {err && (
-        <Card className="border-destructive/40 p-4">
-          <p className="text-destructive text-sm">{err}</p>
+        <Card className="sf-card--compact bg-danger-soft shadow-none">
+          <p className="text-danger-ink m-0 text-sm">{err}</p>
         </Card>
       )}
 
-      <Card className="gap-3 p-4">
-        <h2 className="text-base font-bold">Add someone</h2>
-        <div className="grid gap-3 sm:grid-cols-[1fr_140px_150px_auto] sm:items-end">
-          <label className="flex flex-col gap-1.5 text-[13px] font-semibold">
-            Name
+      <Card className="gap-4">
+        <h2 className="sf-heading m-0">Add someone</h2>
+        <div className="grid gap-3 sm:grid-cols-[1fr_150px_160px_auto] sm:items-end">
+          <label className="sf-field">
+            <span className="sf-field__label">Name</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -96,18 +100,18 @@ export function Team() {
               className={FIELD}
             />
           </label>
-          <label className="flex flex-col gap-1.5 text-[13px] font-semibold">
-            Counter PIN
+          <label className="sf-field">
+            <span className="sf-field__label">Counter PIN</span>
             <input
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
               inputMode="numeric"
               placeholder="4–6 digits"
-              className={cn(FIELD, "font-mono tracking-[0.2em]")}
+              className={cn(FIELD, "tracking-[0.2em]")}
             />
           </label>
-          <label className="flex flex-col gap-1.5 text-[13px] font-semibold">
-            Role
+          <label className="sf-field">
+            <span className="sf-field__label">Role</span>
             <select value={role} onChange={(e) => setRole(e.target.value)} className={FIELD}>
               <option value="cashier">Cashier</option>
               <option value="manager">Manager</option>
@@ -124,32 +128,31 @@ export function Team() {
                 setRole("cashier");
               })
             }
-            className="bg-primary text-primary-foreground inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition hover:brightness-110 disabled:opacity-40"
+            className="sf-btn sf-btn--primary sf-btn--lg"
           >
-            <UserPlus className="size-4" aria-hidden />
+            <UserPlus aria-hidden />
             Add
           </button>
         </div>
-        <p className="text-faint text-xs">
+        <p className="text-ink-3 m-0 text-[12.5px]">
           Only a manager's PIN can leave counter mode. A cashier's PIN attributes their scans but
           keeps them at the till.
         </p>
       </Card>
 
       {!team ? (
-        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-48 rounded-lg" />
       ) : (
-        <Card className="gap-0 p-0">
-          <ul className="divide-border divide-y">
+        // A list in a card: no rules between rows, just space.
+        <Card className="gap-0 py-3">
+          <ul className="sf-rows">
             {team.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-3 p-4">
-                <span className="bg-muted text-primary grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold">
-                  {initial(s.name)}
-                </span>
+              <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2">
+                <span className="sf-avatar">{initial(s.name)}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">{s.name}</p>
-                  <p className="text-faint text-[11.5px] capitalize">
-                    {s.role}
+                  <p className="m-0 truncate text-[15px]">{s.name}</p>
+                  <p className="text-ink-3 m-0 text-[12.5px]">
+                    <span className="capitalize">{s.role}</span>
                     {s.linkedAccount
                       ? " · signs in with their own account"
                       : s.hasPin
@@ -166,7 +169,7 @@ export function Team() {
                       inputMode="numeric"
                       autoFocus
                       placeholder="New PIN"
-                      className={cn(FIELD, "font-mono tracking-[0.2em] sm:w-32")}
+                      className={cn(FIELD, "h-11 tracking-[0.2em] sm:w-32")}
                     />
                     <button
                       type="button"
@@ -178,7 +181,7 @@ export function Team() {
                           setNewPin("");
                         })
                       }
-                      className="bg-primary text-primary-foreground min-h-10 rounded-lg px-3 text-[13px] font-bold disabled:opacity-40"
+                      className="sf-btn sf-btn--ink px-4"
                     >
                       Save
                     </button>
@@ -188,7 +191,7 @@ export function Team() {
                         setResetting(null);
                         setNewPin("");
                       }}
-                      className="text-muted-foreground min-h-10 px-2 text-[13px] font-semibold"
+                      className="sf-btn sf-btn--ghost px-3"
                     >
                       Cancel
                     </button>
@@ -201,9 +204,9 @@ export function Team() {
                         setResetting(s.id);
                         setNewPin("");
                       }}
-                      className="border-border text-muted-foreground hover:text-foreground inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[13px] font-semibold"
+                      className="sf-btn sf-btn--soft px-4"
                     >
-                      <KeyRound className="size-3.5" aria-hidden />
+                      <KeyRound className="size-4" aria-hidden />
                       {s.hasPin ? "Change PIN" : "Set PIN"}
                     </button>
                     {/* Someone with their own login is the mapping from that account to this shop —
@@ -214,9 +217,9 @@ export function Team() {
                         disabled={busy}
                         onClick={() => void act(() => api.removeStaff(s.id))}
                         aria-label={`Remove ${s.name}`}
-                        className="border-border text-muted-foreground hover:text-destructive grid size-9 place-items-center rounded-lg border disabled:opacity-40"
+                        className="sf-bubble hover:text-danger-ink disabled:opacity-40"
                       >
-                        <Trash2 className="size-3.5" />
+                        <Trash2 />
                       </button>
                     )}
                   </div>

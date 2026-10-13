@@ -57,26 +57,25 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
 
   return (
     <div className="min-h-dvh" onPointerDownCapture={unlockAudio} onKeyDownCapture={unlockAudio}>
-      <header className="border-border bg-card/95 sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-3 backdrop-blur">
+      {/* Floats on the canvas: no bar, no border — the scan frame is the screen. */}
+      <header className="bg-canvas/85 sticky top-0 z-20 flex items-center gap-3 px-4 py-3 backdrop-blur-md sm:px-6">
         <Wordmark compact />
-        <span className="bg-primary/12 text-primary ml-1 hidden rounded-full px-2.5 py-1 text-[11px] font-bold sm:inline">
-          Counter mode
-        </span>
+        <span className="sf-status sf-status--dot ml-1 hidden sm:inline-flex">Counter mode</span>
         <button
           type="button"
           onClick={() => {
             setAsking(true);
             setErr(null);
           }}
-          className="border-border text-muted-foreground hover:text-foreground ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-3 text-[13px] font-bold"
+          className="sf-btn ml-auto px-4"
         >
-          <Lock className="size-3.5" aria-hidden />
+          <Lock className="size-4" aria-hidden />
           Exit
         </button>
       </header>
 
       <main className="px-4 pt-4 pb-10">
-        <p className="text-muted-foreground mx-auto mb-3 w-full max-w-[440px] text-center text-[13px]">
+        <p className="text-ink-2 mx-auto mt-0 mb-4 w-full max-w-[440px] text-center text-sm">
           Scan a customer's card to add a stamp
           {shopName ? ` at ${shopName}` : ""}.
         </p>
@@ -85,24 +84,26 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
 
       {asking && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm"
+          className="sf-scrim z-50 grid place-items-center p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Leave counter mode"
         >
-          <div className="bg-card border-border w-full max-w-[340px] rounded-2xl border p-5 shadow-xl">
-            <div className="mb-1 flex items-center gap-2">
-              <h2 className="text-base font-bold">Leave counter mode</h2>
+          <div className="sf-modal max-w-[380px] gap-3 p-6">
+            <div className="flex items-start gap-2">
+              <h2 className="sf-title sf-twotone">
+                <span className="sf-lead">Leave</span> <strong>counter mode</strong>
+              </h2>
               <button
                 type="button"
                 onClick={() => setAsking(false)}
                 aria-label="Cancel"
-                className="text-faint hover:text-foreground ml-auto"
+                className="sf-bubble ml-auto"
               >
-                <X className="size-4" />
+                <X />
               </button>
             </div>
-            <p className="text-muted-foreground mb-4 text-[13px]">
+            <p className="text-ink-2 m-0 text-sm">
               Enter an owner or manager PIN to get back to the dashboard.
             </p>
             <input
@@ -113,14 +114,14 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
               autoFocus
               placeholder="••••"
               aria-label="Manager PIN"
-              className="border-border bg-background focus-visible:ring-ring w-full rounded-xl border px-3.5 py-3 text-center font-mono text-lg tracking-[0.3em] outline-none focus-visible:ring-2"
+              className="sf-code-field"
             />
-            {err && <p className="text-destructive mt-2 text-xs">{err}</p>}
+            {err && <p className="text-danger-ink m-0 text-[13px]">{err}</p>}
             <button
               type="button"
               onClick={() => void tryExit()}
               disabled={pin.length < 4 || checking}
-              className="bg-primary text-primary-foreground mt-3 min-h-11 w-full rounded-xl text-sm font-bold transition hover:brightness-110 disabled:opacity-40"
+              className="sf-btn sf-btn--primary sf-btn--lg sf-btn--block"
             >
               {checking ? "Checking…" : "Unlock"}
             </button>
@@ -133,7 +134,7 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
                 setCounterModeFlag(false);
                 void signOut();
               }}
-              className="text-faint hover:text-foreground mt-3 w-full text-center text-xs"
+              className="sf-btn sf-btn--ghost sf-btn--block"
             >
               No PIN set up? Sign out instead
             </button>
