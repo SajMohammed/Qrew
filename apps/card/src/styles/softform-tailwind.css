@@ -1,0 +1,138 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Softform × Tailwind v4 (+ shadcn/ui) bridge.
+
+   In the app's main stylesheet, in this order:
+     @import "tailwindcss";
+     @import "./softform.css";
+     @import "./softform-tailwind.css";        ← this file
+     @custom-variant dark (&:is(.dark *));     ← theme class on <html>
+
+   1. shadcn/ui variables point at Softform tokens, so existing shadcn
+      components take the palette at once (then restyle their shapes).
+   2. Softform tokens become Tailwind utilities: bg-canvas, bg-surface,
+      text-ink-3, bg-signature, text-signature-ink, bg-pink-soft,
+      shadow-sf-1, font-dots, rounded-pill, ease-soft, backdrop-blur-glass…
+
+   Already mapped with no extra code: Tailwind's rounded-sm/md/lg/xl and
+   font-sans resolve to Softform's values, because Softform declares the
+   same variable names outside any cascade layer. Delete any older
+   `--radius-*` or `--font-*` lines from the app's own @theme block.
+   ════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--ink);
+  --primary: var(--signature);
+  --primary-foreground: var(--on-signature);
+  --secondary: var(--surface-sunken);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-sunken);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--surface-sunken);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--on-danger);
+  --border: var(--line);
+  --input: var(--surface-sunken);
+  --ring: var(--focus);
+  --chart-1: var(--chart-ink);
+  --chart-2: var(--lavender);
+  --chart-3: var(--teal);
+  --chart-4: var(--peach);
+  --chart-5: var(--pink);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--signature);
+  --sidebar-primary-foreground: var(--on-signature);
+  --sidebar-accent: var(--surface-sunken);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--focus);
+  --radius: var(--radius-lg);
+}
+
+@theme inline {
+  /* shadcn names */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Softform names */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-on-inverse: var(--on-inverse);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-line: var(--line);
+  --color-signature: var(--signature);
+  --color-on-signature: var(--on-signature);
+  --color-signature-soft: var(--signature-soft);
+  --color-signature-ink: var(--signature-ink);
+  --color-on-pastel: var(--on-pastel);
+  --color-on-aura: var(--on-aura);
+  --color-paper: var(--paper);
+  --color-lavender: var(--lavender);
+  --color-lavender-soft: var(--lavender-soft);
+  --color-lavender-ink: var(--lavender-ink);
+  --color-pink: var(--pink);
+  --color-pink-soft: var(--pink-soft);
+  --color-pink-ink: var(--pink-ink);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-teal-ink: var(--teal-ink);
+  --color-peach: var(--peach);
+  --color-peach-soft: var(--peach-soft);
+  --color-peach-ink: var(--peach-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-ink: var(--danger-ink);
+  --color-on-danger: var(--on-danger);
+  --color-chart-ink: var(--chart-ink);
+  --color-chart-muted: var(--chart-muted);
+
+  --shadow-sf-1: var(--shadow-1);
+  --shadow-sf-2: var(--shadow-2);
+  --shadow-sf-3: var(--shadow-3);
+  --shadow-sf-bubble: var(--shadow-bubble);
+  --shadow-sf-glass: var(--shadow-glass);
+  --shadow-sf-signature: var(--shadow-signature);
+}
+
+/* These share Tailwind's namespaces with Softform's own names, so they are
+   restated as literals (keep in step with softform.css). */
+@theme {
+  --font-dots: "Doto", "Archivo", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius-pill: 999px;
+  --blur-glass: 24px;
+  --blur-aura: 48px;
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+}

@@ -5,6 +5,7 @@ import type { CardView, FailureKind } from "./api";
 import type { QrState } from "@/lib/connection";
 import { isIos } from "@/lib/platform";
 import { textOn } from "./contrast";
+import { CardFoot, CardTop, merchantStyle } from "./MerchantCard";
 import { Confetti } from "@/components/Confetti";
 import { buzz } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -67,57 +68,42 @@ export function StampCard({
     if (!card.rewardReady) celebrated.current = false;
   }, [card.rewardReady]);
 
-  const style = {
-    "--card-color": card.brandColor,
-    "--card-ink": textOn(card.brandColor),
-  } as CSSProperties;
-
   return (
-    <div className="mx-auto flex w-full max-w-[440px] flex-col gap-4 px-5 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:max-w-[520px]">
+    <div className="mx-auto flex w-full max-w-[440px] flex-col gap-4 px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:max-w-[520px]">
       {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-muted-foreground -ml-1 self-start rounded-lg px-1 py-2 text-sm font-semibold active:scale-95"
-        >
+        <button type="button" onClick={onBack} className="sf-btn sf-btn--ghost -ml-2 self-start px-3">
           ‹ All cards
         </button>
       )}
 
+      {/* The screen's one vivid surface: the shop's own card, in the shop's colour. */}
       <m.div
         initial={{ opacity: 0, y: 14, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        style={style}
-        className={cn(
-          "stampcard relative overflow-hidden rounded-3xl px-6 pt-6 pb-5",
-          card.rewardReady && "ready",
-        )}
+        style={merchantStyle(card.brandColor)}
+        className={cn("sf-aura sf-aura--tint qrew-card aspect-auto", card.rewardReady && "qrew-card--ready")}
       >
-        <Confetti run={celebrate} colors={[card.brandColor, "#cbfa5b", "#ffffff", "#8ff992"]} />
+        {/* The shop's colours only — Qrew's lime stays off the merchant's card. */}
+        <Confetti run={celebrate} colors={[textOn(card.brandColor), "#ffffff", card.brandColor]} />
 
-        <div className="relative z-10 flex items-center gap-3">
-          <span className="on-card-soft grid size-11 shrink-0 place-items-center rounded-full text-lg font-extrabold">
-            {card.merchantName.charAt(0)}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-lg font-extrabold">{card.merchantName}</span>
-            <span className="block truncate text-[13px] opacity-75">{card.programName}</span>
-          </span>
-          <span className="text-2xl font-extrabold">
-            {card.currentStamps}
-            <span className="text-base opacity-70">/{total}</span>
-          </span>
-        </div>
+        <CardTop
+          heading
+          name={card.merchantName}
+          program={card.programName}
+          count={card.currentStamps}
+          total={total}
+        />
 
-        <div
-          className="relative z-10 my-6 grid gap-3"
-          style={{ gridTemplateColumns: `repeat(${Math.min(total, 5)}, minmax(0, 1fr))` }}
+        <ol
+          className="sf-steps qrew-stamps"
+          style={{ "--cols": Math.min(total, 5) } as CSSProperties}
+          aria-label={`${card.currentStamps} of ${total} stamps`}
         >
           {cells.map((on, i) => {
             const justLanded = landedFrom !== null && on && i >= landedFrom;
             return (
-              <m.span
+              <m.li
                 key={i}
                 initial={false}
                 animate={justLanded ? { scale: [0.3, 1.18, 1] } : { scale: 1 }}
@@ -126,98 +112,72 @@ export function StampCard({
                     ? { duration: 0.5, times: [0, 0.6, 1], delay: (i - (landedFrom ?? 0)) * 0.08 }
                     : { duration: 0 }
                 }
-                className={cn(
-                  "grid aspect-square place-items-center rounded-full text-lg",
-                  on
-                    ? "bg-white text-[var(--card-color)] shadow-[0_3px_10px_rgba(0,0,0,0.25)]"
-                    : "on-card-line border-[1.5px] border-dashed",
-                )}
+                className={cn("sf-steps__dot", on && "sf-steps__dot--done")}
               >
                 {/* Artwork where the shop has it, their emoji otherwise — the same order the
                     wallet strip and the designer preview use. */}
                 {card.stampImageUrl ? (
-                  <img
-                    src={on ? card.stampImageUrl : (card.emptyStampImageUrl ?? card.stampImageUrl)}
-                    alt=""
-                    className="size-[72%] object-contain"
-                  />
+                  <img src={on ? card.stampImageUrl : (card.emptyStampImageUrl ?? card.stampImageUrl)} alt="" />
                 ) : on ? (
                   card.stampIcon
                 ) : (
                   ""
                 )}
-              </m.span>
+              </m.li>
             );
           })}
-        </div>
+        </ol>
 
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-bold">
-            {card.rewardReady ? "🎉 Reward ready!" : `${remaining} to your reward`}
-          </span>
-          <span className="on-card-soft rounded-full px-3 py-1 text-xs font-semibold">
-            {card.rewardText}
-          </span>
-        </div>
-
-        {/*
-          The QR sits on its own solid white panel with dark modules. It used to be white modules on
-          the card itself, which only scanned because the card was always dark — a pale brand colour
-          or a light theme made it unreadable.
-        */}
-        <div className="relative z-10 mt-6 flex flex-col items-center gap-2">
-          <div className="relative rounded-2xl bg-white p-3 shadow-lg">
-            {/*
-              A lapsed code fails at the till, so it must not look scannable: faded under a notice
-              on the same white panel (Qrew's words, never on the shop's colour). The card and its
-              count stay — the customer's progress is still theirs to see.
-            */}
-            <div className={cn(expired && "opacity-25 blur-[3px]")} aria-hidden={expired}>
-              <QRCodeSVG
-                value={card.qrToken || card.serial}
-                size={124}
-                bgColor="#ffffff"
-                fgColor="#0c2712"
-                level="M"
-              />
-            </div>
-            {expired && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-2xl p-2 text-center text-[#0c2712]">
-                <span className="text-sm font-extrabold">QR expired</span>
-                {/* The typed code below doesn't expire — staff can still stamp the card by it. */}
-                <span className="text-[11px] leading-tight">Reconnect for a fresh one, or give staff the code below</span>
-                {onRetry && (
-                  <button
-                    type="button"
-                    onClick={onRetry}
-                    className="mt-1 rounded-full bg-[#0c2712] px-3 py-1 text-[12px] font-bold text-white"
-                  >
-                    Try again
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          {!expired && (
-            <span className="text-[12px] font-medium opacity-80">
-              Show this to staff to earn a stamp
-            </span>
-          )}
-          {/* The code a cashier types when the QR won't read — a glare, a cracked screen. */}
-          {card.shortCode && (
-            <span className="text-[12px] opacity-80">
-              Can't scan? Code{" "}
-              <span className="font-mono text-sm font-bold tracking-[0.15em]">{card.shortCode}</span>
-            </span>
-          )}
-        </div>
+        <CardFoot>
+          <span className="sf-tag">{card.rewardReady ? "Reward ready" : `${remaining} to your reward`}</span>
+          <span className="sf-tag">{card.rewardText}</span>
+        </CardFoot>
       </m.div>
+
+      {/*
+        The QR is Qrew's, on its own card: a solid white panel with near-black modules in both
+        themes. It used to sit on the shop's colour, which only scanned because the card was always
+        dark — a pale brand colour or a light theme made it unreadable.
+      */}
+      <section aria-label="Your code" className="sf-card items-center gap-3 text-center">
+        <div className="qrew-qr">
+          {/*
+            A lapsed code fails at the till, so it must not look scannable: faded under a notice
+            on the same white panel (Qrew's words, never on the shop's colour). The card and its
+            count stay — the customer's progress is still theirs to see.
+          */}
+          <div className={cn(expired && "opacity-25 blur-[3px]")} aria-hidden={expired}>
+            <QRCodeSVG value={card.qrToken || card.serial} size={168} bgColor="#ffffff" fgColor="#121512" level="M" />
+          </div>
+          {expired && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-3 text-center">
+              <span className="text-[15px] font-medium">QR expired</span>
+              {/* The typed code below doesn't expire — staff can still stamp the card by it. */}
+              <span className="text-[12.5px] leading-tight">Reconnect for a fresh one, or give staff the code below</span>
+              {onRetry && (
+                <button type="button" onClick={onRetry} className="sf-btn sf-btn--ink mt-2">
+                  Try again
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        {!expired && <p className="text-ink-2 m-0 text-sm">Show this to staff to earn a stamp</p>}
+        {/* The code a cashier types when the QR won't read — a glare, a cracked screen. */}
+        {card.shortCode && (
+          <p className="text-ink-3 m-0 flex flex-wrap items-center justify-center gap-x-3 text-[12.5px]">
+            Can't scan? Code{" "}
+            <span className="sf-code text-ink [word-spacing:-0.3em]">{card.shortCode}</span>
+          </p>
+        )}
+      </section>
 
       {/*
         Shown only when the provider actually produced a save link, so a wallet outage or an
         unconfigured environment simply omits it rather than offering a dead button. Never on iOS:
         there is no Google Wallet there.
 
+        Google's own colours, not Qrew's: the button stands in for their badge.
         NOTE before launch: Google's brand guidelines require their official "Add to Google Wallet"
         badge asset. This is a faithful stand-in; drop the downloaded asset into public/ and swap it
         in when publishing access is requested.
@@ -228,7 +188,7 @@ export function StampCard({
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => buzz(10)}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2.5 rounded-full bg-[#202124] px-5 text-[15px] font-semibold text-white transition active:scale-[0.98]"
+          className="sf-btn sf-btn--block bg-[#202124] text-white"
         >
           <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
             <path
@@ -242,22 +202,12 @@ export function StampCard({
       )}
 
       {import.meta.env.DEV && onStamp && onRedeem && (
-        <div className="border-border bg-surface flex items-center gap-2 rounded-xl border p-2.5">
-          <span className="text-faint font-mono text-[10px] tracking-[0.12em] uppercase">Dev</span>
-          <button
-            type="button"
-            onClick={onStamp}
-            disabled={busy}
-            className="border-border ml-auto rounded-lg border px-3 py-1.5 text-[13px] font-semibold disabled:opacity-50"
-          >
+        <div className="sf-card sf-card--sunken sf-card--compact flex-row items-center">
+          <span className="sf-tag bg-surface">Dev</span>
+          <button type="button" onClick={onStamp} disabled={busy} className="sf-btn sf-btn--sm ml-auto">
             + Stamp
           </button>
-          <button
-            type="button"
-            onClick={onRedeem}
-            disabled={busy || !card.rewardReady}
-            className="border-border rounded-lg border px-3 py-1.5 text-[13px] font-semibold disabled:opacity-40"
-          >
+          <button type="button" onClick={onRedeem} disabled={busy || !card.rewardReady} className="sf-btn sf-btn--sm">
             Redeem
           </button>
         </div>
@@ -265,26 +215,26 @@ export function StampCard({
 
       {footer}
 
-      <p className="text-faint flex items-center justify-center gap-2 text-xs" aria-live="polite">
+      <p className="text-ink-3 m-0 flex items-center justify-center gap-2 text-[12.5px]" aria-live="polite">
         {connection.qr === "live" ? (
           <>
-            <span className="live-dot bg-success inline-block size-2 rounded-full" aria-hidden />
+            <span className="live-dot" aria-hidden />
             Live — updates as staff stamp your card
           </>
         ) : connection.qr === "reconnecting" ? (
           <>
-            <span className="bg-faint inline-block size-2 rounded-full" aria-hidden />
+            <span className="bg-ink-3 inline-block size-2 rounded-full" aria-hidden />
             {connection.failing === "offline" ? "No connection — reconnecting…" : "Can't reach Qrew — retrying…"}
           </>
         ) : (
           <>
-            <span className="bg-destructive inline-block size-2 rounded-full" aria-hidden />
+            <span className="bg-danger inline-block size-2 rounded-full" aria-hidden />
             Your code needs a connection to refresh
           </>
         )}
       </p>
 
-      {err && <p className="text-destructive text-center text-sm">{err}</p>}
+      {err && <p className="text-danger-ink m-0 text-center text-sm">{err}</p>}
     </div>
   );
 }

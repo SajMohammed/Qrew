@@ -1,97 +1,28 @@
 @import "tailwindcss";
+/* Softform, copied verbatim from the design system (~/.claude/skills/softform): re-copy to update, never edit. */
+@import "./styles/softform.css";
+@import "./styles/softform-tailwind.css";
+@import "./styles/qrew.css";
 
 /* The theme switcher stamps `.dark` on <html>, matching the shop app's convention. */
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Qrew Card — the customer's wallet.
+ * Qrew Card — the customer's wallet, on Softform.
  *
  * THE SPLIT RULE, which decides everything below: the app chrome is Qrew's and follows the
- * viewer's light/dark preference; the stamp card itself is the MERCHANT's and keeps their brand
- * colour in both themes. So the tokens here dress the shell only — a card never reads from them.
- *
- * Text tiers were contrast-checked against the surface they sit on, in both themes.
+ * viewer's light/dark preference; the stamp card itself is the MERCHANT's (`.qrew-card`, a tinted
+ * aura grown from their brand colour) and looks the same in both themes. Nothing Qrew — no lime, no
+ * wordmark — is ever drawn on a merchant card.
  */
-:root {
-  --radius: 1rem;
-
-  --background: #f4f5f7;
-  --foreground: #14181d;
-  --surface: #ffffff;
-  --panel: #f1f3f5;
-  --muted-foreground: #4f5864; /* secondary text — 7.5:1 on white */
-  --faint: #6e7783; /* captions, timestamps — 4.54:1 on white */
-  --border: #e8eaee;
-
-  --primary: #146a2e;
-  --primary-foreground: #f4fbe9;
-  --lime: #cbfa5b;
-  --forest: #146a2e;
-  --success: #1f9e46;
-  --destructive: #d64550;
-
-  /* The Qrew hero gradient — used on the app's own surfaces, never on a merchant's card. */
-  --grad: linear-gradient(160deg, #cbfa5b 0%, #86e056 34%, #38ad4c 68%, #146a2e 100%);
-}
-
-.dark {
-  --background: #0c0e11;
-  --foreground: #e8ebef;
-  --surface: #15181d;
-  --panel: #1c2027;
-  --muted-foreground: #aab3be;
-  --faint: #8a939e;
-  --border: #242932;
-
-  --primary: #7fd457;
-  --primary-foreground: #0c2712;
-  --lime: #cbfa5b;
-  --forest: #7fd457;
-  --success: #56c96f;
-  --destructive: #e0715f;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-panel: var(--panel);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-faint: var(--faint);
-  --color-border: var(--border);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-lime: var(--lime);
-  --color-forest: var(--forest);
-  --color-success: var(--success);
-  --color-destructive: var(--destructive);
-
-  --font-sans: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Anton", "Archivo", sans-serif;
-
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 0.375rem);
-  --radius-2xl: calc(var(--radius) + 0.625rem);
-}
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  html {
-    color-scheme: light;
-  }
-  html.dark {
-    color-scheme: dark;
-  }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    /* A soft lift behind the content, tuned per theme rather than a single fixed gradient. */
-    background-image: radial-gradient(120% 70% at 50% -10%, color-mix(in srgb, var(--lime) 22%, transparent), transparent 70%);
-    background-attachment: fixed;
     /* The status bar overlays the app on iOS (viewport-fit=cover + black-translucent), so the
        top inset has to be honoured or the header hides underneath it. */
     padding-top: env(safe-area-inset-top);
+    /* Stop iOS rubber-banding the whole page so pull-to-refresh owns the gesture. */
+    overscroll-behavior-y: contain;
   }
   button:not(:disabled),
   a[href],
@@ -102,52 +33,90 @@
   button:disabled {
     cursor: not-allowed;
   }
-  /* Stop iOS rubber-banding the whole page so pull-to-refresh owns the gesture. */
-  body {
-    overscroll-behavior-y: contain;
-  }
 }
 
 @layer components {
   /*
-   * The stamp card. Deliberately NOT themed: this surface belongs to the merchant, so it stays on
-   * their brand colour whichever theme the customer is using. `--card-color` and `--card-ink` are
-   * set inline per card; `--card-ink` flips the text for pale brand colours.
+   * Text on a merchant card stays in its top zone. The tinted aura brightens toward a pale bloom at
+   * the bottom-left, where a light ink falls to ~2:1 on dark and mid brand colours; the foot's words
+   * therefore sit on light glass tags instead (`.sf-aura .sf-tag`).
    */
-  .stampcard {
-    background: linear-gradient(
-      155deg,
-      var(--card-color, #146a2e),
-      color-mix(in srgb, var(--card-color, #146a2e) 45%, #05100d)
-    );
-    color: var(--card-ink, #fbfbf7);
-    box-shadow:
-      0 2px 6px rgba(12, 39, 18, 0.14),
-      0 40px 70px -34px rgba(12, 39, 18, 0.5);
+  .qrew-card__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
   }
-  .stampcard::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(120% 90% at 85% -10%, rgba(255, 255, 255, 0.22), transparent 60%);
-    pointer-events: none;
+  /* Clear of the 4px reward-ready ring, which is lime like dark mode's focus ring. */
+  .qrew-card:focus-visible {
+    outline-offset: 6px;
   }
-  .stampcard.ready {
-    box-shadow:
-      0 0 0 2px var(--lime),
-      0 2px 6px rgba(12, 39, 18, 0.14),
-      0 40px 70px -34px rgba(12, 39, 18, 0.5),
-      0 0 44px -6px rgba(203, 250, 91, 0.6);
+  .qrew-card__foot .sf-tag {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+
+  /* The stamps on a card held open: up to five a row, each dot as wide as its column allows. */
+  .qrew-card .qrew-stamps {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+  .qrew-card .qrew-stamps .sf-steps__dot {
+    width: 100%;
+    max-width: 64px;
+    height: auto;
+    aspect-ratio: 1;
+    justify-self: center;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .qrew-stamps .sf-steps__dot img {
+    width: 72%;
+    height: 72%;
+    object-fit: contain;
+  }
+
   /*
-   * Chrome drawn ON the card is tinted from --card-ink rather than hardcoded white, so a pale
-   * brand colour doesn't leave invisible white-on-white pills and borders.
+   * The QR's own panel: white with near-black modules in both themes, because a scanner needs that
+   * contrast whatever the phone's theme. Words on it use the fixed pastel ink for the same reason.
    */
-  .on-card-soft {
-    background: color-mix(in srgb, var(--card-ink, #fbfbf7) 16%, transparent);
+  .qrew-qr {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--paper);
+    color: var(--on-pastel);
   }
-  .on-card-line {
-    border-color: color-mix(in srgb, var(--card-ink, #fbfbf7) 42%, transparent);
+  .qrew-qr .sf-btn--ink {
+    background: var(--on-pastel);
+    color: var(--paper);
+  }
+
+  /* The open card is "live": a lime marker with an ink ring, breathing while polls succeed. */
+  .live-dot {
+    display: inline-block;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--signature);
+    box-shadow: 0 0 0 1.5px var(--chart-ink);
+    animation: qrew-pulse 2s var(--ease-inout) infinite;
+  }
+  @keyframes qrew-pulse {
+    0% {
+      box-shadow: 0 0 0 1.5px var(--chart-ink), 0 0 0 0 var(--signature-glow);
+    }
+    70% {
+      box-shadow: 0 0 0 1.5px var(--chart-ink), 0 0 0 8px transparent;
+    }
+    100% {
+      box-shadow: 0 0 0 1.5px var(--chart-ink), 0 0 0 0 transparent;
+    }
   }
 
   /*
@@ -156,7 +125,7 @@
    * for a fade the platform can do for free.
    */
   .screen-in {
-    animation: qrew-screen-in 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: qrew-screen-in var(--dur-base) var(--ease-soft) both;
   }
   @keyframes qrew-screen-in {
     from {
@@ -166,21 +135,6 @@
     to {
       opacity: 1;
       transform: none;
-    }
-  }
-
-  .live-dot {
-    animation: qrew-pulse 2s infinite;
-  }
-  @keyframes qrew-pulse {
-    0% {
-      box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 50%, transparent);
-    }
-    70% {
-      box-shadow: 0 0 0 8px transparent;
-    }
-    100% {
-      box-shadow: 0 0 0 0 transparent;
     }
   }
 }

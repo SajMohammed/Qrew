@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { friendlyError } from "./api";
@@ -38,6 +38,7 @@ export function SignInPanel({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const { resolved } = useTheme();
+  const emailId = useId();
 
   async function handle(fn: () => Promise<void>) {
     setErr(null);
@@ -88,45 +89,49 @@ export function SignInPanel({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-2",
-        !bare && "border-border bg-surface/70 rounded-2xl border p-5 text-center backdrop-blur",
+        "flex flex-col items-center gap-3",
+        !bare && "sf-card text-center",
         !bare && (compact ? "mt-2" : "mt-auto"),
       )}
     >
-      {!bare && !compact && <h2 className="text-lg font-extrabold tracking-tight">Save your cards</h2>}
+      {!bare && !compact && <h2 className="sf-heading m-0">Save your cards</h2>}
       {!bare && (
-        <p className="text-muted-foreground text-[13.5px] leading-relaxed">
+        <p className="text-ink-2 m-0 max-w-[36ch] text-sm">
           Sign in to keep every shop's card in one place — on any device.
         </p>
       )}
 
       {CLIENT_ID ? (
-        <div ref={btnRef} className="mt-1 min-h-11" />
+        <div ref={btnRef} className="min-h-11" />
       ) : (
-        <div className="mt-1 flex w-full flex-col gap-2">
-          <span className="text-faint self-center font-mono text-[10px] tracking-[0.14em] uppercase">
-            Dev sign-in
-          </span>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            inputMode="email"
-            aria-label="Email"
-            className="border-border bg-background placeholder:text-faint focus-visible:ring-primary w-full rounded-xl border px-3.5 py-3 text-sm outline-none focus-visible:ring-2"
-          />
+        <div className="flex w-full flex-col gap-3 text-left">
+          <div className="sf-field">
+            <label className="sf-field__label" htmlFor={emailId}>
+              Email
+            </label>
+            <input
+              id={emailId}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              inputMode="email"
+              aria-label="Email"
+              className="sf-input"
+            />
+            <p className="sf-field__hint m-0">Dev sign-in</p>
+          </div>
           <button
             type="button"
             disabled={busy || !email.includes("@")}
             onClick={() => handle(() => onDev(email))}
-            className="bg-primary text-primary-foreground min-h-12 w-full rounded-xl text-sm font-bold transition active:scale-[0.98] disabled:opacity-40"
+            className="sf-btn sf-btn--ink sf-btn--block"
           >
             {busy ? "Signing in…" : "Continue"}
           </button>
         </div>
       )}
-      {err && <p className="text-destructive text-sm">{err}</p>}
+      {err && <p className="text-danger-ink m-0 text-sm">{err}</p>}
     </div>
   );
 }

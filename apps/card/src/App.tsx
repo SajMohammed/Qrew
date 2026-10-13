@@ -26,6 +26,7 @@ import { SignInPanel } from "./SignInPanel";
 import { SaveCardNudge } from "./SaveCardNudge";
 import { ConnectionNotice } from "./ConnectionNotice";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Icon } from "@/components/Icon";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { CardsSkeleton, CardDetailSkeleton, Skeleton } from "@/components/Skeleton";
 import { buzz } from "@/lib/haptics";
@@ -468,6 +469,19 @@ export function App() {
     : "home";
 
   const qr = qrHeld ? qrState({ heldAt: qrHeld.at, ttlMs: qrHeld.ttlMs, failing: sync.failing, now: Date.now() }) : "live";
+  // The counter-QR landing: the shop's card is this screen's vivid surface, so the wallet below it lists rows.
+  const landing = Boolean(shop.m && shop.p && tilesLoaded);
+  const joining = landing && preview.status === "ready" ? preview.preview.merchantName : null;
+  const cardsTitle = auth.signedIn ? (
+    <>
+      <span className="sf-lead">Your</span> <strong>cards</strong>
+    </>
+  ) : (
+    <>
+      <span className="sf-lead">Cards on</span> <strong>this device</strong>
+    </>
+  );
+
   const showNudge =
     Boolean(card) && auth.ready && !auth.signedIn && !auth.stalled && !nudgeDismissed && localSerials.includes(card!.serial);
 
@@ -503,27 +517,19 @@ export function App() {
         )}
 
         {screen === "missing" && (
-          <div className={`${SCREEN} flex flex-col gap-4 px-5 pt-4`}>
-            <button
-              type="button"
-              onClick={backHome}
-              className="text-muted-foreground -ml-1 self-start rounded-lg px-1 py-2 text-sm font-semibold"
-            >
+          <div className={`${SCREEN} flex flex-col gap-4 px-4 pt-4`}>
+            <button type="button" onClick={backHome} className="sf-btn sf-btn--ghost -ml-2 self-start px-3">
               ‹ All cards
             </button>
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <span className="text-4xl" aria-hidden>
-                🔍
+            <div className="sf-empty">
+              <span className="sf-bubble sf-bubble--lens sf-bubble--lg pointer-events-none" aria-hidden>
+                <Icon name="search" />
               </span>
-              <h1 className="text-xl font-extrabold">Card not found</h1>
-              <p className="text-muted-foreground text-sm">
-                This card may have been removed. Head back to your cards.
-              </p>
-              <button
-                type="button"
-                onClick={() => retryDetailRef.current()}
-                className="text-primary mt-2 min-h-11 px-2 text-sm font-semibold"
-              >
+              <h1 className="sf-title sf-twotone">
+                <span className="sf-lead">Card</span> <strong>not found</strong>
+              </h1>
+              <p>This card may have been removed. Head back to your cards.</p>
+              <button type="button" onClick={() => retryDetailRef.current()} className="sf-btn mt-2">
                 Try again
               </button>
             </div>
@@ -531,29 +537,23 @@ export function App() {
         )}
 
         {screen === "unreachable" && (
-          <div className={`${SCREEN} flex flex-col gap-4 px-5 pt-4`}>
-            <button
-              type="button"
-              onClick={backHome}
-              className="text-muted-foreground -ml-1 self-start rounded-lg px-1 py-2 text-sm font-semibold"
-            >
+          <div className={`${SCREEN} flex flex-col gap-4 px-4 pt-4`}>
+            <button type="button" onClick={backHome} className="sf-btn sf-btn--ghost -ml-2 self-start px-3">
               ‹ All cards
             </button>
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <span className="text-4xl" aria-hidden>
-                📡
+            <div className="sf-empty">
+              <span className="sf-bubble sf-bubble--lens sf-bubble--lg pointer-events-none" aria-hidden>
+                <Icon name={detailError === "offline" ? "wifiOff" : "cloudOff"} />
               </span>
-              <h1 className="text-xl font-extrabold">Can't load your card</h1>
-              <p className="text-muted-foreground text-sm">
+              <h1 className="sf-title sf-twotone">
+                <span className="sf-lead">Can't load</span> <strong>your card</strong>
+              </h1>
+              <p>
                 {detailError === "offline"
                   ? "No connection. Your stamps are safe — your card will load as soon as you're back online."
                   : "Qrew isn't responding right now. Your stamps are safe — try again in a moment."}
               </p>
-              <button
-                type="button"
-                onClick={() => retryDetailRef.current()}
-                className="bg-primary text-primary-foreground mt-3 min-h-12 rounded-2xl px-6 text-sm font-bold"
-              >
+              <button type="button" onClick={() => retryDetailRef.current()} className="sf-btn sf-btn--primary mt-2">
                 Try again
               </button>
             </div>
@@ -561,7 +561,7 @@ export function App() {
         )}
 
         {screen === "loading" && (
-          <div className={`${SCREEN} px-5 pt-14`}>
+          <div className={`${SCREEN} px-4 pt-[76px]`}>
             <CardDetailSkeleton />
           </div>
         )}
@@ -569,20 +569,14 @@ export function App() {
         {screen === "home" && (
           <PullToRefresh onRefresh={loadTiles}>
             <div
-              className={`${SCREEN} flex min-h-dvh flex-col gap-4 px-5 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]`}
+              className={`${SCREEN} flex min-h-dvh flex-col gap-6 px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]`}
             >
-              <header className="flex items-center gap-3">
-                <span className="font-display text-2xl tracking-wide">
-                  <span className="text-primary">Q</span>rew
-                </span>
-                <div className="ml-auto flex items-center gap-2">
+              <header className="sf-spread">
+                <span className="qrew-wordmark">Qrew</span>
+                <div className="sf-cluster">
                   <ThemeToggle />
                   {auth.signedIn && (
-                    <button
-                      type="button"
-                      onClick={() => void auth.signOut()}
-                      className="text-muted-foreground rounded-lg px-2 py-2 text-[13px] font-semibold"
-                    >
+                    <button type="button" onClick={() => void auth.signOut()} className="sf-btn sf-btn--ghost px-4">
                       Sign out
                     </button>
                   )}
@@ -602,10 +596,13 @@ export function App() {
               )}
 
               {/* Only once this device's cards are known: one of them may be this shop's (see the redirect). */}
-              {shop.m && shop.p && tilesLoaded && (
-                <div className="flex flex-col gap-3">
+              {landing && (
+                <div className="flex flex-col gap-4">
                   {preview.status === "ready" ? (
                     <>
+                      <h1 className="sf-display sf-twotone">
+                        <span className="sf-lead">Join</span> <strong>{joining}</strong>
+                      </h1>
                       <CardPreview preview={preview.preview} />
                       <button
                         type="button"
@@ -613,9 +610,16 @@ export function App() {
                         // while a card here that can't be checked might be this shop's.
                         disabled={busy || Boolean(auth.stalled) || Boolean(tilesProblem?.unknown)}
                         onClick={addShopCard}
-                        className="bg-primary text-primary-foreground min-h-13 w-full rounded-2xl text-[15px] font-extrabold transition active:scale-[0.98] disabled:opacity-50"
+                        className="sf-btn sf-btn--primary sf-btn--lg sf-btn--block"
                       >
-                        {busy ? "Getting your card…" : "＋ Get this shop's card"}
+                        {busy ? (
+                          "Getting your card…"
+                        ) : (
+                          <>
+                            <Icon name="plus" />
+                            Get this shop's card
+                          </>
+                        )}
                       </button>
                     </>
                   ) : preview.status === "failed" ? (
@@ -638,12 +642,8 @@ export function App() {
                     )
                   ) : (
                     <>
-                      <Skeleton className="h-[220px] rounded-3xl" />
-                      <button
-                        type="button"
-                        disabled
-                        className="bg-primary text-primary-foreground min-h-13 w-full rounded-2xl text-[15px] font-extrabold opacity-50"
-                      >
+                      <Skeleton className="h-[260px] rounded-xl" />
+                      <button type="button" disabled className="sf-btn sf-btn--primary sf-btn--lg sf-btn--block">
                         Loading…
                       </button>
                     </>
@@ -671,20 +671,22 @@ export function App() {
                 <CardsSkeleton />
               ) : tiles.length > 0 ? (
                 <>
-                  <h1 className="text-xl font-extrabold tracking-tight">
-                    {auth.signedIn ? "Your cards" : "Cards on this device"}
-                  </h1>
-                  <CardsGrid cards={tiles} onOpen={openCard} />
+                  {joining ? (
+                    <h2 className="sf-heading sf-twotone">{cardsTitle}</h2>
+                  ) : (
+                    <h1 className="sf-display sf-twotone">{cardsTitle}</h1>
+                  )}
+                  <CardsGrid cards={tiles} onOpen={openCard} lead={!landing} />
                 </>
               ) : (shop.m && shop.p) || tilesProblem || auth.stalled ? null : (
-                <div className="flex flex-col items-center gap-2 py-16 text-center">
-                  <span className="text-4xl" aria-hidden>
-                    🎟️
+                <div className="sf-empty">
+                  <span className="sf-bubble sf-bubble--lens sf-bubble--lg pointer-events-none" aria-hidden>
+                    <Icon name="ticket" />
                   </span>
-                  <h1 className="text-xl font-extrabold">No cards yet</h1>
-                  <p className="text-muted-foreground text-sm">
-                    Scan a shop's Qrew code to get your first stamp card.
-                  </p>
+                  <h1 className="sf-title sf-twotone">
+                    <span className="sf-lead">No cards</span> <strong>yet</strong>
+                  </h1>
+                  <p>Scan a shop's Qrew code to get your first stamp card.</p>
                 </div>
               )}
 
@@ -697,7 +699,7 @@ export function App() {
                   compact={tiles.length > 0 || Boolean(shop.m && shop.p)}
                 />
               )}
-              {err && <p className="text-destructive text-center text-sm">{err}</p>}
+              {err && <p className="text-danger-ink m-0 text-center text-sm">{err}</p>}
             </div>
           </PullToRefresh>
         )}
