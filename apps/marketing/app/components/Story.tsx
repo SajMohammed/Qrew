@@ -94,15 +94,20 @@ export function Story() {
               </article>
             </div>
 
-            <div className="sf-liquid sf-liquid--tint mk-notif mk-story__notif" data-liquid="9" data-bezel="18">
-              <span className="mk-notif__icon" style={{ "--c": COLOUR } as CSSProperties}>
+            <div
+              className="sf-notify sf-liquid sf-liquid--tint mk-story__notif"
+              style={{ "--notify-icon-bg": COLOUR, "--notify-icon-ink": textOn(COLOUR) } as CSSProperties}
+              data-liquid="9"
+              data-bezel="18"
+            >
+              <span className="sf-notify__icon">
                 <GiftIcon />
               </span>
-              <span className="mk-notif__text">
-                <b>Nomad Coffee</b>
+              <span>
+                <b className="sf-notify__title">Nomad Coffee</b>
                 Your free coffee is ready
               </span>
-              <span className="mk-notif__time">now</span>
+              <span className="sf-notify__meta">now</span>
             </div>
             <span className="sf-status sf-status--positive sf-status--lg mk-story__reward">
               <CheckIcon /> Reward ready

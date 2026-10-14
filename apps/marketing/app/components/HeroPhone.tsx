@@ -51,15 +51,26 @@ export function HeroPhone() {
         </div>
 
         {n > START && (
-          <div key={n} className={`sf-liquid sf-liquid--tint mk-notif${ready ? " mk-notif--hold" : ""}`} data-liquid="9" data-bezel="18">
-            <span className="mk-notif__icon" style={{ "--c": COLOUR } as CSSProperties}>
-              {ready ? <GiftIcon /> : <CheckIcon />}
-            </span>
-            <span className="mk-notif__text">
-              <b>Nomad Coffee</b>
+          // Softform's notification, in the shop's colour: a short drop between stamps, a long hold on the reward.
+          <div
+            key={n}
+            className="sf-notify sf-liquid sf-liquid--tint mk-phone__notify"
+            style={
+              {
+                "--notify-for": ready ? "4s" : "1.6s",
+                "--notify-icon-bg": COLOUR,
+                "--notify-icon-ink": textOn(COLOUR),
+              } as CSSProperties
+            }
+            data-liquid="9"
+            data-bezel="18"
+          >
+            <span className="sf-notify__icon">{ready ? <GiftIcon /> : <CheckIcon />}</span>
+            <span>
+              <b className="sf-notify__title">Nomad Coffee</b>
               {ready ? "Your free coffee is ready" : `Stamp added · ${n} of ${TOTAL}`}
             </span>
-            <span className="mk-notif__time">now</span>
+            <span className="sf-notify__meta">now</span>
           </div>
         )}
 
