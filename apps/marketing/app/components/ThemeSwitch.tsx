@@ -13,24 +13,34 @@ export function ThemeSwitch() {
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
   }, []);
 
-  const choose = (next: Theme) => {
+  const choose = (next: Theme, from: HTMLElement) => {
     if (next === theme) return;
     setTheme(next);
     try {
       localStorage.setItem("qrew-theme", next);
     } catch {}
-    // A soft cross-fade where the browser supports it and the visitor hasn't asked for less motion.
+    // The new theme spreads out from the switch as a growing circle, where the browser supports view
+    // transitions and the visitor hasn't asked for less motion. Otherwise it simply changes.
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!reduce && "startViewTransition" in document) document.startViewTransition(() => applyTheme(next));
-    else applyTheme(next);
+    if (reduce || !("startViewTransition" in document)) return applyTheme(next);
+    const box = from.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    const r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    document.startViewTransition(() => applyTheme(next)).ready.then(() => {
+      document.documentElement.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
+        { duration: 700, easing: "cubic-bezier(0.22, 1, 0.36, 1)", pseudoElement: "::view-transition-new(root)" },
+      );
+    });
   };
 
   return (
     <div className="sf-tabs mk-theme" role="group" aria-label="Theme">
-      <button type="button" className="sf-tabs__tab" aria-label="Light" aria-pressed={theme === "light"} onClick={() => choose("light")}>
+      <button type="button" className="sf-tabs__tab" aria-label="Light" aria-pressed={theme === "light"} onClick={(e) => choose("light", e.currentTarget)}>
         <SunIcon />
       </button>
-      <button type="button" className="sf-tabs__tab" aria-label="Dark" aria-pressed={theme === "dark"} onClick={() => choose("dark")}>
+      <button type="button" className="sf-tabs__tab" aria-label="Dark" aria-pressed={theme === "dark"} onClick={(e) => choose("dark", e.currentTarget)}>
         <MoonIcon />
       </button>
     </div>
