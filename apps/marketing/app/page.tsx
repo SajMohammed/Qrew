@@ -22,7 +22,7 @@ export default function Home() {
       <section className="mk-section" id="rewards">
         <div className="mk-container">
           <Head tag="One card, every kind of reward" lead="Reward them" strong="your way" center>
-            Stamps, points, a standing discount or a members&apos; card — pick what fits how your customers buy.
+            Stamp cards are ready today. Points, a standing discount and members&apos; cards are coming soon.
           </Head>
           <Rewards />
         </div>
@@ -158,7 +158,7 @@ function Hero() {
 function Proof() {
   const items = [
     ["0", "apps for customers to download"],
-    ["2", "wallets: Apple & Google"],
+    ["2", "wallets: Google now, Apple soon"],
     ["1", "QR code on your counter"],
     ["0", "hardware to buy"],
   ];
@@ -192,18 +192,18 @@ const GALLERY: PassData[][] = [
   [
     { kind: "stamps", name: "Nomad Coffee", program: "Coffee club", colour: "#6c2a4b", have: 7, total: 10, tag: "3 to a free flat white" },
     { kind: "stamps", name: "Fade Barbers", program: "Cut club", colour: "#1f5673", have: 4, total: 6, tag: "2 to a free trim" },
-    { kind: "points", name: "Mist Bakery", program: "Bread points", colour: "#b0413e", points: 140, goal: 200, tag: "60 to a free loaf" },
+    { kind: "stamps", name: "Mist Bakery", program: "Bread club", colour: "#b0413e", have: 5, total: 8, tag: "3 to a free loaf" },
     { kind: "stamps", name: "Saba Juice", program: "Juice card", colour: "#146a2e", have: 5, total: 8, tag: "3 to a juice on us" },
-    { kind: "membership", name: "Layla Salon", program: "Glow members", colour: "#8a4b2f", tier: "Gold", number: "No. 0482", tag: "Members' perks" },
+    { kind: "stamps", name: "Layla Salon", program: "Glow card", colour: "#8a4b2f", have: 3, total: 6, tag: "3 to a free blow-dry" },
     { kind: "stamps", name: "Karak House", program: "Chai card", colour: "#c2501b", have: 3, total: 5, tag: "2 to a free karak" },
   ],
   [
     { kind: "stamps", name: "Spin Car Wash", program: "Wash card", colour: "#1d6e69", have: 2, total: 5, tag: "3 to a free wash" },
-    { kind: "points", name: "Bloom Florist", program: "Petal points", colour: "#962a68", points: 80, goal: 150, tag: "70 to a free bouquet" },
-    { kind: "discount", name: "Daily Greens", program: "Neighbours", colour: "#2f5d50", percent: 10, tag: "Show at the counter" },
+    { kind: "stamps", name: "Bloom Florist", program: "Petal card", colour: "#962a68", have: 4, total: 6, tag: "2 to a free bouquet" },
+    { kind: "stamps", name: "Daily Greens", program: "Bowl club", colour: "#2f5d50", have: 7, total: 10, tag: "3 to a free bowl" },
     { kind: "stamps", name: "Shawarma Spot", program: "Wrap card", colour: "#7d4e00", have: 6, total: 8, tag: "2 to a free wrap" },
     { kind: "stamps", name: "Iron Gym", program: "Class pass", colour: "#2b2f3a", have: 8, total: 12, tag: "4 to a free class" },
-    { kind: "points", name: "Dune Bakery", program: "Crumb points", colour: "#e8c9a0", points: 300, goal: 400, tag: "100 to a free cake" },
+    { kind: "stamps", name: "Dune Bakery", program: "Crumb club", colour: "#e8c9a0", have: 6, total: 8, tag: "2 to a free cake" },
   ],
 ];
 
@@ -217,7 +217,7 @@ function Gallery() {
           <h2 id="gallery-title" className="sf-display sf-twotone">
             <span className="sf-lead">A card for</span> <strong>every counter</strong>
           </h2>
-          <p className="sf-body-lg">Every shop&apos;s card in its own colours, with the reward that fits how its customers buy.</p>
+          <p className="sf-body-lg">Every shop&apos;s card in its own colours, with its own reward.</p>
         </div>
       </div>
       <div className="mk-gallery__rows" aria-hidden>
@@ -238,7 +238,7 @@ function Gallery() {
 const STEPS = [
   { icon: <PaletteIcon />, title: "Design your card", body: "Your colours, your logo or artwork, your reward. It looks like your shop, not a template." },
   { icon: <PrinterIcon />, title: "Put the QR on your counter", body: "Qrew makes a counter poster for you to print. One scan and a customer is in." },
-  { icon: <WalletIcon />, title: "Customers add it to their wallet", body: "No app to download. The card saves straight to Apple Wallet or Google Wallet." },
+  { icon: <WalletIcon />, title: "Customers add it to their wallet", body: "No app to download. The card saves straight to Google Wallet, with Apple Wallet coming soon." },
   { icon: <ScanIcon />, title: "Staff scan to stamp", body: "Any phone becomes the scanner. Each cashier has a PIN, and rewards redeem in one tap." },
   { icon: <ChartIcon />, title: "Watch them come back", body: "Visits, rewards and regulars, live — and who's slipping away before they're gone." },
 ];
@@ -328,7 +328,7 @@ function Compare() {
 const FAQ = [
   {
     q: "Do my customers need to download an app?",
-    a: "No. The card saves to Apple Wallet or Google Wallet, which are already on their phone. Customers who want every shop's card in one place can also open the Qrew card app in their browser.",
+    a: "No. On Android, the card saves to Google Wallet, which is already on the phone; Apple Wallet for iPhone is coming soon. On any phone, customers can also keep every shop's card in the Qrew card app, right in their browser.",
   },
   {
     q: "What do I need at the counter?",
@@ -340,7 +340,7 @@ const FAQ = [
   },
   {
     q: "What kinds of reward can I run?",
-    a: "Stamps, points, a standing discount or a members' card. You pick one when you design your card, and you set the reward.",
+    a: "Stamp cards are ready today: you choose how many stamps earn the reward, and what it is. Points, a standing discount and members' cards are coming soon.",
   },
   {
     q: "Where is my data kept?",

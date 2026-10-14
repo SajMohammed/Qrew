@@ -4,7 +4,8 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Pass, type PassData } from "./Pass";
 import { CheckIcon } from "./icons";
 
-const KINDS: Array<{ id: string; label: string; title: string; points: string[]; pass: PassData }> = [
+// Only stamp cards are production-ready today; the other kinds are shown as coming soon.
+const KINDS: Array<{ id: string; label: string; soon?: boolean; title: string; points: string[]; pass: PassData }> = [
   {
     id: "stamps",
     label: "Stamps",
@@ -14,6 +15,7 @@ const KINDS: Array<{ id: string; label: string; title: string; points: string[];
   },
   {
     id: "points",
+    soon: true,
     label: "Points",
     title: "Points on every visit.",
     points: ["Choose how many points a visit earns", "Customers see their balance in their wallet", "Spend them on rewards you set"],
@@ -21,6 +23,7 @@ const KINDS: Array<{ id: string; label: string; title: string; points: string[];
   },
   {
     id: "discount",
+    soon: true,
     label: "Discount",
     title: "A standing discount, always in their pocket.",
     points: ["Pick the rate card holders get", "Staff see it the moment they scan", "No codes to remember or type in"],
@@ -28,6 +31,7 @@ const KINDS: Array<{ id: string; label: string; title: string; points: string[];
   },
   {
     id: "membership",
+    soon: true,
     label: "Membership",
     title: "Members, with perks.",
     points: ["Give your best customers a members' card", "Their status shows at the counter", "Perks you choose, from extras to early access"],
@@ -102,6 +106,12 @@ export function Rewards() {
             onClick={() => choose(i)}
           >
             {k.label}
+            {k.soon && (
+              <>
+                {" "}
+                <span className="mk-tabs__soon">Soon</span>
+              </>
+            )}
           </button>
         ))}
       </div>
@@ -111,6 +121,7 @@ export function Rewards() {
           <Pass pass={kind.pass} />
         </div>
         <div key={`${kind.id}-copy`} className="mk-rewards__copy">
+          {kind.soon && <span className="sf-status sf-status--info mk-rewards__soon">Coming soon</span>}
           <h3 className="sf-title">{kind.title}</h3>
           <ul className="mk-ticks">
             {kind.points.map((p) => (

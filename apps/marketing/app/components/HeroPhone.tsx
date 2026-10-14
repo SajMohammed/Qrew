@@ -42,7 +42,7 @@ export function HeroPhone() {
       <div className="mk-phone__screen" aria-hidden>
         <div className="mk-phone__status">
           <span>9:41</span>
-          <span className="mk-phone__island" />
+          <span className="mk-phone__camera" />
           <span className="mk-phone__icons">
             <i />
             <i />
@@ -75,7 +75,7 @@ export function HeroPhone() {
           </div>
           <div className="mk-phone__peek" style={{ "--card-color": "#b0413e" } as CSSProperties}>
             <span>Mist Bakery</span>
-            <span>140 pts</span>
+            <span>5/8</span>
           </div>
           <article
             className={`sf-aura sf-aura--tint qrew-card mk-phone__card${ready ? " qrew-card--ready" : ""}`}

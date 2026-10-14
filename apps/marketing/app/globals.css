@@ -507,11 +507,12 @@
     font: 600 13px/1 var(--font-sans);
     color: var(--ink);
   }
-  .mk-phone__island {
-    width: 88px;
-    height: 26px;
-    border-radius: var(--radius-pill);
+  .mk-phone__camera {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
     background: #000;
+    box-shadow: inset 0 0 0 3px #1b1f1b;
   }
   .mk-phone__icons {
     display: flex;
@@ -1122,6 +1123,16 @@
   .mk-tabs__tab[aria-selected="true"] {
     color: var(--ink);
   }
+  .mk-tabs__soon {
+    margin-left: 2px;
+    padding: 3px 7px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-3);
+    vertical-align: 2px;
+  }
   /* The selection: a drop of lime-tinted glass over the chosen label, sliding on a spring. */
   .mk-tabs__drop {
     --lg-blur: 0px;
@@ -1164,6 +1175,7 @@
   }
   .mk-rewards__copy {
     display: grid;
+    justify-items: start;
     gap: var(--space-6);
     animation: mk-swap 500ms var(--ease-soft) 60ms both;
   }
@@ -1977,6 +1989,10 @@
       height: 42px;
       padding: 0 var(--space-4);
       font-size: 14px;
+    }
+    /* No room for the badges here; the panel says "Coming soon" instead. */
+    .mk-tabs__soon {
+      display: none;
     }
     .mk-rewards__panel {
       grid-template-columns: 1fr;
