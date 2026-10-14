@@ -16,7 +16,7 @@ const doto = Doto({ subsets: ["latin"], axes: ["ROND"], variable: "--font-doto",
 export const metadata: Metadata = {
   title: "Qrew — Loyalty that sticks",
   description:
-    "The wallet-native digital stamp card for the UAE's best cafés, salons & shops. No app — a beautiful card in Apple & Google Wallet, set up in minutes.",
+    "The wallet-native digital stamp card for the UAE's best cafés, salons & shops. No app — a beautiful card in your customers' phone wallet, set up in minutes.",
   openGraph: {
     title: "Qrew — Loyalty that sticks",
     description: "The wallet-native stamp card for UAE cafés, salons & shops. No app to download.",
