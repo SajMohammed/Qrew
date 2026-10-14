@@ -148,7 +148,7 @@ function AppCard({
           showsProgress && <p className="sf-figure sf-figure-md">{progressLabel}</p>
         )}
 
-        <div className="qrew-card__foot flex-wrap items-center">
+        <div className="qrew-card__foot">
           {showsStamps && <span className="sf-tag">{stampsRequired - part} to your reward</span>}
           <span className="sf-tag">{rewardText || "reward"}</span>
         </div>

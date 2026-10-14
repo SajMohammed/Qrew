@@ -47,5 +47,5 @@ export function CardTop({
 
 /** The card's foot: its words on light glass tags, which read on any brand colour. */
 export function CardFoot({ children }: { children: ReactNode }) {
-  return <div className="qrew-card__foot flex-wrap items-center">{children}</div>;
+  return <div className="qrew-card__foot">{children}</div>;
 }

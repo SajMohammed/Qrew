@@ -13,6 +13,12 @@
       text-ink-3, bg-signature, text-signature-ink, bg-pink-soft,
       shadow-sf-1, font-dots, rounded-pill, ease-soft, backdrop-blur-glass…
 
+   Overriding a Softform part with an arbitrary variant: Tailwind turns `_`
+   into a space there, so `[&_.sf-steps__dot]:…` silently becomes
+   `.sf-steps dot` and matches nothing. Escape the underscores
+   (`[&_.sf-steps\_\_dot]:…`; in a JS string `"[&_.sf-steps\\_\\_dot]:…"`)
+   or, better, write a named rule in the app's CSS.
+
    Already mapped with no extra code: Tailwind's rounded-sm/md/lg/xl and
    font-sans resolve to Softform's values, because Softform declares the
    same variable names outside any cascade layer. Delete any older
@@ -123,6 +129,26 @@
   --shadow-sf-bubble: var(--shadow-bubble);
   --shadow-sf-glass: var(--shadow-glass);
   --shadow-sf-signature: var(--shadow-signature);
+}
+
+/* Tailwind's Preflight resets buttons to the default arrow cursor, so anything
+   actionable reads as inert text. Put the pointer back once, here. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  summary,
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="color"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* These share Tailwind's namespaces with Softform's own names, so they are

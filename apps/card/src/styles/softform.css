@@ -260,8 +260,13 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
+  /* Components size with border-box (an input at width: 100% with padding, a card at a set width). Tailwind's
+     Preflight sets this too; without it, padded components overflow their columns. */
+  .sf-app, .sf-app *, .sf-app *::before, .sf-app *::after { box-sizing: border-box; }
   .sf-app :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .sf-app ::selection { background: var(--signature); color: var(--on-signature); }
+  /* Lucide (lucide-react, lucide) draws at a 2px stroke by default; Softform icons are 1.6px. */
+  svg.lucide { stroke-width: 1.6; }
 }
 
 @layer components {
@@ -421,6 +426,22 @@
 .sf-aura--drift { background-size: 150% 150%; animation: sf-drift 16s var(--ease-inout) infinite alternate; }
 @keyframes sf-drift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
 .sf-aura__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+/* A solid card on an aura is its own surface: the aura's descendant rules (light ink, light glass) stop at it,
+   and what it holds draws as it would on the canvas. */
+.sf-aura .sf-card .sf-twotone .sf-lead { color: var(--ink-3); opacity: 1; }
+.sf-aura .sf-card .sf-figure__sup, .sf-aura .sf-card .sf-figure__unit { color: var(--ink-3); opacity: 1; }
+.sf-aura .sf-card .sf-figure__sup--up { color: var(--signature-ink); }
+.sf-aura .sf-card .sf-figure__sup--down { color: var(--danger-ink); }
+.sf-aura .sf-card .sf-tag:not(.sf-tag--glass) { background: var(--surface-sunken); color: var(--ink-2); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.sf-aura .sf-card .sf-spark, .sf-aura .sf-card .sf-ring { color: var(--chart-ink); }
+.sf-aura .sf-card .sf-ring__track { stroke: var(--chart-muted); }
+.sf-aura .sf-card .sf-steps__dot { box-shadow: inset 0 0 0 1.5px var(--chart-muted); }
+.sf-aura .sf-card .sf-steps__dot--done { background: var(--chart-ink); box-shadow: none; color: inherit; }
+.sf-aura .sf-card .sf-steps__dot--current { box-shadow: inset 0 0 0 3px var(--chart-ink); }
+.sf-aura .sf-card .sf-steps--signature .sf-steps__dot--done { background: var(--signature); box-shadow: inset 0 0 0 1.5px var(--chart-ink); }
+.sf-aura .sf-card .sf-msg, .sf-aura .sf-card .sf-typing { background: var(--surface-sunken); color: var(--ink); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.sf-aura .sf-card .sf-msg--me { background: var(--surface-inverse); color: var(--on-inverse); }
+.sf-aura .sf-card .sf-suggest { background: var(--surface); color: var(--ink); }
 
 /* Aura tile: a soft color blob with grain (files, programs, rewards). Ink text on every tint. */
 .sf-tile {
@@ -514,7 +535,8 @@
 .sf-bubble--glass { background: var(--glass-light); color: var(--on-pastel); box-shadow: inset 0 1px 0 var(--glass-rim); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .sf-bubble--plain { background: transparent; }
 .sf-bubble--plain:hover { background: var(--surface-sunken); }
-.sf-bubble[aria-pressed="true"] { background: var(--surface-inverse); color: var(--on-inverse); box-shadow: none; }
+/* Pressed (a toggle) or the current page (a dock destination): the bubble goes ink, like the current nav pill. */
+.sf-bubble[aria-pressed="true"], .sf-bubble[aria-current="page"] { background: var(--surface-inverse); color: var(--on-inverse); box-shadow: none; }
 /* Notification pip on a bubble. */
 .sf-bubble__pip { position: absolute; top: 18%; right: 20%; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--surface-sunken); }
 
@@ -549,7 +571,8 @@
   transition: color var(--dur-quick), background-color var(--dur-quick), box-shadow var(--dur-quick);
 }
 .sf-tabs__tab:hover { color: var(--ink); }
-.sf-tabs__tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+/* aria-selected for tabs that switch panels; aria-pressed for a segmented control that sets a value. */
+.sf-tabs__tab[aria-selected="true"], .sf-tabs__tab[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
 
 /* Pager: ← 03/153 → */
 .sf-pager { display: inline-flex; align-items: center; gap: var(--space-3); }
@@ -740,8 +763,8 @@ textarea.sf-input { height: auto; min-height: 120px; padding: 14px var(--space-5
 .sf-banner__title { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.25; }
 .sf-banner__meta { margin: 0; font-size: 12.5px; opacity: 0.78; }
 .sf-banner--dusk { background: var(--aura-dusk); box-shadow: var(--shadow-2); }
-/* Controls inside a banner use the fixed pastel ink so they hold in both themes. */
-.sf-banner .sf-btn--ink { background: var(--on-pastel); color: var(--paper); }
+/* Controls on surfaces that stay light in both themes (banner, light glass, tiles) take the fixed pastel ink. */
+.sf-banner .sf-btn--ink, .sf-glass--light .sf-btn--ink, .sf-tile .sf-btn--ink { background: var(--on-pastel); color: var(--paper); }
 .sf-banner .sf-bubble { background: var(--paper); color: var(--on-pastel); }
 
 /* ── Micro-charts (inline SVG + these classes) ────────────────────────── */
@@ -767,6 +790,8 @@ textarea.sf-input { height: auto; min-height: 120px; padding: 14px var(--space-5
 }
 .sf-progress__bar { position: relative; width: var(--value); height: 3px; border-radius: var(--radius-pill); background: var(--signature); transition: width var(--dur-slow) var(--ease-soft); }
 .sf-progress__bar::after { content: ""; position: absolute; right: -5px; top: 50%; width: 10px; height: 10px; border-radius: 50%; background: var(--chart-ink); transform: translateY(-50%); }
+/* Magnitudes (ladders, rankings, shares) are not a positive state: draw them in ink so lime stays a signal. */
+.sf-progress--ink .sf-progress__bar { background: var(--chart-ink); }
 
 /* Ring: solid arc + dashed remainder + centred figure. SVG uses pathLength="100". */
 .sf-ring { --size: 116px; position: relative; display: inline-grid; place-items: center; width: var(--size); height: var(--size); flex: none; color: var(--chart-ink); }
@@ -898,6 +923,7 @@ textarea.sf-input { height: auto; min-height: 120px; padding: 14px var(--space-5
 @media (prefers-reduced-transparency: reduce) {
   .sf-glass, .sf-menu, .sf-nav--glass .sf-nav__item { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .sf-glass--on-color, .sf-glass--light, .sf-tag--glass, .sf-btn--glass, .sf-bubble--glass, .sf-aura .sf-msg--them { background: var(--paper); color: var(--on-pastel); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .sf-aura .sf-card .sf-msg--them { background: var(--surface-sunken); color: var(--ink); }
 }
 @media (prefers-reduced-motion: reduce) {
   .sf-rise, .sf-aura--drift, .sf-wave.is-live i, .sf-typing i, .sf-skeleton::after, .sf-spinner { animation: none; }
