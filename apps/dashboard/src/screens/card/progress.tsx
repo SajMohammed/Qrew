@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { CardDesign, CardType } from "@/api";
-import { cn } from "@/lib/utils";
 import { FIELD, Group, ImageField, Labelled, NumberField, Segmented, Slider } from "./controls";
 
 /**
@@ -71,12 +70,8 @@ function StampEditor({ target, setTarget, bonus, setBonus, design, patch, upload
               type="button"
               onClick={() => patch({ stampIcon: i })}
               aria-pressed={i === design.stampIcon}
-              className={cn(
-                "grid size-11 cursor-pointer place-items-center rounded-xl border text-lg transition",
-                i === design.stampIcon
-                  ? "border-primary bg-primary/12"
-                  : "border-border bg-card hover:bg-accent",
-              )}
+              // The shop's mark is content, so it sits in a bubble; the chosen one goes ink.
+              className="sf-bubble text-lg"
             >
               {i}
             </button>
@@ -172,7 +167,7 @@ function StampEditor({ target, setTarget, bonus, setBonus, design, patch, upload
             />
           </div>
           {design.emptyStampImageUrl && (
-            <p className="text-muted-foreground text-[12px]">
+            <p className="text-ink-2 m-0 text-[12.5px]">
               Fade is ignored while you have artwork for an unearned stamp — yours is drawn as you made it.
             </p>
           )}
@@ -257,11 +252,11 @@ function DiscountEditor({ mechanics, setMechanics }: ProgressEditorProps) {
           onChange={(e) => set({ terms: e.target.value })}
           maxLength={300}
           rows={3}
-          className={`${FIELD} mt-1.5 resize-y`}
+          className={`${FIELD} mt-1.5 min-h-24 resize-y`}
         />
       </Labelled>
 
-      <p className="text-muted-foreground text-[12px] leading-snug">
+      <p className="text-ink-2 m-0 text-[12.5px] leading-snug">
         Nothing to collect on this card — it is valid the day you issue it. Staff scanning it are checking
         it is genuine, not adding to it.
       </p>
@@ -284,8 +279,8 @@ function MembershipEditor({ mechanics, setMechanics }: ProgressEditorProps) {
   return (
     <>
       <div>
-        <span className="text-[13px] font-semibold">Tiers</span>
-        <p className="text-muted-foreground mt-0.5 text-[12px]">
+        <span className="sf-field__label">Tiers</span>
+        <p className="sf-field__hint mt-0.5 mb-0">
           A member moves up as they visit and never moves back down — status is not spent.
         </p>
         <div className="mt-2 flex flex-col gap-2">
@@ -310,7 +305,7 @@ function MembershipEditor({ mechanics, setMechanics }: ProgressEditorProps) {
                 type="button"
                 onClick={() => set({ tiers: tiers.filter((_, j) => j !== i) })}
                 aria-label={`Remove ${t.name || "tier"}`}
-                className="border-border bg-card hover:bg-accent grid size-10 shrink-0 cursor-pointer place-items-center rounded-xl border"
+                className="sf-bubble shrink-0"
               >
                 <Trash2 className="size-4" aria-hidden />
               </button>
@@ -321,7 +316,7 @@ function MembershipEditor({ mechanics, setMechanics }: ProgressEditorProps) {
           <button
             type="button"
             onClick={() => set({ tiers: [...tiers, { name: "", at: 0 }] })}
-            className="border-border bg-card hover:bg-accent mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-[13px] font-semibold"
+            className="sf-btn sf-btn--soft mt-2 px-4"
           >
             <Plus className="size-3.5" aria-hidden /> Add a tier
           </button>

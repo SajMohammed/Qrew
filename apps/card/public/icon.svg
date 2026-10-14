@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#0C2712"/>
-  <text x="256" y="366" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-size="312" font-weight="900" fill="#CBFA5B" text-anchor="middle">Q</text>
+  <!-- Qrew: Softform's lime Q on ink. The Q is Anton's own outline (the wordmark face), so the icon
+       draws the same everywhere without depending on a font being installed. -->
+  <rect width="512" height="512" rx="112" fill="#121512"/>
+  <path fill="#CBFA5B" transform="translate(158.2 414.7) scale(0.19)" d="M856 187L576 3Q528 16 477 16Q271 16 162.5 -106Q54 -228 54 -462L54 -1313Q54 -1540 165.5 -1658Q277 -1776 488 -1776Q699 -1776 810.5 -1658Q922 -1540 922 -1313L922 -462Q922 -244 824 -119L975 -23L856 187ZM488 -308Q526 -308 542.5 -336Q559 -364 563.5 -405Q568 -446 568 -484L568 -1307Q568 -1363 552.5 -1407.5Q537 -1452 486 -1452Q434 -1452 418 -1408.5Q402 -1365 402 -1308L402 -477Q402 -442 406.5 -402.5Q411 -363 429 -335.5Q447 -308 488 -308Z"/>
 </svg>

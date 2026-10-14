@@ -3,9 +3,10 @@
  *
  * iOS ignores an SVG touch icon, so it needs a PNG — and a full-bleed one: iOS rounds the corners
  * itself, and the transparent corners of our rounded icon.svg would show as black. A real browser
- * draws it, because the "Q" is text in Arial Black, which no PNG encoder in this repo can render.
+ * draws it, because no PNG encoder in this repo can rasterise an SVG. (The "Q" is Anton's outline as
+ * a path, so no font needs to be installed.)
  *
- * Not part of any build. Run again only if icon.svg changes (on macOS, which has Arial Black):
+ * Not part of any build. Run again only if icon.svg changes:
  *   pnpm --filter @qrew/e2e exec node scripts/render-app-icon.mjs
  */
 import { readFileSync } from "node:fs";

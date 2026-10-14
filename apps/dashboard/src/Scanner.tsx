@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SwitchCamera } from "lucide-react";
+import { SwitchCamera, UserRound } from "lucide-react";
 import { useApi, PinLocked, CounterError } from "./useApi";
 import type { ScanResult, RedeemResult } from "./api";
 import { cn } from "@/lib/utils";
@@ -151,6 +151,18 @@ export function Scanner() {
     signal(feedbackFor(r));
   }
 
+  // The frame glows for a moment when a stamp lands or a reward is redeemed — the counter's success moment.
+  const [glow, setGlow] = useState(false);
+  useEffect(() => {
+    const landed =
+      (result?.found && (result.reason === "applied" || result.reason === "duplicate" || result.reason === "no_accrual")) ||
+      redeemed?.redeemed;
+    if (!landed) return;
+    setGlow(true);
+    const t = window.setTimeout(() => setGlow(false), 1600);
+    return () => window.clearTimeout(t);
+  }, [result, redeemed]);
+
   // A result's buttons act on the card it names; left up, they would act on it for the next customer.
   useEffect(() => {
     if (!result) return;
@@ -301,15 +313,15 @@ export function Scanner() {
         </Banner>
       )}
 
-      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-xl border p-2.5">
+      {/* The PIN field is bare inside this pill, so the pill takes the focus ring while it is focused. */}
+      <div className="sf-card sf-card--compact flex-row flex-wrap items-center gap-2 p-2 pl-4 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-[var(--focus)] has-[input:focus-visible]:outline-solid">
         {cashier ? (
           <>
-            <span className="text-sm font-bold">👤 {cashier.name}</span>
-            <button
-              type="button"
-              onClick={() => setCashier(null)}
-              className="text-primary ml-auto text-[13px] font-bold hover:underline"
-            >
+            <span className="inline-flex items-center gap-2 text-[15px]">
+              <UserRound className="text-ink-2 size-[18px]" aria-hidden />
+              {cashier.name}
+            </span>
+            <button type="button" onClick={() => setCashier(null)} className="sf-btn sf-btn--soft ml-auto px-4">
               Switch cashier
             </button>
           </>
@@ -322,35 +334,36 @@ export function Scanner() {
               inputMode="numeric"
               placeholder="Cashier PIN (optional)"
               aria-label="Cashier PIN"
-              className="placeholder:text-faint min-w-0 flex-1 bg-transparent px-1 py-2 text-sm outline-none"
+              className="placeholder:text-ink-3 min-w-0 flex-1 bg-transparent py-2 text-[15px] outline-none"
             />
             <button
               type="button"
               onClick={() => void signInCashier()}
               disabled={pin.length < 4}
-              className="text-primary shrink-0 px-2 py-2 text-[13px] font-bold hover:underline disabled:opacity-40"
+              className="sf-btn sf-btn--soft shrink-0 px-4"
             >
               Set
             </button>
           </div>
         )}
-        {pinErr && <span className="text-destructive w-full text-xs">{pinErr}</span>}
-        {cashierNotice && !cashier && <span className="text-warning w-full text-xs font-semibold">{cashierNotice}</span>}
+        {pinErr && <span className="text-danger-ink w-full pb-1 text-[13px]">{pinErr}</span>}
+        {cashierNotice && !cashier && <span className="text-warning-ink w-full pb-1 text-[13px]">{cashierNotice}</span>}
       </div>
 
-      {/* #reader must stay mounted unconditionally — html5-qrcode attaches to it by element id. */}
-      <div className="relative aspect-square overflow-hidden rounded-3xl bg-linear-[160deg,#cbfa5b_0%,#86e056_34%,#38ad4c_68%,#146a2e_100%] p-1.5 shadow-[0_24px_48px_-28px_rgba(20,106,46,0.5)]">
+      {/*
+        #reader must stay mounted unconditionally — html5-qrcode attaches to it by element id. The frame
+        around it is Qrew's scan frame: lime corners on an ink well, glowing when a stamp lands.
+      */}
+      <div className={cn("qrew-scanframe", glow && "is-success")}>
         <div id="reader" />
         {camera !== "on" && (
-          <div className="absolute inset-1.5 flex flex-col items-center justify-center gap-3 rounded-[18px] bg-[repeating-linear-gradient(45deg,#10240f,#10240f_12px,#143016_12px,#143016_24px)] p-6 text-center text-[13px] leading-relaxed font-semibold text-[#e4fb98]">
+          <div className="bg-surface-inverse text-on-inverse absolute inset-0 flex flex-col items-center justify-center gap-4 p-10 text-center text-sm leading-relaxed">
             {/* While starting, the browser may be asking for permission — say so, or staff wait on it. */}
-            <p>{camera === "starting" ? "Starting camera… allow it if the browser asks." : CAMERA_COPY[camera]}</p>
+            <p className="m-0 max-w-[30ch]">
+              {camera === "starting" ? "Starting camera… allow it if the browser asks." : CAMERA_COPY[camera]}
+            </p>
             {camera !== "starting" && RETRYABLE.has(camera) && (
-              <button
-                type="button"
-                onClick={() => setAttempt((n) => n + 1)}
-                className="min-h-10 rounded-xl bg-[#e4fb98] px-4 text-[13px] font-bold text-[#10240f]"
-              >
+              <button type="button" onClick={() => setAttempt((n) => n + 1)} className="sf-btn">
                 Try again
               </button>
             )}
@@ -362,32 +375,33 @@ export function Scanner() {
             onClick={switchCamera}
             aria-label="Switch camera"
             title="Switch camera"
-            className="absolute top-3 right-3 z-10 grid size-10 place-items-center rounded-full bg-black/45 text-white backdrop-blur"
+            className="sf-bubble sf-bubble--glass absolute top-4 right-4 z-10"
           >
-            <SwitchCamera className="size-5" aria-hidden />
+            <SwitchCamera aria-hidden />
           </button>
         )}
       </div>
 
-      <form onSubmit={submitCode} className="flex flex-col gap-2.5">
-        <label className="flex flex-col gap-1.5 text-[13px] font-semibold">
-          <span>
-            Card code <span className="text-faint font-medium">(under the customer's QR)</span>
+      {/* The manual fallback: one field for the code printed under the customer's QR, in dot-matrix. */}
+      <form onSubmit={submitCode} className="flex flex-col gap-3">
+        <label className="sf-field">
+          <span className="sf-field__label">
+            Card code <span className="text-ink-3">(under the customer's QR)</span>
           </span>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="e.g. K7M 4QX"
+            placeholder="K7M 4QX"
             autoCapitalize="characters"
             autoComplete="off"
             spellCheck={false}
-            className="border-border bg-card placeholder:text-faint focus-visible:ring-ring w-full rounded-xl border px-3.5 py-3 font-mono text-sm font-normal tracking-wider outline-none focus-visible:ring-2"
+            className="sf-code-field [word-spacing:-0.3em]"
           />
         </label>
         <button
           type="submit"
           disabled={!code.trim() || sending || busy !== null}
-          className="bg-primary text-primary-foreground min-h-12 w-full rounded-xl text-sm font-bold transition hover:brightness-110 disabled:opacity-40"
+          className="sf-btn sf-btn--primary sf-btn--lg sf-btn--block"
         >
           {sending ? "Checking card…" : "+ Stamp"}
         </button>
@@ -395,16 +409,16 @@ export function Scanner() {
 
       {result && <ResultBanner result={result} />}
       {result?.found && result.enrollmentId && !result.rewardReady && result.reason !== "no_accrual" && (
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center gap-1.5">
           <button
             type="button"
             onClick={() => void stampAgain()}
             disabled={busy !== null || extraResting}
-            className="border-primary text-primary min-h-11 w-full rounded-xl border-2 text-sm font-bold transition hover:bg-primary/5 disabled:opacity-50"
+            className="sf-btn sf-btn--lg sf-btn--block"
           >
             {busy === "extra" ? "Adding…" : "+ Add another stamp"}
           </button>
-          <span className="text-faint text-xs">For a second purchase on this visit</span>
+          <span className="text-ink-3 text-[12.5px]">For a second purchase on this visit</span>
         </div>
       )}
       {result?.found && result.rewardReady && result.enrollmentId && (
@@ -412,7 +426,7 @@ export function Scanner() {
           type="button"
           onClick={() => void doRedeem()}
           disabled={busy !== null}
-          className="bg-lime min-h-12 w-full rounded-xl text-sm font-extrabold text-[#0c2712] transition hover:brightness-105 disabled:opacity-50"
+          className="sf-btn sf-btn--ink sf-btn--lg sf-btn--block"
         >
           {busy === "redeem" ? "Redeeming…" : "🎁 Redeem reward"}
         </button>
@@ -423,7 +437,7 @@ export function Scanner() {
         </Banner>
       )}
       {err && (
-        <p role="alert" className="text-destructive text-sm">
+        <p role="alert" className="text-danger-ink m-0 text-sm">
           {err}
         </p>
       )}
@@ -441,27 +455,61 @@ function feedbackFor(r: ScanResult): Feedback {
 function Banner({
   tone,
   card,
+  stamps,
+  landed,
   children,
 }: {
   tone: "ok" | "warn" | "bad" | "ready";
   /** The card this result is about, so staff can see which card the buttons below will act on. */
   card?: string;
+  /** The card's stamps, drawn as dots — the same dots the customer sees on their card. */
+  stamps?: { current: number; total: number };
+  /** Whether a stamp just landed, so the newest dot springs in. */
+  landed?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "rounded-xl px-3.5 py-3 text-center text-sm font-bold",
-        tone === "ok" && "bg-success/13 text-success",
-        tone === "warn" && "bg-warning/15 text-warning",
-        tone === "bad" && "bg-destructive/13 text-destructive",
-        tone === "ready" && "bg-lime/30 text-primary",
+        "flex flex-col items-center gap-1 rounded-[var(--radius-lg)] px-4 py-4 text-center text-[15px] font-medium",
+        tone === "ok" && "bg-signature-soft text-signature-ink",
+        tone === "warn" && "bg-warning-soft text-warning-ink",
+        tone === "bad" && "bg-danger-soft text-danger-ink",
+        // A reward ready is the one lime fill on the screen.
+        tone === "ready" && "bg-signature text-on-signature",
       )}
     >
       <div>{children}</div>
-      {card && <div className="mt-0.5 font-mono text-[11px] font-semibold tracking-wider opacity-75">Card {card}</div>}
+      {card && <div className="text-[12.5px] font-normal opacity-80">Card {card}</div>}
+      {stamps && stamps.total > 0 && (
+        <ol
+          key={stamps.current}
+          className={cn(
+            "sf-steps mt-2 justify-center",
+            tone === "ready" && "qrew-steps--on-lime",
+          )}
+          aria-hidden
+        >
+          {Array.from({ length: stamps.total }, (_, i) => (
+            <li
+              key={i}
+              className={cn(
+                "sf-steps__dot",
+                i < stamps.current && "sf-steps__dot--done",
+                landed && i === stamps.current - 1 && "qrew-land",
+              )}
+            />
+          ))}
+        </ol>
+      )}
     </div>
   );
+}
+
+function stampsOf(r: ScanResult): { current: number; total: number } | undefined {
+  return r.currentStamps !== undefined && r.stampsRequired !== undefined
+    ? { current: r.currentStamps, total: r.stampsRequired }
+    : undefined;
 }
 
 function ResultBanner({ result }: { result: ScanResult }) {
@@ -469,7 +517,7 @@ function ResultBanner({ result }: { result: ScanResult }) {
   const card = result.shortCode;
   if (result.reason === "cooldown")
     return (
-      <Banner tone="warn" card={card}>
+      <Banner tone="warn" card={card} stamps={stampsOf(result)}>
         ⏳ Already stamped just now · {result.currentStamps}/{result.stampsRequired}
       </Banner>
     );
@@ -482,13 +530,13 @@ function ResultBanner({ result }: { result: ScanResult }) {
     );
   if (result.reason === "reward_ready")
     return (
-      <Banner tone="ready" card={card}>
+      <Banner tone="ready" card={card} stamps={stampsOf(result)}>
         🎉 Reward ready — redeem it below · {result.currentStamps}/{result.stampsRequired}
       </Banner>
     );
   // "applied", or "duplicate": a retry of a request whose stamp had already landed — added either way.
   return (
-    <Banner tone={result.rewardReady ? "ready" : "ok"} card={card}>
+    <Banner tone={result.rewardReady ? "ready" : "ok"} card={card} stamps={stampsOf(result)} landed>
       {result.rewardReady ? "🎉 Reward ready!" : "✓ Stamp added"} · {result.currentStamps}/
       {result.stampsRequired}
     </Banner>

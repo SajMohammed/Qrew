@@ -42,8 +42,8 @@ export function ShopNameForm({
 
   return (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1.5 text-[13px] font-semibold">
-        Shop name
+      <label className="sf-field">
+        <span className="sf-field__label">Shop name</span>
         <input
           value={value}
           maxLength={SHOP_NAME_MAX}
@@ -61,18 +61,18 @@ export function ShopNameForm({
         <button
           type="submit"
           disabled={!valid || !changed || status === "saving"}
-          className="bg-primary text-primary-foreground inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold transition hover:brightness-110 disabled:opacity-40"
+          className="sf-btn sf-btn--primary"
         >
           {status === "saving" ? busyLabel : submitLabel}
         </button>
         {status === "saved" && (
-          <span className="text-primary inline-flex items-center gap-1 text-[13px] font-semibold">
+          <span className="text-signature-ink inline-flex items-center gap-1 text-[13px] font-medium">
             <Check className="size-4" aria-hidden /> Saved
           </span>
         )}
       </div>
       {err && (
-        <p role="alert" className="text-destructive text-[13px]">
+        <p role="alert" className="sf-field__error m-0">
           {err}
         </p>
       )}
