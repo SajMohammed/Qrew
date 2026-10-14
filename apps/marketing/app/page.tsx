@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Waitlist } from "./components/Waitlist";
 import { HeroDemo } from "./components/HeroDemo";
 import { CardDesigner } from "./components/CardDesigner";
+import { ThemeSwitch } from "./components/ThemeSwitch";
 import { ChartIcon, CheckIcon, PaletteIcon, QrIcon, WalletIcon } from "./components/icons";
 
 export default function Home() {
@@ -43,9 +44,12 @@ function Nav() {
             Who it&apos;s for
           </a>
         </div>
-        <a className="sf-btn sf-btn--primary" href="#waitlist">
-          Get early access
-        </a>
+        <div className="mk-nav__end">
+          <ThemeSwitch />
+          <a className="sf-btn sf-btn--primary" href="#waitlist">
+            Get early access
+          </a>
+        </div>
       </nav>
     </header>
   );
