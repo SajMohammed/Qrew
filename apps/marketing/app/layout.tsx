@@ -5,6 +5,7 @@ import { Anton, Archivo, Doto } from "next/font/google";
 import "./styles/softform.css";
 import "./styles/qrew.css";
 import "./globals.css";
+import { THEME_COLOR } from "./lib/theme";
 
 // Self-hosted at build time by next/font — no external request, no layout shift. Archivo carries the
 // UI, Doto the dot-matrix numbers (with its round-dot axis), Anton only the wordmark.
@@ -24,21 +25,18 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#eceeea" },
-    { media: "(prefers-color-scheme: dark)", color: "#0d0f0d" },
-  ],
+  themeColor: THEME_COLOR.light,
 };
 
-// Softform's dark tokens apply under `.dark` on <html>. The page has no theme switch, so it follows
-// the visitor's OS — set before first paint, or a dark-mode visit flashes light.
-const followTheme = `(function(){try{var m=window.matchMedia("(prefers-color-scheme: dark)");var s=function(){document.documentElement.classList.toggle("dark",m.matches)};s();m.addEventListener("change",s)}catch(e){}})();`;
+// Light is the default; the nav's theme switch remembers a visitor's choice. Softform's dark tokens apply
+// under `.dark` on <html>, so a remembered dark choice is applied before first paint, or the page flashes light.
+const rememberedTheme = `(function(){try{if(localStorage.getItem("qrew-theme")==="dark"){document.documentElement.classList.add("dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","${THEME_COLOR.dark}")}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${anton.variable} ${archivo.variable} ${doto.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: followTheme }} />
+        <script dangerouslySetInnerHTML={{ __html: rememberedTheme }} />
       </head>
       <body className="sf-app sf-canvas">{children}</body>
     </html>
