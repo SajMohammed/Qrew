@@ -23,31 +23,37 @@ export function Waitlist() {
     }
   }
 
+  // Calm canvas and a white form card: the page spends its one vivid surface on the hero.
   return (
-    <section className="section waitlist" id="waitlist">
-      <div className="container wl-grid">
-        <div className="wl-copy">
-          <h2>
-            Get <span className="ink">early</span> access
+    <section className="mk-section" id="waitlist">
+      <div className="mk-container mk-waitlist__grid">
+        <div className="mk-waitlist__copy">
+          <h2 className="sf-display sf-twotone">
+            <span className="sf-lead">Get</span> <strong>early access</strong>
           </h2>
-          <p>
+          <p className="sf-body-lg">
             Join the merchants shaping Qrew. We&apos;ll reach out to design your first card and get you
             live before launch.
           </p>
         </div>
 
-        <div className="wl-card">
+        <div className="sf-card">
           {status === "done" ? (
-            <div className="wl-done">
-              <div className="big">You&apos;re on the list</div>
-              <p>Thanks — we&apos;ll be in touch soon to set up your card. ☕</p>
+            <div className="mk-done">
+              <p className="sf-title sf-twotone">
+                <span className="sf-lead">You&apos;re</span> <strong>on the list</strong>
+              </p>
+              <p>Thanks — we&apos;ll be in touch soon to set up your card.</p>
             </div>
           ) : (
-            <form onSubmit={submit}>
-              <div className="field">
-                <label htmlFor="biz">Business name</label>
+            <form onSubmit={submit} className="mk-form">
+              <div className="sf-field">
+                <label className="sf-field__label" htmlFor="biz">
+                  Business name
+                </label>
                 <input
                   id="biz"
+                  className="sf-input"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   placeholder="Nomad Coffee"
@@ -55,10 +61,13 @@ export function Waitlist() {
                   maxLength={120}
                 />
               </div>
-              <div className="field">
-                <label htmlFor="email">Email</label>
+              <div className="sf-field">
+                <label className="sf-field__label" htmlFor="email">
+                  Email
+                </label>
                 <input
                   id="email"
+                  className="sf-input"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -66,15 +75,24 @@ export function Waitlist() {
                   required
                 />
               </div>
-              <div className="field">
-                <label htmlFor="city">City (optional)</label>
-                <input id="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Dubai" maxLength={80} />
+              <div className="sf-field">
+                <label className="sf-field__label" htmlFor="city">
+                  City (optional)
+                </label>
+                <input
+                  id="city"
+                  className="sf-input"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Dubai"
+                  maxLength={80}
+                />
               </div>
-              <button className="btn btn-lime" type="submit" disabled={status === "sending"}>
+              <button className="sf-btn sf-btn--primary sf-btn--lg sf-btn--block" type="submit" disabled={status === "sending"}>
                 {status === "sending" ? "Joining…" : "Join the waitlist"}
               </button>
-              {err && <p className="wl-err">{err}</p>}
-              <p className="wl-note">No spam. We&apos;ll only email about early access.</p>
+              {err && <p className="mk-form__error">{err}</p>}
+              <p className="mk-form__note">No spam. We&apos;ll only email about early access.</p>
             </form>
           )}
         </div>

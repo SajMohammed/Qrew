@@ -1,0 +1,124 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Qrew — a Softform brand theme. Load AFTER softform.css.
+
+   Qrew's signature is Softform's default lime (#cbfa5b), so no color
+   overrides are needed. This file adds what only Qrew has:
+   the Anton wordmark, the merchant card, and the counter's scan frame.
+
+   Fonts: add Anton to the Softform Google Fonts link:
+   ...family=Anton&family=Archivo:wdth,wght@62..125,100..900&family=Doto:ROND,wght@0..100,100..900&display=swap
+   ════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --font-wordmark: "Anton", "Archivo", sans-serif;
+}
+
+@layer components {
+
+/* The wordmark — the ONLY place Anton appears. Never for headings or numbers. */
+.qrew-wordmark { font-family: var(--font-wordmark); font-weight: 400; font-size: 26px; line-height: 1; letter-spacing: 0.01em; color: var(--ink); }
+.qrew-mark {
+  display: inline-grid; place-items: center; flex: none;
+  width: var(--bubble-md); height: var(--bubble-md); border-radius: 50%;
+  background: var(--on-signature); color: var(--signature); /* ink in BOTH themes */
+  font-family: var(--font-wordmark); font-size: 22px; line-height: 1;
+}
+
+/* ── Merchant card ─────────────────────────────────────────────────────
+   THE SPLIT RULE: the card is the shop's, not Qrew's. It is an aura grown
+   from the shop's brandColor and never reads Qrew's signature tokens.
+   Inputs (set inline from CardDesign):
+     --card-color  the shop's brandColor           (default: Qrew forest)
+     --card-ink    textOn(brandColor) from contrast.ts
+   Anatomy (contrast decides it): the tint is darkest across the top and
+   brightens to a pale bloom low-left, where a light card ink falls to ~2:1.
+   So words live in the top zone (__top: shop + the count), stamps in the
+   middle, and the foot's words sit on .sf-tag light glass.
+   Markup:
+   <article class="sf-aura sf-aura--tint qrew-card" style="--card-color:#7a3e1d;--card-ink:#fbfbf7">
+     <div class="qrew-card__top"><div class="qrew-card__shop">…</div><p class="sf-figure sf-figure-xl">7<span class="sf-figure__sup">/10</span></p></div>
+     <ol class="sf-steps">…</ol>
+     <div class="qrew-card__foot"><span class="sf-tag">3 to a free flat white</span></div>
+   </article> */
+.qrew-card {
+  --tint: var(--card-color, #146a2e);
+  --on-tint: var(--card-ink, #fbfbf7);
+  aspect-ratio: 1.6;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+}
+.qrew-card__shop { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.qrew-card__logo {
+  display: grid; place-items: center; flex: none; overflow: hidden;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: color-mix(in srgb, var(--on-tint) 18%, transparent);
+  font-size: 20px;
+}
+.qrew-card__logo img { width: 100%; height: 100%; object-fit: cover; }
+.qrew-card__name { margin: 0; font-size: 17px; font-weight: 500; line-height: 1.2; }
+.qrew-card__program { margin: 0; font-size: 13px; opacity: 0.8; }
+.qrew-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.qrew-card__reward { margin: 0; font-size: 13px; opacity: 0.85; }
+/* Stamps on the card are drawn in the card's own ink, so they work on any brand color. */
+.qrew-card .sf-steps { gap: 6px; }
+.qrew-card .sf-steps__dot { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--on-tint) 55%, transparent); }
+.qrew-card .sf-steps__dot--done { background: var(--on-tint); color: var(--tint); box-shadow: none; }
+.qrew-card .sf-figure__sup { color: inherit; opacity: 0.75; }
+/* The top zone: the shop on the left, the count (or an action bubble) on the right. */
+.qrew-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+/* Words in the card's foot sit on light glass tags (the tint's pale bloom is too light for card ink); long ones truncate. */
+.qrew-card__foot .sf-tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* A focusable card: keep the focus ring clear of the 4px reward-ready ring, which is lime like dark mode's focus. */
+.qrew-card:focus-visible { outline-offset: 6px; }
+/* A card held open: its stamps as a grid, up to --cols (default 5) a row, each dot as wide as its column allows,
+   with the shop's stamp emoji or artwork inside. */
+.qrew-card .qrew-stamps { display: grid; grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: var(--space-3); }
+.qrew-card .qrew-stamps .sf-steps__dot { width: 100%; max-width: 64px; height: auto; aspect-ratio: 1; justify-self: center; font-size: 20px; line-height: 1; }
+.qrew-stamps .sf-steps__dot img { width: 72%; height: 72%; object-fit: contain; }
+/* Stamp dots drawn on a lime surface (a reward-ready result at the counter): lime stays light in both themes,
+   so the dots take the fixed dark ink, not the theme's. */
+.qrew-steps--on-lime .sf-steps__dot { box-shadow: inset 0 0 0 1.5px var(--on-signature); }
+.qrew-steps--on-lime .sf-steps__dot--done { background: var(--on-signature); box-shadow: none; }
+/* A stamp landing: put it on the newest dot; it springs in. */
+.qrew-land { animation: qrew-land var(--dur-base) var(--ease-spring) both; }
+@keyframes qrew-land { from { transform: scale(0.6); opacity: 0; } }
+.qrew-card--ready { box-shadow: 0 0 0 4px var(--signature), 0 18px 40px -12px var(--signature-glow); }
+
+/* ── The card's QR ─────────────────────────────────────────────────────
+   Qrew's, on its own white panel beside the card, never on the shop's color:
+   a scanner needs near-black modules on white whatever the theme, so the panel
+   is paper in both themes and its words and buttons take the fixed pastel ink. */
+.qrew-qr {
+  position: relative; display: grid; place-items: center;
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--paper); color: var(--on-pastel);
+}
+.qrew-qr .sf-btn--ink { background: var(--on-pastel); color: var(--paper); }
+
+/* ── Counter scan frame ────────────────────────────────────────────────
+   Camera feed in an ink well, lime corner brackets, a glow on success. */
+.qrew-scanframe {
+  position: relative; overflow: hidden;
+  aspect-ratio: 1; width: 100%;
+  border-radius: var(--radius-xl);
+  background: var(--surface-inverse);
+}
+.qrew-scanframe > video, .qrew-scanframe > img { width: 100%; height: 100%; object-fit: cover; }
+.qrew-scanframe::after {
+  --corner: 44px;
+  content: ""; position: absolute; inset: var(--space-6); pointer-events: none;
+  border: 3px solid var(--signature); border-radius: var(--radius-lg);
+  -webkit-mask: conic-gradient(at var(--corner) var(--corner), transparent 75%, #000 0) 0 0 / calc(100% - var(--corner)) calc(100% - var(--corner));
+  mask: conic-gradient(at var(--corner) var(--corner), transparent 75%, #000 0) 0 0 / calc(100% - var(--corner)) calc(100% - var(--corner));
+  transition: inset var(--dur-base) var(--ease-spring);
+}
+.qrew-scanframe.is-success { box-shadow: 0 0 0 6px var(--signature-glow); }
+.qrew-scanframe.is-success::after { inset: var(--space-4); }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qrew-land { animation: none; }
+}
