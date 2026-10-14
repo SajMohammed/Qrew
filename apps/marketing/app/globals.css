@@ -30,12 +30,6 @@
 }
 
 @layer base {
-  /* Softform's components size with border-box (Tailwind's Preflight gives the other apps this). */
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
   html {
     scroll-behavior: smooth;
     /* Anchored sections land below the floating nav. */
@@ -896,11 +890,6 @@
     justify-content: center;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-3);
-  }
-  /* A solid card on an aura is its own surface: it takes back the two-tone lead colour. */
-  .mk-cta__form .sf-twotone .sf-lead {
-    color: var(--ink-3);
-    opacity: 1;
   }
   .mk-form {
     display: grid;
