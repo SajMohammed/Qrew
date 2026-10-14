@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SwitchCamera, UserRound } from "lucide-react";
+import { Check, Gift, SwitchCamera, UserRound } from "lucide-react";
 import { useApi, PinLocked, CounterError } from "./useApi";
 import type { ScanResult, RedeemResult } from "./api";
 import { cn } from "@/lib/utils";
@@ -151,17 +151,27 @@ export function Scanner() {
     signal(feedbackFor(r));
   }
 
-  // The frame glows for a moment when a stamp lands or a reward is redeemed — the counter's success moment.
+  // The frame glows for a moment when a stamp lands or a reward is redeemed — the counter's success moment —
+  // and the same news drops over the camera as a liquid glass notification, then slips away.
   const [glow, setGlow] = useState(false);
+  const [moment, setMoment] = useState<(Moment & { id: number }) | null>(null);
   useEffect(() => {
     const landed =
       (result?.found && (result.reason === "applied" || result.reason === "duplicate" || result.reason === "no_accrual")) ||
       redeemed?.redeemed;
     if (!landed) return;
+    const next = momentOf(result, redeemed);
+    if (next) setMoment((m) => ({ ...next, id: (m?.id ?? 0) + 1 }));
     setGlow(true);
     const t = window.setTimeout(() => setGlow(false), 1600);
     return () => window.clearTimeout(t);
   }, [result, redeemed]);
+
+  useEffect(() => {
+    if (!moment) return;
+    const t = window.setTimeout(() => setMoment(null), MOMENT_MS);
+    return () => window.clearTimeout(t);
+  }, [moment]);
 
   // A result's buttons act on the card it names; left up, they would act on it for the next customer.
   useEffect(() => {
@@ -369,13 +379,31 @@ export function Scanner() {
             )}
           </div>
         )}
+        {/* Said by the banner below too, which is what assistive tech reads; this is for the eye at the till. */}
+        {moment && (
+          <div
+            key={moment.id}
+            aria-hidden
+            className="sf-notify sf-liquid sf-liquid--tint counter-notify"
+            data-liquid="9"
+            data-bezel="18"
+          >
+            <span className="sf-notify__icon">{moment.gift ? <Gift /> : <Check />}</span>
+            <span>
+              <b className="sf-notify__title">{moment.title}</b>
+              {moment.detail}
+            </span>
+          </div>
+        )}
         {camera !== "starting" && camera !== "unsupported" && (
           <button
             type="button"
             onClick={switchCamera}
             aria-label="Switch camera"
             title="Switch camera"
-            className="sf-bubble sf-bubble--glass absolute top-4 right-4 z-10"
+            className="sf-bubble sf-liquid sf-liquid--tint absolute top-4 right-4 z-10"
+            data-liquid="7"
+            data-bezel="14"
           >
             <SwitchCamera aria-hidden />
           </button>
@@ -510,6 +538,24 @@ function stampsOf(r: ScanResult): { current: number; total: number } | undefined
   return r.currentStamps !== undefined && r.stampsRequired !== undefined
     ? { current: r.currentStamps, total: r.stampsRequired }
     : undefined;
+}
+
+/** How long the notification over the camera stays: Softform's `sf-notify` plays in, holds and leaves in 2.6s. */
+const MOMENT_MS = 2700;
+
+type Moment = { title: string; detail?: string; gift?: boolean };
+
+/** The one-line version of a result, for the notification over the camera. The banner keeps the detail. */
+function momentOf(result: ScanResult | null, redeemed: RedeemResult | null): Moment | null {
+  if (result?.found && (result.reason === "applied" || result.reason === "duplicate")) {
+    const count = `${result.currentStamps} of ${result.stampsRequired}`;
+    return result.rewardReady
+      ? { title: "Reward ready", detail: `${count} · redeem it below`, gift: true }
+      : { title: "Stamp added", detail: count };
+  }
+  if (result?.found && result.reason === "no_accrual") return { title: "Valid card", detail: "Apply the offer" };
+  if (redeemed?.redeemed) return { title: "Reward redeemed", detail: redeemed.rewardText, gift: true };
+  return null;
 }
 
 function ResultBanner({ result }: { result: ScanResult }) {

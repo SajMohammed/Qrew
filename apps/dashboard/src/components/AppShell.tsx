@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
+import { LiquidDrop } from "@/components/LiquidDrop";
 
 /** The management surface. Counter mode is deliberately not one of these — it replaces the shell. */
 export type ManageView = "dashboard" | "customers" | "card" | "counterqr" | "team" | "settings";
@@ -38,7 +39,7 @@ interface Props {
 /**
  * Softform's shell: floating pills on the canvas rather than a framed sidebar. On a desktop the brand
  * and the tools share a row with the pill nav beneath (one row from 1536px); on a phone
- * the nav moves into a glass dock at the bottom, with counter mode as its one big button.
+ * the nav moves into a liquid glass dock at the bottom, with counter mode as its one big button.
  */
 export function AppShell({ view, onNavigate, onEnterCounter, shopName, children }: Props) {
   return (
@@ -90,12 +91,17 @@ export function AppShell({ view, onNavigate, onEnterCounter, shopName, children 
         {children}
       </main>
 
-      {/* Thumb-reachable nav on phones and tablets, floating clear of the home indicator on iOS. */}
+      {/* Thumb-reachable nav on phones and tablets, floating clear of the home indicator on iOS. The page
+          scrolls under it, bending at its rim; the current section sits under a drop that slides between
+          them — the screen's one lens. */}
       <nav
         aria-label="Manage"
-        className="sf-glass sf-glass--strong fixed left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-full p-1.5 lg:hidden"
+        className="shop-dock sf-liquid sf-liquid--tint fixed left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-full p-1.5 lg:hidden"
         style={{ bottom: "calc(12px + env(safe-area-inset-bottom))" }}
+        data-liquid="10"
+        data-bezel="22"
       >
+        <LiquidDrop watch={view} lens />
         {NAV.map((item) => (
           <button
             key={item.id}

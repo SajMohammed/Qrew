@@ -57,8 +57,12 @@ export function CounterMode({ shopName, onExit }: { shopName?: string; onExit: (
 
   return (
     <div className="min-h-dvh" onPointerDownCapture={unlockAudio} onKeyDownCapture={unlockAudio}>
-      {/* Floats on the canvas: no bar, no border — the scan frame is the screen. */}
-      <header className="bg-canvas/85 sticky top-0 z-20 flex items-center gap-3 px-4 py-3 backdrop-blur-md sm:px-6">
+      {/* A liquid pill floating over the page as it scrolls: no bar, no border — the scan frame is the screen. */}
+      <header
+        className="sf-liquid sf-liquid--tint sticky top-3 z-20 mx-3 mt-3 flex items-center gap-3 rounded-full py-2 pr-2 pl-4 sm:mx-6"
+        data-liquid="10"
+        data-bezel="20"
+      >
         <Wordmark compact />
         <span className="sf-status sf-status--dot ml-1 hidden sm:inline-flex">Counter mode</span>
         <button

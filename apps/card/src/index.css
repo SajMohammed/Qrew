@@ -28,6 +28,25 @@
 }
 
 @layer components {
+  /* A stamp's news, dropping in at the top of the screen (StampCard). */
+  .card-notify {
+    position: fixed;
+    z-index: 50;
+    top: calc(10px + env(safe-area-inset-top));
+    left: 50%;
+    width: min(100% - 24px, 400px);
+    translate: -50% 0;
+  }
+  /* A ready reward's tag breathes, slowly, until it is redeemed. */
+  .reward-chip {
+    animation: reward-breathe 2.4s var(--ease-inout) infinite alternate;
+  }
+  @keyframes reward-breathe {
+    to {
+      transform: scale(1.06);
+    }
+  }
+
   /* The open card is "live": a lime marker with an ink ring, breathing while polls succeed. */
   .live-dot {
     display: inline-block;

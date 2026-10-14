@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { displayName, formatCount, percentChange, relativeTime } from "@/lib/format";
 import { Greeting } from "@/components/Greeting";
+import { LiquidDrop } from "@/components/LiquidDrop";
 
 const RANGES: { id: AnalyticsRange; label: string }[] = [
   { id: "7d", label: "7 days" },
@@ -42,7 +43,8 @@ export function Dashboard({
       <header className="flex flex-wrap items-end justify-between gap-4">
         <Greeting data={data} />
         <div className="flex items-center gap-2">
-          <div className="sf-tabs" role="group" aria-label="Period">
+          <div className="sf-tabs sf-tabs--liquid" role="group" aria-label="Period">
+            <LiquidDrop watch={range} />
             {RANGES.map((r) => (
               <button
                 key={r.id}

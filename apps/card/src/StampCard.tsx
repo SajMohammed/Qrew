@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { m } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
 import type { CardView, FailureKind } from "./api";
@@ -9,6 +10,9 @@ import { CardFoot, CardTop, merchantStyle } from "./MerchantCard";
 import { Confetti } from "@/components/Confetti";
 import { buzz } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+
+/** How long the notification stays: Softform's `sf-notify` plays in, holds and leaves in 2.6s. */
+const NOTICE_MS = 2700;
 
 export function StampCard({
   card,
@@ -43,10 +47,21 @@ export function StampCard({
   const [landedFrom, setLandedFrom] = useState<number | null>(null);
   const [celebrate, setCelebrate] = useState(false);
   const celebrated = useRef(card.rewardReady);
+  // The news of a stamp (or a reward) dropping in at the top of the screen, as it happens at the counter.
+  const [notice, setNotice] = useState<{ id: number; text: string } | null>(null);
+  const say = (text: string) => setNotice((n) => ({ id: (n?.id ?? 0) + 1, text }));
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), NOTICE_MS);
+    return () => window.clearTimeout(t);
+  }, [notice]);
 
   useEffect(() => {
     if (card.currentStamps > prevCount.current) {
       setLandedFrom(prevCount.current);
+      const added = card.currentStamps - prevCount.current;
+      say(`${added > 1 ? `${added} stamps added` : "Stamp added"} · ${card.currentStamps} of ${card.stampsRequired}`);
       buzz(14);
       const t = window.setTimeout(() => setLandedFrom(null), 900);
       prevCount.current = card.currentStamps;
@@ -60,6 +75,7 @@ export function StampCard({
     if (card.rewardReady && !celebrated.current) {
       celebrated.current = true;
       setCelebrate(true);
+      say(`Your reward is ready: ${card.rewardText}`);
       buzz([18, 60, 24]);
       // Comfortably longer than the burst itself, so it ends by finishing rather than by being cut.
       const t = window.setTimeout(() => setCelebrate(false), 1900);
@@ -70,11 +86,46 @@ export function StampCard({
 
   return (
     <div className="mx-auto flex w-full max-w-[440px] flex-col gap-4 px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:max-w-[520px]">
+      {/* Floats over the card as the screen scrolls, in liquid glass. */}
       {onBack && (
-        <button type="button" onClick={onBack} className="sf-btn sf-btn--ghost -ml-2 self-start px-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="sf-btn sf-liquid sf-liquid--tint sticky top-[calc(8px+env(safe-area-inset-top))] z-20 self-start px-4"
+          data-liquid="9"
+          data-bezel="18"
+        >
           ‹ All cards
         </button>
       )}
+      {notice &&
+        createPortal(
+          <div
+            key={notice.id}
+            role="status"
+            className="sf-notify sf-liquid sf-liquid--tint card-notify"
+            style={
+              {
+                "--notify-icon-bg": card.brandColor,
+                "--notify-icon-ink": textOn(card.brandColor),
+              } as CSSProperties
+            }
+            data-liquid="9"
+            data-bezel="18"
+          >
+            <span className="sf-notify__icon" aria-hidden>
+              {card.merchantName.slice(0, 1)}
+            </span>
+            <span>
+              <b className="sf-notify__title">{card.merchantName}</b>
+              {notice.text}
+            </span>
+            <span className="sf-notify__meta" aria-hidden>
+              now
+            </span>
+          </div>,
+          document.body,
+        )}
 
       {/* The screen's one vivid surface: the shop's own card, in the shop's colour. */}
       <m.div
@@ -129,7 +180,16 @@ export function StampCard({
         </ol>
 
         <CardFoot>
-          <span className="sf-tag">{card.rewardReady ? "Reward ready" : `${remaining} to your reward`}</span>
+          {/* Ready, the tag turns into a drop of liquid glass that breathes: the card's one lens. */}
+          <span
+            // A fresh element when it turns ready, so liquid glass gives it its lens (it lenses glass as it mounts).
+            key={card.rewardReady ? "ready" : "counting"}
+            className={cn("sf-tag", card.rewardReady && "sf-liquid sf-liquid--light reward-chip")}
+            data-liquid={card.rewardReady ? "" : undefined}
+            data-bezel={card.rewardReady ? "12" : undefined}
+          >
+            {card.rewardReady ? "Reward ready" : `${remaining} to your reward`}
+          </span>
           <span className="sf-tag">{card.rewardText}</span>
         </CardFoot>
       </m.div>
