@@ -17,12 +17,6 @@
 }
 
 @layer base {
-  /* Softform's components size with border-box (Tailwind's Preflight gives the other apps this). */
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
   html {
     scroll-behavior: smooth;
   }
@@ -153,15 +147,6 @@
   }
   .mk-stage__metric .sf-spark {
     flex: none;
-  }
-  /* A solid card floating on an aura is its own surface, so it takes back the chart ink and the
-     positive change colour that Softform's aura-descendant rules would turn white and faded. */
-  .mk-stage__metric .sf-spark {
-    color: var(--chart-ink);
-  }
-  .mk-stage__metric .sf-figure__sup--up {
-    color: var(--signature-ink);
-    opacity: 1;
   }
 
   /* ── features and steps ── */
