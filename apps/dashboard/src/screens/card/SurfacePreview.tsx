@@ -3,6 +3,7 @@ import { Smartphone, Wallet, Apple, Printer } from "lucide-react";
 import { useApi } from "@/useApi";
 import type { CardDesign } from "@/api";
 import { cn } from "@/lib/utils";
+import { LiquidDrop } from "@/components/LiquidDrop";
 
 /**
  * The card as the customer meets it, in every place it appears.
@@ -58,7 +59,8 @@ export function SurfacePreview(props: PreviewInput) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="sf-tabs w-full">
+      <div className="sf-tabs sf-tabs--liquid w-full">
+        <LiquidDrop watch={surface} />
         {SURFACES.map((s) => (
           <button
             key={s.id}

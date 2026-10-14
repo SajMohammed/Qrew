@@ -38,6 +38,8 @@ import {
   qrExpiresAt,
   qrState,
 } from "@/lib/connection";
+// Softform's liquid glass script, copied verbatim beside its CSS: re-copy to update, never edit.
+import { liquidGlass } from "./styles/liquid-glass.js";
 
 function param(name: string): string {
   return new URLSearchParams(window.location.search).get(name) ?? "";
@@ -119,6 +121,8 @@ const SCREEN = "mx-auto w-full max-w-[440px] sm:max-w-[560px]";
 
 export function App() {
   const auth = useCustomerAuth();
+  // Liquid glass's pointer light and (in Chromium) lens, for every `.sf-liquid` in the app.
+  useEffect(() => liquidGlass(), []);
   const [shop, setShop] = useState(() => ({ m: param("m"), p: param("p") }));
   const [localSerials, setLocalSerials] = useState<string[]>(readLocal);
   const [tiles, setTiles] = useState<CardTile[]>([]);
@@ -573,10 +577,15 @@ export function App() {
             >
               <header className="sf-spread">
                 <span className="qrew-wordmark">Qrew</span>
+                {/* Floating liquid controls: they give like gel under a thumb. */}
                 <div className="sf-cluster">
-                  <ThemeToggle />
+                  <ThemeToggle className="sf-liquid sf-liquid--tint" />
                   {auth.signedIn && (
-                    <button type="button" onClick={() => void auth.signOut()} className="sf-btn sf-btn--ghost px-4">
+                    <button
+                      type="button"
+                      onClick={() => void auth.signOut()}
+                      className="sf-btn sf-liquid sf-liquid--tint px-4"
+                    >
                       Sign out
                     </button>
                   )}

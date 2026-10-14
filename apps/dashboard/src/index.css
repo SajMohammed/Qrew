@@ -25,6 +25,31 @@
 }
 
 @layer components {
+  /* The phone dock's current section is the liquid drop sliding under it (LiquidDrop), not an ink bubble.
+     The drop is tinted just enough to read as a selection; the other sections step back to ink-2. */
+  .shop-dock .sf-bubble[aria-current="page"] {
+    background: transparent;
+    color: var(--ink);
+  }
+  .shop-dock .sf-bubble--plain:not([aria-current]) {
+    color: var(--ink-2);
+  }
+  .shop-dock .sf-tabs__drop {
+    top: 6px;
+    bottom: 6px;
+    background: color-mix(in srgb, var(--ink) 9%, transparent);
+  }
+
+  /* The scan result over the camera: a liquid notification along the top of the frame, clear of the
+     switch-camera bubble. */
+  .counter-notify {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 72px;
+    z-index: 10;
+  }
+
   /* Screens settle in rather than appearing, which makes navigation feel continuous. */
   .rise {
     animation: qrew-rise var(--dur-base) var(--ease-soft) both;

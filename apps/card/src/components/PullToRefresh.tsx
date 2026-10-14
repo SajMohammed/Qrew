@@ -75,15 +75,22 @@ export function PullToRefresh({
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
         initial={false}
       >
+        {/* The spinner rides down in a bubble of liquid glass as the list is pulled. */}
         <span
           className={cn(
-            "text-ink-3 size-6 rounded-full border-2 border-current border-t-transparent transition-opacity",
-            busy && "animate-spin",
+            "sf-bubble sf-liquid sf-liquid--tint pointer-events-none transition-opacity",
             pull > 8 ? "opacity-100" : "opacity-0",
           )}
-          style={{ transform: busy ? undefined : `rotate(${pull * 3}deg)` }}
           aria-hidden
-        />
+        >
+          <span
+            className={cn(
+              "text-ink-2 size-5 rounded-full border-2 border-current border-t-transparent",
+              busy && "animate-spin",
+            )}
+            style={{ transform: busy ? undefined : `rotate(${pull * 3}deg)` }}
+          />
+        </span>
       </m.div>
       {children}
     </div>

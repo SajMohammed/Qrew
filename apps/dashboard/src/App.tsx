@@ -13,12 +13,16 @@ import { CreateShop } from "@/screens/CreateShop";
 import { Settings } from "@/screens/Settings";
 import { Card } from "@/components/ui/card";
 import { isCounterMode, setCounterModeFlag } from "@/lib/counter-mode";
+// Softform's liquid glass script, copied verbatim beside its CSS: re-copy to update, never edit.
+import { liquidGlass } from "./styles/liquid-glass.js";
 
 /** The dashboard is a live view of the till, but each load is a handful of aggregates. */
 const POLL_MS = 60_000;
 
 export function App() {
   const { isLoaded, isSignedIn } = useAuth();
+  // Liquid glass's pointer light and (in Chromium) lens, for every `.sf-liquid` on every screen.
+  useEffect(() => liquidGlass(), []);
 
   if (!isLoaded) {
     return (

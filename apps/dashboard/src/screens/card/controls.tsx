@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LiquidDrop } from "@/components/LiquidDrop";
 
 /** The shared controls the card sections are built from. Nothing here knows about card types. */
 
@@ -119,7 +120,8 @@ export function Segmented<T extends string>({
   options: { id: T; label: string }[];
 }) {
   return (
-    <div className="sf-tabs mt-1.5 w-full">
+    <div className="sf-tabs sf-tabs--liquid mt-1.5 w-full">
+      <LiquidDrop watch={value} />
       {options.map((o) => (
         <button
           key={o.id}
