@@ -542,67 +542,13 @@
     }
   }
 
-  /* A notification: liquid glass that drops in from the top of the screen, then slips away. */
-  .mk-notif {
-    --liquid-tint: rgba(255, 255, 255, 0.72);
+  /* The phone's notifications are Softform's (sf-notify), placed across the top of the screen. */
+  .mk-phone__notify {
     position: absolute;
     z-index: 5;
     top: 46px;
     left: 10px;
     right: 10px;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 22px;
-    font-size: 12.5px;
-    line-height: 1.3;
-    animation: mk-notif 1.6s var(--ease-spring) both;
-  }
-  :root.dark .mk-notif {
-    --liquid-tint: rgba(30, 35, 30, 0.74);
-  }
-  .mk-notif--hold {
-    animation-duration: 4s;
-  }
-  @keyframes mk-notif {
-    0% {
-      opacity: 0;
-      transform: translateY(-140%) scale(0.9);
-    }
-    16%,
-    84% {
-      opacity: 1;
-      transform: none;
-    }
-    100% {
-      opacity: 0;
-      transform: translateY(-140%) scale(0.92);
-    }
-  }
-  .mk-notif b {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-  }
-  .mk-notif__icon {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    background: var(--c);
-    color: #fbfbf7;
-  }
-  .mk-notif__icon svg {
-    width: 18px;
-    height: 18px;
-  }
-  .mk-notif__time {
-    align-self: start;
-    font-size: 11px;
-    color: var(--ink-3);
   }
 
   /* Glass floating beside the phone: the shop's side of the same moment. */
@@ -936,10 +882,12 @@
     font-size: 13px;
     opacity: 0.55;
   }
+  /* Still, the story's notification simply sits there; scrolled, it drops in at the end (see below). */
   .mk-story__notif {
+    position: absolute;
+    z-index: 5;
     top: 2%;
     right: 0;
-    left: auto;
     width: 290px;
     animation: none;
   }
@@ -1670,7 +1618,7 @@
         animation-range: contain 82% contain 87%;
       }
       .mk-story__notif {
-        animation: mk-notif-in linear both;
+        animation: mk-notify-in linear both;
         animation-timeline: --story;
         animation-range: contain 85% contain 91%;
       }
@@ -1779,7 +1727,7 @@
       transform: scale(0.7);
     }
   }
-  @keyframes mk-notif-in {
+  @keyframes mk-notify-in {
     from {
       opacity: 0;
       transform: translateY(-40px) scale(0.9);
