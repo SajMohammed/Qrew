@@ -94,7 +94,7 @@ export function Story() {
               </article>
             </div>
 
-            <div className="mk-lg mk-lg--tint mk-notif mk-story__notif" data-liquid="9" data-bezel="18">
+            <div className="sf-liquid sf-liquid--tint mk-notif mk-story__notif" data-liquid="9" data-bezel="18">
               <span className="mk-notif__icon" style={{ "--c": COLOUR } as CSSProperties}>
                 <GiftIcon />
               </span>

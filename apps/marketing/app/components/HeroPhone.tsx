@@ -51,7 +51,7 @@ export function HeroPhone() {
         </div>
 
         {n > START && (
-          <div key={n} className={`mk-lg mk-lg--tint mk-notif${ready ? " mk-notif--hold" : ""}`} data-liquid="9" data-bezel="18">
+          <div key={n} className={`sf-liquid sf-liquid--tint mk-notif${ready ? " mk-notif--hold" : ""}`} data-liquid="9" data-bezel="18">
             <span className="mk-notif__icon" style={{ "--c": COLOUR } as CSSProperties}>
               {ready ? <GiftIcon /> : <CheckIcon />}
             </span>

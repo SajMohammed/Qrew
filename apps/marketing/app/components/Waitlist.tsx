@@ -46,7 +46,7 @@ export function Waitlist() {
             </h2>
             <ul className="mk-cta__promises">
               {PROMISES.map((p) => (
-                <li key={p} className="mk-lg mk-lg--light sf-insight" data-liquid="9" data-bezel="18">
+                <li key={p} className="sf-liquid sf-liquid--light sf-insight" data-liquid="9" data-bezel="18">
                   <span className="sf-bubble sf-bubble--sm sf-bubble--primary mk-cta__check" aria-hidden>
                     <CheckIcon />
                   </span>

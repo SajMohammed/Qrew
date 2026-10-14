@@ -60,6 +60,12 @@
   --glass-rim: rgba(255, 255, 255, 0.85);
   --glass-light: rgba(255, 255, 255, 0.62);
   --paper: #ffffff;
+  --liquid: rgba(255, 255, 255, 0.10);
+  --liquid-tint: rgba(255, 255, 255, 0.56);
+  --liquid-rim: rgba(255, 255, 255, 0.95);
+  --liquid-rim-soft: rgba(255, 255, 255, 0.40);
+  --liquid-sheen: rgba(255, 255, 255, 0.60);
+  --liquid-shade: rgba(16, 22, 16, 0.12);
   --aura-1: #17703a;
   --aura-2: #3fae48;
   --aura-3: #97da4b;
@@ -82,6 +88,7 @@
   --shadow-3: 0 8px 24px -12px rgba(16, 22, 16, 0.12), 0 32px 80px -24px rgba(16, 22, 16, 0.30);
   --shadow-bubble: inset 0 1px 1px rgba(255, 255, 255, 0.95), inset 0 -3px 6px rgba(16, 22, 16, 0.05), 0 6px 14px -6px rgba(16, 22, 16, 0.22);
   --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.80), inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 10px 30px -12px rgba(16, 22, 16, 0.20);
+  --shadow-liquid: 0 12px 32px -14px rgba(16, 22, 16, 0.28), 0 2px 6px -2px rgba(16, 22, 16, 0.08);
   --shadow-press: inset 0 2px 6px rgba(16, 22, 16, 0.12);
   --shadow-signature: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 24px -10px rgba(110, 170, 20, 0.65);
 }
@@ -132,6 +139,12 @@
   --glass-rim: rgba(255, 255, 255, 0.16);
   --glass-light: rgba(255, 255, 255, 0.62);
   --paper: #ffffff;
+  --liquid: rgba(255, 255, 255, 0.04);
+  --liquid-tint: rgba(30, 35, 30, 0.68);
+  --liquid-rim: rgba(255, 255, 255, 0.34);
+  --liquid-rim-soft: rgba(255, 255, 255, 0.08);
+  --liquid-sheen: rgba(255, 255, 255, 0.14);
+  --liquid-shade: rgba(0, 0, 0, 0.35);
   --aura-1: #125c2f;
   --aura-2: #33963d;
   --aura-3: #86c943;
@@ -154,6 +167,7 @@
   --shadow-3: 0 8px 24px -12px rgba(0, 0, 0, 0.5), 0 32px 80px -24px rgba(0, 0, 0, 0.8);
   --shadow-bubble: inset 0 1px 1px rgba(255, 255, 255, 0.10), inset 0 -3px 6px rgba(0, 0, 0, 0.25), 0 6px 14px -6px rgba(0, 0, 0, 0.6);
   --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --shadow-liquid: 0 14px 36px -14px rgba(0, 0, 0, 0.75), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
   --shadow-press: inset 0 2px 6px rgba(0, 0, 0, 0.45);
   --shadow-signature: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 10px 28px -10px rgba(203, 250, 91, 0.35);
 }
@@ -177,6 +191,8 @@
   --radius-pill: 999px;
   --blur-glass: 24px;
   --blur-aura: 48px;
+  --blur-liquid: 2px;
+  --blur-liquid-tint: 10px;
   --control-sm: 32px;
   --control-md: 44px;
   --control-lg: 56px;
@@ -222,6 +238,8 @@
 
 /* Layout gaps are set per element (style="--gap: 8px") and must NOT inherit into nested stacks. */
 @property --gap { syntax: "*"; inherits: false; }
+/* Each liquid lens is drawn for one element's size (assets/liquid-glass.js); a nested one must not inherit it. */
+@property --liquid-lens { syntax: "*"; inherits: false; }
 
 /* ── Recipes built from tokens (gradients and textures can't be single tokens) ── */
 :root {
@@ -911,6 +929,84 @@ textarea.sf-input { height: auto; min-height: 120px; padding: 14px var(--space-5
 .sf-spinner { display: inline-block; width: 22px; height: 22px; border: 2.5px dotted currentColor; border-radius: 50%; animation: sf-spin 1.4s linear infinite; }
 @keyframes sf-spin { to { transform: rotate(360deg); } }
 
+/* ── Liquid glass ─────────────────────────────────────────────────────── */
+/* Glass made thicker and clearer: barely blurred, a lip of light along the top edge, a sheen that follows the
+   pointer and, in Chromium with assets/liquid-glass.js, rounded edges that bend the page behind like a drop of
+   water. For chrome that floats over moving content: bars, docks, notifications, selection drops. Clear liquid
+   carries no words; words go on --tint (or --light on an aura). It sits last in the layer so it composes onto
+   controls (`sf-btn sf-liquid sf-liquid--tint`), and it draws with ::before and ::after, so it doesn't go on
+   components that draw their own (aura, tile, folder, sheet, switch, lens bubble). */
+:where(.sf-liquid) { position: relative; border-radius: var(--radius-lg); }
+.sf-liquid {
+  --liquid-blur: var(--blur-liquid);
+  isolation: isolate;
+  background: var(--liquid);
+  color: var(--ink);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.8) brightness(1.04);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.8) brightness(1.04);
+}
+/* Rim, inner light and bottom shade. :hover keeps them on a control (sf-btn deepens its shadow on hover). */
+.sf-liquid, .sf-liquid:hover {
+  box-shadow:
+    inset 0 1px 0.5px var(--liquid-rim),
+    inset 0 -1px 0.5px var(--liquid-rim-soft),
+    inset 0 0 0 0.5px var(--liquid-rim-soft),
+    inset 0 12px 20px -14px var(--liquid-sheen),
+    inset 0 -14px 22px -16px var(--liquid-shade),
+    var(--shadow-liquid);
+}
+/* The sheen: a soft bright spot where the light falls; liquid-glass.js moves it with the pointer (--mx, --my). */
+.sf-liquid::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(180px circle at var(--mx, 22%) var(--my, -10%), var(--liquid-sheen), transparent 70%),
+    linear-gradient(170deg, var(--liquid-sheen) 0%, transparent 34%);
+  opacity: 0.85;
+}
+/* The rim: bright where it faces the light, fading away from it. */
+.sf-liquid::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border-radius: inherit; padding: 1px;
+  background: linear-gradient(140deg, var(--liquid-rim) 0%, transparent 30%, transparent 64%, var(--liquid-rim-soft) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.sf-liquid--tint { --liquid-blur: var(--blur-liquid-tint); background: var(--liquid-tint); }
+/* On an aura or a tile: light glass in both themes, with the fixed pastel ink (like sf-glass--light). */
+.sf-liquid--light {
+  --liquid-blur: var(--blur-liquid-tint);
+  --liquid-rim: color-mix(in srgb, var(--paper) 95%, transparent);
+  --liquid-sheen: color-mix(in srgb, var(--paper) 70%, transparent);
+  background: var(--glass-light);
+  color: var(--on-pastel);
+}
+/* The lens (Chromium; liquid-glass.js sets data-refract on <html> and --liquid-lens on each [data-liquid]).
+   Where the edge bends the page, the tint needs less frost to read on. */
+[data-refract] .sf-liquid[data-liquid] {
+  -webkit-backdrop-filter: var(--liquid-lens, ) blur(var(--liquid-blur)) saturate(1.8) brightness(1.04);
+  backdrop-filter: var(--liquid-lens, ) blur(var(--liquid-blur)) saturate(1.8) brightness(1.04);
+}
+[data-refract] .sf-liquid--tint { --liquid-blur: calc(var(--blur-liquid-tint) * 0.6); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sf-liquid--tint { background: var(--glass-strong); }
+  .sf-liquid--light { background: var(--paper); }
+}
+/* Selection drop: a clear drop of liquid over the chosen tab, sliding on a spring. Script sets --x and --w
+   from the selected tab's offsetLeft and offsetWidth (components.md → LiquidGlass). The label reads through
+   it, so it takes no blur and no pointer hotspot (on a drop this small the spot would wash the whole label). */
+.sf-tabs--liquid { position: relative; }
+.sf-tabs--liquid .sf-tabs__tab[aria-selected="true"], .sf-tabs--liquid .sf-tabs__tab[aria-pressed="true"] { background: transparent; box-shadow: none; }
+.sf-tabs__drop {
+  position: absolute; z-index: 1; top: 4px; bottom: 4px; left: 0;
+  width: var(--w, 0px); translate: var(--x, 0px) 0;
+  --liquid-blur: 0px;
+  border-radius: var(--radius-pill); pointer-events: none;
+  transition: translate var(--dur-slow) var(--ease-spring), width var(--dur-slow) var(--ease-spring);
+}
+.sf-tabs__drop::before { background: linear-gradient(170deg, var(--liquid-sheen) 0%, transparent 34%); }
+
 /* ── Motion helpers ───────────────────────────────────────────────────── */
 .sf-rise { animation: sf-rise var(--dur-base) var(--ease-soft) both; animation-delay: calc(var(--i, 0) * 45ms); }
 @keyframes sf-rise { from { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(6px); } }
@@ -924,8 +1020,12 @@ textarea.sf-input { height: auto; min-height: 120px; padding: 14px var(--space-5
   .sf-glass, .sf-menu, .sf-nav--glass .sf-nav__item { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .sf-glass--on-color, .sf-glass--light, .sf-tag--glass, .sf-btn--glass, .sf-bubble--glass, .sf-aura .sf-msg--them { background: var(--paper); color: var(--on-pastel); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .sf-aura .sf-card .sf-msg--them { background: var(--surface-sunken); color: var(--ink); }
+  /* Liquid: no blur and no lens; the glass that carries words turns solid. Clear liquid has nothing to read, so it stays clear. */
+  .sf-liquid { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .sf-liquid--tint { background: var(--surface-raised); }
+  .sf-liquid--light { background: var(--paper); color: var(--on-pastel); }
 }
 @media (prefers-reduced-motion: reduce) {
   .sf-rise, .sf-aura--drift, .sf-wave.is-live i, .sf-typing i, .sf-skeleton::after, .sf-spinner { animation: none; }
-  .sf-btn, .sf-bubble, .sf-nav__item, .sf-card--interactive, .sf-switch::after, .sf-progress__bar, .sf-ring__arc, .sf-suggest, .sf-press { transition-duration: 1ms; }
+  .sf-btn, .sf-bubble, .sf-nav__item, .sf-card--interactive, .sf-switch::after, .sf-progress__bar, .sf-ring__arc, .sf-suggest, .sf-press, .sf-tabs__drop { transition-duration: 1ms; }
 }

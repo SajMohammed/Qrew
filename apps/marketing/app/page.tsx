@@ -54,7 +54,7 @@ function Wordmark() {
 function Nav() {
   return (
     <header className="mk-nav">
-      <nav className="mk-lg mk-lg--tint mk-nav__bar" data-liquid="10" data-bezel="20" aria-label="Main">
+      <nav className="sf-liquid sf-liquid--tint mk-nav__bar" data-liquid="10" data-bezel="20" aria-label="Main">
         <a href="#top" aria-label="Qrew, back to top">
           <Wordmark />
         </a>
@@ -101,7 +101,7 @@ function Hero() {
     <section className="mk-hero" id="top">
       <div className="mk-container mk-hero__grid">
         <div className="mk-hero__copy">
-          <span className="mk-lg mk-lg--tint mk-live mk-in" style={vars({ "--i": 0 })}>
+          <span className="sf-liquid sf-liquid--tint mk-live mk-in" style={vars({ "--i": 0 })}>
             <i className="mk-live__dot" aria-hidden />
             Wallet loyalty for UAE shops
           </span>
@@ -119,7 +119,7 @@ function Hero() {
             <a className="sf-btn sf-btn--primary sf-btn--lg mk-gel mk-glow" href="#waitlist">
               Get early access
             </a>
-            <a className="sf-btn sf-btn--lg mk-lg mk-lg--tint mk-gel" href="#how">
+            <a className="sf-btn sf-btn--lg sf-liquid sf-liquid--tint mk-gel" href="#how">
               See how it works
             </a>
           </div>
@@ -133,13 +133,13 @@ function Hero() {
         <div className="mk-hero__stage">
           <Jelly />
           <HeroPhone />
-          <div className="mk-lg mk-lg--tint mk-float mk-float--metric" data-liquid="10" data-bezel="20" aria-hidden>
+          <div className="sf-liquid sf-liquid--tint mk-float mk-float--metric" data-liquid="10" data-bezel="20" aria-hidden>
             <p className="sf-card__label">Stamps today</p>
             <p className="sf-figure sf-figure-lg">
               148<span className="sf-figure__sup sf-figure__sup--up">+12%</span>
             </p>
           </div>
-          <div className="mk-lg mk-lg--tint mk-float mk-float--regular" data-liquid="9" data-bezel="18" aria-hidden>
+          <div className="sf-liquid sf-liquid--tint mk-float mk-float--regular" data-liquid="9" data-bezel="18" aria-hidden>
             <span className="sf-avatar sf-avatar--sm">S</span>
             <span>
               <b>Sara is back</b>
@@ -147,7 +147,7 @@ function Hero() {
             </span>
           </div>
           {/* A clear drop of glass drifting over the edge of the phone: the lens at its plainest. */}
-          <i className="mk-lg mk-lens" data-liquid="26" data-bezel="56" aria-hidden />
+          <i className="sf-liquid mk-lens" data-liquid="26" data-bezel="56" aria-hidden />
         </div>
       </div>
     </section>
@@ -166,7 +166,7 @@ function Proof() {
     <section className="mk-proof" aria-label="Qrew at a glance">
       <div className="mk-container mk-proof__row">
         {items.map(([n, label], i) => (
-          <div className="mk-lg mk-lg--tint mk-proof__item" data-liquid="10" data-bezel="20" key={label} style={vars({ "--i": i })}>
+          <div className="sf-liquid sf-liquid--tint mk-proof__item" data-liquid="10" data-bezel="20" key={label} style={vars({ "--i": i })}>
             <span className="sf-figure sf-figure-lg">{n}</span>
             <span className="mk-proof__label">{label}</span>
           </div>
@@ -253,7 +253,7 @@ function Steps() {
         <ol className="mk-steps">
           {STEPS.map((s, i) => (
             <li className="mk-step" key={s.title} style={vars({ "--i": i })}>
-              <span className="mk-lg mk-step__bubble" aria-hidden>
+              <span className="sf-liquid sf-liquid--tint mk-step__bubble" aria-hidden>
                 {s.icon}
               </span>
               <p className="mk-step__n">Step {i + 1}</p>
@@ -304,7 +304,7 @@ function Compare() {
               </ul>
             </div>
           ))}
-          <div className="mk-lg mk-lg--tint mk-compare__col mk-compare__col--qrew" data-liquid="12" data-bezel="24">
+          <div className="sf-liquid sf-liquid--tint mk-compare__col mk-compare__col--qrew" data-liquid="12" data-bezel="24">
             <h3 className="sf-heading">
               <span className="qrew-wordmark">Qrew</span>
             </h3>
@@ -364,7 +364,7 @@ function Faq() {
         </div>
         <div className="mk-faq__list">
           {FAQ.map((f) => (
-            <details key={f.q} className="mk-lg mk-lg--tint mk-faq__item">
+            <details key={f.q} className="sf-liquid sf-liquid--tint mk-faq__item">
               <summary>
                 {f.q}
                 <span className="mk-faq__icon" aria-hidden>
