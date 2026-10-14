@@ -1,170 +1,1095 @@
+/*
+ * Qrew — the landing page, on Softform.
+ *
+ * softform.css and the Qrew theme load first (layout.tsx). This page's rules live in an `app`
+ * cascade layer declared after Softform's `base` and `components`, so they refine components
+ * instead of flattening them: an unlayered reset here would beat every layered Softform rule.
+ *
+ * The page's feel is lime foam: soft signature glows that drift behind glass, a few soap-bubble
+ * highlights, and lime washes pooling under each product visual. The one full aura is the
+ * waitlist finale. Merchant cards stay in their shop's colour (the split rule): Qrew's lime lives
+ * in the glass, glow and controls around them, never on them.
+ */
+
+/* Softform names its families; point them at the fonts next/font self-hosts (layout.tsx). */
 :root {
-  /* Qrew brand */
-  --lime: #cbfa5b;
-  --lime-soft: #e4fb98;
-  --spring: #8ff992;
-  --forest: #2fa24a;
-  --forest-deep: #146a2e;
-  --ink: #0c2712;
-  --ink-2: #16351f;
+  --font-sans: var(--font-archivo), "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-dots: var(--font-doto), "Doto", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-wordmark: var(--font-anton), "Anton", "Archivo", sans-serif;
 
-  /* neutrals — light shell */
-  --bg: #f6fbef;
-  --surface: #ffffff;
-  --mist: #eef2ec;
-  --muted: #5e6b60;
-  --faint: #8a938b;
-  --border: #dce4d6;
-
-  /* signature lime → forest gradient — the hero surface */
-  --grad: linear-gradient(158deg, #cbfa5b 0%, #86e056 34%, #38ad4c 66%, #146a2e 100%);
-
-  /* fonts injected by next/font */
-  --display: var(--font-anton), "Archivo", sans-serif;
-  --sans: var(--font-archivo), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Lime washes: a glow that pools under product visuals. Dark canvases need far less lime to glow. */
+  --mk-lime: color-mix(in srgb, var(--signature) 48%, transparent);
+  --mk-lime-faint: color-mix(in srgb, var(--signature) 24%, transparent);
+  --mk-orb-opacity: 0.9;
+}
+:root.dark,
+[data-theme="dark"] {
+  --mk-lime: color-mix(in srgb, var(--signature) 20%, transparent);
+  --mk-lime-faint: color-mix(in srgb, var(--signature) 9%, transparent);
+  --mk-orb-opacity: 0.32;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--sans);
-  -webkit-font-smoothing: antialiased;
-  line-height: 1.5;
-}
-a { color: inherit; text-decoration: none; }
-
-.container { width: 100%; max-width: 1140px; margin: 0 auto; padding: 0 26px; }
-
-.eyebrow {
-  font-family: var(--sans); font-weight: 800; font-size: 12px; letter-spacing: 0.2em;
-  text-transform: uppercase; color: var(--forest);
-}
-.display {
-  font-family: var(--display); font-weight: 400; text-transform: uppercase;
-  line-height: 0.92; letter-spacing: 0.005em;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    /* Anchored sections land below the floating nav. */
+    scroll-padding-top: 96px;
+  }
+  body,
+  h1,
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  font-family: var(--sans); font-weight: 800; font-size: 16px; letter-spacing: 0.01em;
-  border: 0; border-radius: 15px; padding: 16px 28px; cursor: pointer;
-  transition: transform 0.08s ease, filter 0.15s ease;
+@layer app {
+  .mk-container {
+    width: min(100% - 2 * var(--space-4), 1180px);
+    margin-inline: auto;
+  }
+  @media (min-width: 1024px) {
+    .mk-container {
+      width: min(100% - 2 * var(--space-12), 1180px);
+    }
+  }
+  .mk-muted {
+    color: var(--ink-2);
+  }
+
+  /* ── nav: a floating glass pill; the page scrolls under it ── */
+  .mk-nav {
+    position: fixed;
+    inset: 12px 0 auto;
+    z-index: 50;
+    padding-inline: var(--space-4);
+    pointer-events: none;
+  }
+  .mk-nav__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    width: min(100%, 1180px);
+    height: 60px;
+    margin-inline: auto;
+    padding: 0 8px 0 var(--space-6);
+    border-radius: var(--radius-pill);
+    pointer-events: auto;
+  }
+  .mk-nav__links {
+    display: flex;
+    gap: 2px;
+  }
+  .mk-nav__link {
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-pill);
+    font-size: 14px;
+    color: var(--ink-2);
+    transition: background-color var(--dur-quick) var(--ease-soft), color var(--dur-quick) var(--ease-soft);
+  }
+  .mk-nav__link:hover {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    color: var(--ink);
+  }
+
+  .mk-nav__end {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  /* The theme switch: two icon segments, the chosen one raised. */
+  .mk-theme {
+    padding: 3px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+  .mk-theme .sf-tabs__tab {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 34px;
+    padding: 0;
+  }
+  .mk-theme svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  /* ── foam: drifting lime glows and soap bubbles ── */
+  .mk-foam {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    /* The foam settles into the canvas before the page moves on. */
+    -webkit-mask-image: linear-gradient(#000 62%, transparent);
+    mask-image: linear-gradient(#000 62%, transparent);
+  }
+  /* A faint dot grid under the glow: Softform's canvas, fading out from the demo. */
+  .mk-foam::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at 1px 1px, var(--canvas-dot) 1px, transparent 1.5px);
+    background-size: 22px 22px;
+    -webkit-mask-image: radial-gradient(60% 70% at 72% 40%, #000, transparent);
+    mask-image: radial-gradient(60% 70% at 72% 40%, #000, transparent);
+  }
+  .mk-orb {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: var(--s);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, var(--signature) 0%, color-mix(in srgb, var(--signature) 40%, transparent) 55%, transparent 100%);
+    opacity: var(--mk-orb-opacity);
+    filter: blur(24px);
+    animation: mk-drift var(--d) var(--ease-inout) infinite alternate;
+  }
+  .mk-orb--deep {
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--aura-3) 80%, transparent) 0%, color-mix(in srgb, var(--aura-2) 22%, transparent) 60%, transparent 100%);
+  }
+  .mk-orb--pale {
+    background: radial-gradient(closest-side, var(--aura-5) 0%, color-mix(in srgb, var(--signature) 30%, transparent) 60%, transparent 100%);
+  }
+  @keyframes mk-drift {
+    to {
+      transform: translate(var(--dx), var(--dy)) scale(1.08);
+    }
+  }
+  /* A soap bubble: a bright highlight, a thin rim with a little iridescence, almost no body. */
+  .mk-bubble {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: var(--s);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95) 0 9%, rgba(255, 255, 255, 0.3) 20%, transparent 48%),
+      radial-gradient(circle at 70% 76%, color-mix(in srgb, var(--signature) 45%, transparent), transparent 62%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+      inset -2px -3px 6px rgba(255, 255, 255, 0.3),
+      0 6px 14px -8px rgba(16, 22, 16, 0.3);
+    -webkit-backdrop-filter: blur(2px) saturate(1.5);
+    backdrop-filter: blur(2px) saturate(1.5);
+    animation: mk-float var(--d) var(--ease-inout) infinite alternate;
+  }
+  .mk-bubble::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(from 200deg, rgba(150, 190, 255, 0.7), transparent 25%, rgba(255, 170, 220, 0.6) 50%, transparent 75%, rgba(150, 190, 255, 0.7));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  :root.dark .mk-bubble,
+  [data-theme="dark"] .mk-bubble {
+    opacity: 0.55;
+  }
+  @keyframes mk-float {
+    to {
+      transform: translate(6px, -18px);
+    }
+  }
+
+  /* ── hero ── */
+  .mk-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding-block: 132px 128px;
+  }
+  .mk-hero__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: var(--space-12);
+    align-items: center;
+  }
+  .mk-hero__copy {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-6);
+  }
+  .mk-hero__title {
+    font-family: var(--font-sans);
+    font-size: clamp(52px, 6.8vw, 96px);
+    line-height: 1.02;
+    font-weight: 300;
+    letter-spacing: -0.045em;
+  }
+  /* The payoff, slapped on like a sticker: a glossy lime pill, a little crooked. */
+  .mk-sticker {
+    display: inline-block;
+    margin-top: 0.08em;
+    padding: 0.02em 0.3em 0.1em;
+    border-radius: var(--radius-pill);
+    background:
+      radial-gradient(120% 140% at 18% 0%, rgba(255, 255, 255, 0.55) 0%, transparent 42%),
+      linear-gradient(100deg, var(--signature) 30%, var(--aura-3) 100%);
+    color: var(--on-signature);
+    letter-spacing: -0.04em;
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.6),
+      inset 0 -6px 14px -6px rgba(23, 112, 58, 0.35),
+      0 24px 48px -18px rgba(110, 170, 20, 0.7);
+    transform: rotate(-3deg);
+    transform-origin: 20% 80%;
+    animation: mk-slap 0.8s var(--ease-spring) 0.2s both;
+  }
+  @keyframes mk-slap {
+    from {
+      opacity: 0;
+      transform: rotate(-12deg) scale(1.3) translateY(-12px);
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  .mk-hero__lead {
+    max-width: 30em;
+    color: var(--ink-2);
+  }
+  .mk-trust {
+    font-size: 13px;
+    color: var(--ink-3);
+  }
+  /* "Live" eyebrow: a lime dot breathing on glass. */
+  .mk-live {
+    height: 34px;
+    padding: 0 14px 0 12px;
+    font-size: 13px;
+    background: var(--glass-strong);
+    color: var(--ink-2);
+    box-shadow: var(--shadow-glass);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .mk-live::before,
+  .mk-head .sf-tag::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--signature);
+    box-shadow: 0 0 0 1.5px var(--chart-ink);
+  }
+  .mk-live::before {
+    animation: mk-pulse 2.4s ease-out infinite;
+  }
+  @keyframes mk-pulse {
+    0% {
+      box-shadow: 0 0 0 1.5px var(--chart-ink), 0 0 0 0 color-mix(in srgb, var(--signature) 80%, transparent);
+    }
+    70%,
+    100% {
+      box-shadow: 0 0 0 1.5px var(--chart-ink), 0 0 0 9px transparent;
+    }
+  }
+  .mk-glow:hover {
+    box-shadow: var(--shadow-signature), 0 0 0 6px var(--mk-lime-faint), 0 18px 44px -12px var(--signature-glow);
+  }
+  .mk-btn-glass {
+    background: var(--glass);
+    color: var(--ink);
+    box-shadow: var(--shadow-glass);
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+    backdrop-filter: blur(16px) saturate(1.6);
+  }
+  .mk-btn-glass:hover {
+    background: var(--glass-strong);
+  }
+
+  /* The live demo: the shop's card filling up, with Qrew's glass floating around it. */
+  .mk-demo {
+    display: grid;
+    place-items: center;
+  }
+  .mk-demo__inner {
+    position: relative;
+    width: min(100%, 440px);
+    padding-block: 80px 72px;
+  }
+  .mk-demo__card {
+    box-shadow: var(--shadow-3), 0 40px 80px -36px color-mix(in srgb, var(--card-color) 70%, transparent);
+    transform: rotate(-2deg);
+  }
+  .mk-demo__card.qrew-card--ready {
+    box-shadow: 0 0 0 4px var(--signature), 0 18px 44px -10px var(--signature-glow), var(--shadow-3);
+  }
+  /* The demo holds the card open (stamps as a grid), so it grows past the wallet-pass ratio to fit them. */
+  .mk-demo__card {
+    aspect-ratio: auto;
+  }
+  .mk-demo .qrew-stamps .sf-steps__dot {
+    max-width: 52px;
+    font-size: 18px;
+  }
+  .mk-demo__toast {
+    position: absolute;
+    top: 28px;
+    left: -28px;
+    z-index: 2;
+    padding: 6px var(--space-5) 6px 6px;
+    animation: mk-pop 0.5s var(--ease-spring) both;
+  }
+  .mk-demo__toast > svg {
+    width: 40px;
+    height: 40px;
+    padding: 10px;
+    border-radius: 50%;
+    background: var(--signature);
+    color: var(--on-signature);
+  }
+  @keyframes mk-pop {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.92);
+    }
+  }
+  .mk-demo__metric {
+    position: absolute;
+    right: -36px;
+    bottom: 12px;
+    z-index: 2;
+    display: grid;
+    gap: 6px;
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-lg);
+    background:
+      radial-gradient(120% 140% at 0% 0%, var(--mk-lime-faint) 0%, transparent 60%),
+      var(--glass-strong);
+  }
+  .mk-demo__metric .sf-card__label {
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .mk-demo__orbit {
+    position: absolute;
+    z-index: 3;
+    --size: 56px;
+    cursor: default;
+    animation: mk-float 6s var(--ease-inout) infinite alternate;
+  }
+  .mk-demo__orbit--1 {
+    top: 8px;
+    right: 28px;
+  }
+  .mk-demo__orbit--2 {
+    --size: 48px;
+    top: 52%;
+    left: -30px;
+    animation-delay: -3s;
+  }
+  .mk-tick {
+    animation: mk-tick 0.45s var(--ease-spring) both;
+  }
+  @keyframes mk-tick {
+    from {
+      opacity: 0.3;
+      transform: translateY(-6px) scale(1.12);
+    }
+  }
+
+  /* ── proof strip: three readouts on glass, overlapping the foam ── */
+  .mk-proof {
+    position: relative;
+    z-index: 2;
+    margin-top: -72px;
+  }
+  .mk-proof__row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+  .mk-proof__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-6);
+    border-radius: var(--radius-xl);
+    background:
+      radial-gradient(90% 140% at 0% 0%, var(--mk-lime-faint) 0%, transparent 60%),
+      var(--glass-strong);
+  }
+  .mk-proof__label {
+    max-width: 13ch;
+    font-size: 15px;
+    line-height: 1.3;
+    color: var(--ink-2);
+  }
+
+  /* ── sections ── */
+  .mk-section {
+    position: relative;
+    isolation: isolate;
+    padding-block: 104px;
+  }
+  .mk-head {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-4);
+    max-width: 680px;
+    margin-bottom: var(--space-10);
+  }
+  .mk-head--center {
+    justify-items: center;
+    margin-inline: auto;
+    text-align: center;
+  }
+  .mk-head .sf-display {
+    font-size: clamp(36px, 4.4vw, 56px);
+  }
+  .mk-head p {
+    color: var(--ink-2);
+  }
+  .mk-head .sf-tag {
+    height: 32px;
+    padding: 0 14px 0 12px;
+    gap: 8px;
+    background: var(--glass-strong);
+    color: var(--ink-2);
+    box-shadow: var(--shadow-glass);
+  }
+  .mk-head .sf-tag::before {
+    width: 6px;
+    height: 6px;
+  }
+
+  /* ── why: a bento of live product moments ── */
+  .mk-bento {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+  .mk-tile {
+    gap: var(--space-6);
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+  }
+  .mk-tile--wallet {
+    grid-column: span 7;
+  }
+  .mk-tile--design {
+    grid-column: span 5;
+  }
+  .mk-tile--dash {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    align-items: center;
+  }
+  .mk-tile__text {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 46ch;
+  }
+  .mk-tile__text .sf-bubble {
+    cursor: default;
+  }
+  /* Every visual sits in a sunken well with lime pooling at its floor. */
+  .mk-tile__visual {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: 1;
+    min-height: 280px;
+    padding: var(--space-6);
+    border-radius: var(--radius-lg);
+    background:
+      radial-gradient(90% 80% at 50% 115%, var(--mk-lime) 0%, transparent 70%),
+      var(--surface-sunken);
+  }
+
+  /* A customer's wallet: each shop's card in its own colour, stacked the way Wallet stacks passes
+     (every shop's name showing), spreading a little on hover. */
+  .mk-stack {
+    min-height: 360px;
+  }
+  .mk-pass {
+    grid-area: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--space-4);
+    width: min(84%, 360px);
+    aspect-ratio: 1.6;
+    padding: var(--space-4) var(--space-5) var(--space-5);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(170deg, color-mix(in oklab, var(--card-color) 78%, black), var(--card-color));
+    color: var(--on-tint);
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.18) inset, 0 -10px 24px -14px rgba(16, 22, 16, 0.45);
+    transition: transform var(--dur-slow) var(--ease-spring);
+  }
+  .mk-pass--1 {
+    transform: translateY(-58px) scale(0.9);
+  }
+  .mk-pass--2 {
+    transform: translateY(-4px) scale(0.95);
+  }
+  .mk-pass--3 {
+    transform: translateY(50px);
+    box-shadow: var(--shadow-3), 0 30px 60px -30px color-mix(in srgb, var(--card-color) 70%, transparent);
+  }
+  /* The front pass is a real tinted aura, like the merchant card it stands for. */
+  .mk-pass.sf-aura--tint {
+    background: var(--aura);
+  }
+  .mk-tile--wallet:hover .mk-pass--1 {
+    transform: translateY(-76px) scale(0.9);
+  }
+  .mk-tile--wallet:hover .mk-pass--2 {
+    transform: translateY(-14px) scale(0.95);
+  }
+  .mk-tile--wallet:hover .mk-pass--3 {
+    transform: translateY(58px) rotate(-1.5deg);
+  }
+  .mk-pass__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .mk-pass__name {
+    font-size: 16px;
+    font-weight: 500;
+  }
+  .mk-pass__count {
+    font-size: 13px;
+    opacity: 0.8;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Stamps on a pass are drawn in the card's own ink, like the real card. */
+  .mk-pass .sf-steps__dot {
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--on-tint) 55%, transparent);
+  }
+  .mk-pass .sf-steps__dot--done {
+    background: var(--on-tint);
+    box-shadow: none;
+  }
+
+  /* The card designer: pick a colour, the card becomes yours. */
+  .mk-designer {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-5);
+    width: 100%;
+  }
+  .mk-designer__swatches {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--glass-strong);
+    box-shadow: var(--shadow-glass);
+  }
+  .mk-swatch {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), inset 0 2px 3px rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: transform var(--dur-press) var(--ease-spring), box-shadow var(--dur-quick) var(--ease-soft);
+  }
+  .mk-swatch:hover {
+    transform: scale(1.12);
+  }
+  .mk-swatch:active {
+    transform: scale(0.94);
+  }
+  .mk-swatch[aria-pressed="true"] {
+    box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--ink);
+  }
+  .mk-swatch:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 5px;
+  }
+  .mk-designer__card {
+    width: min(100%, 320px);
+    padding: var(--space-5);
+    box-shadow: var(--shadow-3), 0 30px 60px -30px color-mix(in srgb, var(--card-color) 70%, transparent);
+  }
+
+  /* A slice of the dashboard: the lime priority banner and two readouts. */
+  .mk-dash {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    place-items: stretch;
+    align-content: center;
+    gap: var(--space-3);
+    min-height: 0;
+  }
+  .mk-dash__banner {
+    grid-column: 1 / -1;
+  }
+  .mk-dash .sf-btn {
+    cursor: default;
+  }
+  .mk-dash .sf-spark {
+    flex: none;
+  }
+  .mk-dash__ring .sf-ring {
+    align-self: center;
+  }
+
+  /* ── how it works: three cards, each with its moment ── */
+  .mk-how::before {
+    content: "";
+    position: absolute;
+    inset: 15% 0 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 55%, var(--mk-lime-faint), transparent 72%);
+  }
+  .mk-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .mk-step {
+    --pad: var(--space-5);
+    gap: var(--space-3);
+    border-radius: var(--radius-xl);
+  }
+  .mk-step__visual {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 176px;
+    margin-bottom: var(--space-3);
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background:
+      radial-gradient(80% 90% at 50% 110%, var(--mk-lime) 0%, transparent 70%),
+      var(--surface-sunken);
+  }
+  .mk-step__visual--stack {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .mk-step__n {
+    color: var(--ink);
+  }
+  .mk-dot-swatch {
+    width: 56px;
+    height: 56px;
+    margin-left: -14px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 0 4px var(--surface), var(--shadow-2);
+    animation: mk-bob 3.2s var(--ease-inout) infinite;
+    animation-delay: calc(var(--i) * 0.2s);
+  }
+  .mk-dot-swatch:first-child {
+    margin-left: 0;
+  }
+  @keyframes mk-bob {
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  .mk-mini-scan {
+    display: grid;
+    place-items: center;
+    width: 124px;
+    border-radius: var(--radius-lg);
+    color: var(--on-inverse);
+  }
+  .mk-mini-scan > svg {
+    width: 52px;
+    height: 52px;
+  }
+  .mk-mini-scan::after {
+    --corner: 22px;
+    inset: 12px;
+    border-radius: 16px;
+  }
+  .mk-mini-scan::before {
+    content: "";
+    position: absolute;
+    top: 22px;
+    left: 18px;
+    right: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--signature);
+    box-shadow: 0 0 12px 2px var(--signature-glow);
+    animation: mk-scan 2.2s var(--ease-inout) infinite alternate;
+  }
+  @keyframes mk-scan {
+    to {
+      transform: translateY(78px);
+    }
+  }
+  .mk-loop {
+    display: grid;
+  }
+  .mk-loop > .sf-steps {
+    grid-area: 1 / 1;
+  }
+  .mk-loop__fill {
+    animation: mk-fill 6s infinite;
+  }
+  /* Six steps: one more stamp each tick, then a hold while the reward shows. */
+  @keyframes mk-fill {
+    0% {
+      clip-path: inset(0 100% 0 0);
+      animation-timing-function: steps(6, jump-end);
+    }
+    66%,
+    100% {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+  .mk-loop__reward {
+    animation: mk-reward 6s infinite;
+  }
+  @keyframes mk-reward {
+    0%,
+    66% {
+      opacity: 0;
+      transform: scale(0.8);
+      animation-timing-function: var(--ease-spring);
+    }
+    72%,
+    96% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  .mk-step .sf-status svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* ── who: a slow marquee of glass chips over a lime band ── */
+  .mk-who {
+    padding-bottom: var(--space-12);
+  }
+  .mk-who .mk-head {
+    margin-bottom: var(--space-6);
+  }
+  .mk-marquee {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding-block: var(--space-8);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+  .mk-marquee::before {
+    content: "";
+    position: absolute;
+    inset: 22% 0;
+    z-index: -1;
+    background: linear-gradient(90deg, var(--mk-lime-faint), var(--mk-lime) 50%, var(--mk-lime-faint));
+    filter: blur(28px);
+  }
+  .mk-marquee__track {
+    display: flex;
+    gap: var(--space-3);
+    width: max-content;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    animation: mk-marquee 40s linear infinite;
+  }
+  .mk-marquee:hover .mk-marquee__track {
+    animation-play-state: paused;
+  }
+  /* The list runs twice; move by one copy plus one gap so the loop is seamless. */
+  @keyframes mk-marquee {
+    to {
+      transform: translateX(calc(-50% - var(--space-3) / 2));
+    }
+  }
+  .mk-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 56px;
+    padding: 0 var(--space-6) 0 var(--space-4);
+    border-radius: var(--radius-pill);
+    font-size: 18px;
+    white-space: nowrap;
+  }
+  .mk-chip__dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 2px 3px rgba(255, 255, 255, 0.35);
+  }
+
+  /* ── waitlist: the page's one aura, drifting, with the form card on it ── */
+  .mk-cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+    align-items: start;
+    gap: var(--space-10);
+    padding: var(--space-12);
+    border-radius: 44px;
+    box-shadow: var(--shadow-3), 0 40px 120px -40px var(--signature-glow);
+  }
+  .mk-cta__copy {
+    display: grid;
+    align-self: stretch;
+    align-content: space-between;
+    gap: var(--space-8);
+  }
+  .mk-cta__copy .sf-display {
+    max-width: 9ch;
+    font-size: clamp(44px, 5.4vw, 72px);
+    line-height: 1;
+  }
+  .mk-cta__promises {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 420px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .mk-cta__promises .sf-insight {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 10px var(--space-5) 10px 10px;
+    border-radius: var(--radius-pill);
+  }
+  .mk-cta__check {
+    cursor: default;
+  }
+  .mk-cta__form {
+    --pad: var(--space-8);
+    align-self: stretch;
+    justify-content: center;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-3);
+  }
+  .mk-form {
+    display: grid;
+    gap: var(--space-4);
+  }
+  .mk-form__note {
+    font-size: 12.5px;
+    color: var(--ink-3);
+    text-align: center;
+  }
+  .mk-form__error {
+    font-size: 13.5px;
+    color: var(--danger-ink);
+    text-align: center;
+  }
+  .mk-done {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+    padding: var(--space-6) var(--space-2);
+    text-align: center;
+  }
+  .mk-done p {
+    color: var(--ink-2);
+  }
+
+  /* ── footer ── */
+  .mk-footer {
+    padding-block: var(--space-12) var(--space-10);
+  }
+  .mk-footer .mk-container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-6);
+    flex-wrap: wrap;
+  }
+  .mk-footer .qrew-wordmark {
+    font-size: 40px;
+  }
+  .mk-footer__tag {
+    margin-top: var(--space-2);
+    color: var(--ink-2);
+  }
+  .mk-footer__meta {
+    font-size: 13px;
+    color: var(--ink-3);
+    text-align: right;
+  }
+
+  /* Sections rise in as they scroll into view, where the browser can drive it from scroll alone. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .mk-head,
+      .mk-tile,
+      .mk-step,
+      .mk-cta {
+        animation: mk-reveal linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 35%;
+      }
+    }
+  }
+  @keyframes mk-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(28px) scale(0.98);
+    }
+  }
+
+  /* ── tablets ── */
+  @media (max-width: 1024px) {
+    .mk-tile--wallet,
+    .mk-tile--design {
+      grid-column: 1 / -1;
+    }
+    .mk-cta {
+      grid-template-columns: 1fr;
+      padding: var(--space-8);
+    }
+  }
+
+  /* ── phones and small tablets ── */
+  @media (max-width: 860px) {
+    .mk-nav__links {
+      display: none;
+    }
+    .mk-nav__bar {
+      height: 56px;
+      padding-left: var(--space-5);
+    }
+    .mk-hero {
+      padding-block: 104px 112px;
+    }
+    .mk-hero__grid {
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+    }
+    .mk-demo__inner {
+      padding-block: 76px 84px;
+    }
+    .mk-demo .qrew-stamps .sf-steps__dot {
+      max-width: 44px;
+      font-size: 16px;
+    }
+    /* Off to the side on wide screens, these would sit on a headline here. */
+    .mk-bubble--wide {
+      display: none;
+    }
+    .mk-demo__toast {
+      top: 16px;
+      left: 0;
+    }
+    .mk-demo__metric {
+      right: 0;
+      bottom: 0;
+      padding: var(--space-3) var(--space-4);
+    }
+    .mk-demo__orbit--1 {
+      top: 0;
+      right: 4px;
+      --size: 48px;
+    }
+    .mk-demo__orbit--2 {
+      display: none;
+    }
+    .mk-proof__row {
+      gap: var(--space-2);
+    }
+    .mk-proof__item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+      padding: var(--space-4);
+      border-radius: var(--radius-lg);
+    }
+    .mk-proof__label {
+      font-size: 13px;
+    }
+    .mk-section {
+      padding-block: var(--space-16);
+    }
+    .mk-tile--dash,
+    .mk-steps {
+      grid-template-columns: 1fr;
+    }
+    .mk-stack {
+      min-height: 260px;
+    }
+    .mk-cta {
+      padding: var(--space-6);
+      border-radius: var(--radius-xl);
+    }
+    .mk-cta__form {
+      --pad: var(--space-5);
+    }
+    .mk-footer .mk-container {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .mk-footer__meta {
+      text-align: left;
+    }
+  }
+  @media (max-width: 420px) {
+    .mk-dash {
+      grid-template-columns: 1fr;
+    }
+  }
 }
-.btn:active { transform: translateY(1px); }
-.btn-lime { background: var(--lime); color: var(--ink); }
-.btn-lime:hover { filter: brightness(1.04); }
-.btn-ink { background: var(--ink); color: var(--lime); }
-.btn-ghost-light { background: rgba(255, 255, 255, 0.14); color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.4); }
 
-/* ───────── nav ───────── */
-.nav { position: absolute; top: 0; left: 0; right: 0; z-index: 5; }
-.nav .container { display: flex; align-items: center; justify-content: space-between; height: 78px; }
-.wordmark { font-family: var(--display); font-weight: 400; font-size: 30px; text-transform: uppercase; letter-spacing: 0.01em; color: #fff; }
-.wordmark .q { color: var(--ink); }
-.nav .btn { padding: 11px 20px; font-size: 14px; }
-
-/* ───────── hero ───────── */
-.hero { position: relative; background: var(--grad); overflow: hidden; padding: 128px 0 92px; }
-.hero::before {
-  content: "Q"; position: absolute; right: -60px; top: -70px;
-  font-family: var(--display); font-size: 560px; line-height: 0.8; color: rgba(255, 255, 255, 0.12);
-  pointer-events: none; user-select: none;
-}
-.hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; align-items: center; position: relative; }
-.hero-eyebrow { color: var(--ink); opacity: 0.72; margin-bottom: 20px; }
-.hero h1 { font-family: var(--display); font-weight: 400; text-transform: uppercase; line-height: 0.9; letter-spacing: 0.005em; font-size: clamp(52px, 8vw, 92px); color: #fff; }
-.hero h1 .ink { color: var(--ink); }
-.hero p.lead { font-size: 19px; line-height: 1.55; color: #fff; opacity: 0.95; max-width: 30em; margin: 22px 0 30px; }
-.hero-cta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.hero-trust { margin-top: 22px; font-weight: 700; font-size: 13.5px; color: #fff; opacity: 0.9; display: flex; align-items: center; gap: 9px; }
-.hero-trust .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
-
-/* floating card mockup */
-.mock { display: flex; justify-content: center; }
-.mock-card {
-  width: 320px; border-radius: 26px; padding: 24px; color: #fbf7fa; position: relative; overflow: hidden;
-  background: linear-gradient(158deg, #7a2f54, #3d1830);
-  box-shadow: 0 40px 80px -30px rgba(12, 39, 18, 0.55), 0 2px 0 rgba(255, 255, 255, 0.08) inset;
-  transform: rotate(3deg);
-}
-.mock-top { display: flex; align-items: center; gap: 12px; }
-.mock-logo { width: 46px; height: 46px; border-radius: 13px; background: rgba(255, 255, 255, 0.18); display: grid; place-items: center; font-family: var(--display); font-size: 24px; }
-.mock-name { font-weight: 800; font-size: 19px; }
-.mock-sub { font-weight: 700; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.72; margin-top: 3px; }
-.mock-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 11px; margin: 22px 0 16px; }
-.mock-dot { aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed rgba(255, 255, 255, 0.4); display: grid; place-items: center; font-size: 16px; }
-.mock-dot.on { border-color: transparent; background: rgba(255, 255, 255, 0.96); }
-.mock-foot { display: flex; align-items: center; justify-content: space-between; }
-.mock-reward { font-weight: 800; font-size: 14px; }
-.mock-pill { font-weight: 800; font-size: 11px; background: rgba(255, 255, 255, 0.18); padding: 6px 12px; border-radius: 999px; }
-
-/* ───────── generic section ───────── */
-.section { padding: 92px 0; }
-.section-head { max-width: 620px; margin-bottom: 46px; }
-.section-head h2 { font-family: var(--display); font-weight: 400; text-transform: uppercase; line-height: 0.94; font-size: clamp(34px, 5vw, 52px); margin: 12px 0 0; }
-.section-head p { font-size: 18px; color: var(--muted); margin-top: 16px; }
-
-/* features */
-.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.feature { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 30px 26px; }
-.feature .ic { width: 54px; height: 54px; border-radius: 15px; background: var(--mist); display: grid; place-items: center; font-size: 26px; margin-bottom: 20px; }
-.feature h3 { font-family: var(--sans); font-weight: 800; font-size: 20px; letter-spacing: -0.01em; }
-.feature p { color: var(--muted); font-size: 15.5px; line-height: 1.55; margin-top: 10px; }
-
-/* how it works */
-.how { background: var(--mist); }
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; counter-reset: step; }
-.step { position: relative; padding-top: 8px; }
-.step .n { font-family: var(--display); font-weight: 400; font-size: 58px; color: var(--forest); line-height: 1; }
-.step h3 { font-family: var(--sans); font-weight: 800; font-size: 20px; margin: 12px 0 0; }
-.step p { color: var(--muted); font-size: 15.5px; line-height: 1.55; margin-top: 8px; }
-
-/* audience — deep ink band */
-.audience { background: var(--ink); color: var(--surface); text-align: center; }
-.audience h2 { font-family: var(--display); font-weight: 400; text-transform: uppercase; line-height: 0.96; font-size: clamp(32px, 5vw, 50px); color: #fff; max-width: 16ch; margin: 0 auto; }
-.audience h2 .lime { color: var(--lime); }
-.aud-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 34px; }
-.aud-chip { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 15px; color: var(--lime-soft); background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; padding: 11px 18px; }
-
-/* waitlist */
-.waitlist { position: relative; overflow: hidden; background: var(--grad); }
-.waitlist::before { content: "Q"; position: absolute; left: -50px; bottom: -140px; font-family: var(--display); font-size: 460px; line-height: 0.8; color: rgba(255, 255, 255, 0.12); pointer-events: none; }
-.wl-grid { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; }
-.wl-copy h2 { font-family: var(--display); font-weight: 400; text-transform: uppercase; line-height: 0.94; font-size: clamp(38px, 6vw, 62px); color: #fff; }
-.wl-copy h2 .ink { color: var(--ink); }
-.wl-copy p { color: #fff; opacity: 0.95; font-size: 18px; line-height: 1.55; margin-top: 18px; max-width: 30em; }
-.wl-card { background: var(--surface); border-radius: 26px; padding: 30px; box-shadow: 0 40px 80px -30px rgba(12, 39, 18, 0.5); }
-.wl-card .field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
-.wl-card label { font-family: var(--sans); font-weight: 800; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-.wl-card input {
-  font-family: var(--sans); font-size: 15px; color: var(--ink); background: var(--bg);
-  border: 1.5px solid var(--border); border-radius: 12px; padding: 14px 15px; outline: none; width: 100%;
-}
-.wl-card input:focus { border-color: var(--forest); background: var(--surface); }
-.wl-card .btn { width: 100%; margin-top: 6px; }
-.wl-note { font-size: 12.5px; color: var(--faint); margin-top: 14px; text-align: center; }
-.wl-done { text-align: center; padding: 24px 8px; }
-.wl-done .big { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: 40px; color: var(--forest-deep); }
-.wl-done p { color: var(--muted); margin-top: 10px; font-size: 15.5px; }
-.wl-err { color: #c0392b; font-weight: 600; font-size: 13.5px; margin-top: 12px; text-align: center; }
-
-/* footer */
-.footer { background: var(--ink); color: var(--surface); padding: 60px 0 44px; }
-.footer .container { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-.footer .wordmark { color: #fff; font-size: 40px; }
-.footer .wordmark .q { color: var(--lime); }
-.footer .tag { color: var(--lime-soft); font-weight: 700; margin-top: 8px; }
-.footer .meta { color: var(--faint); font-size: 13px; text-align: right; }
-
-/* ───────── responsive ───────── */
-@media (max-width: 860px) {
-  .hero { padding: 116px 0 72px; }
-  .hero-grid { grid-template-columns: 1fr; gap: 46px; }
-  .mock { justify-content: flex-start; }
-  .features, .steps { grid-template-columns: 1fr; }
-  .wl-grid { grid-template-columns: 1fr; gap: 30px; }
-  .footer .container { flex-direction: column; align-items: flex-start; }
-  .footer .meta { text-align: left; }
+/* ── preferences ── */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .mk-orb,
+  .mk-bubble,
+  .mk-sticker,
+  .mk-live::before,
+  .mk-demo__toast,
+  .mk-demo__orbit,
+  .mk-tick,
+  .mk-dot-swatch,
+  .mk-mini-scan::before,
+  .mk-loop__fill,
+  .mk-loop__reward {
+    animation: none;
+  }
+  /* Without motion the marquee becomes a still, wrapped row of each kind of shop, once. */
+  .mk-marquee__track {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: auto;
+    animation: none;
+  }
+  .mk-marquee__track [aria-hidden="true"] {
+    display: none;
+  }
+  .mk-pass {
+    transition-duration: 1ms;
+  }
 }
