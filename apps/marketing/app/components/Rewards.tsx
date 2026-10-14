@@ -88,8 +88,8 @@ export function Rewards() {
   const kind = KINDS[active]!;
   return (
     <div className="mk-rewards">
-      <div className="mk-lg mk-lg--tint mk-tabs" role="tablist" aria-label="Kinds of card" onKeyDown={onKey}>
-        <span ref={drop} className="mk-lg mk-tabs__drop" data-liquid="12" data-bezel="24" aria-hidden />
+      <div className="sf-liquid sf-liquid--tint mk-tabs" role="tablist" aria-label="Kinds of card" onKeyDown={onKey}>
+        <span ref={drop} className="sf-liquid sf-tabs__drop mk-tabs__drop" data-liquid="12" data-bezel="24" aria-hidden />
         {KINDS.map((k, i) => (
           <button
             key={k.id}

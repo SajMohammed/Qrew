@@ -5,9 +5,9 @@
  * cascade layer declared after Softform's `base` and `components`, so they refine components
  * instead of flattening them: an unlayered reset here would beat every layered Softform rule.
  *
- * Liquid glass (`.mk-lg`) is Softform's glass made thicker and clearer: barely blurred, with a lip
- * of light along its top edge, a sheen that follows the pointer, and — in Chromium — rounded edges
- * that bend the page behind them (LiquidGlass.tsx draws each lens). Lime stays a fill or a glow:
+ * The floating chrome is Softform's liquid glass (`.sf-liquid`): barely blurred, with a lip of light
+ * along its top edge, a sheen that follows the pointer, and — in Chromium — rounded edges that bend
+ * the page behind them (the system's liquid-glass.js, started by LiquidGlass.tsx). Lime stays a fill or a glow:
  * glossy jelly behind the hero's phone, washes under product visuals, the waitlist's aura. Merchant
  * cards keep their shop's colour (the split rule); Qrew's lime lives around them, never on them.
  */
@@ -22,15 +22,6 @@
   --mk-lime: color-mix(in srgb, var(--signature) 48%, transparent);
   --mk-lime-faint: color-mix(in srgb, var(--signature) 24%, transparent);
 
-  /* Liquid glass. Clear glass carries no words; tinted glass is frosted just enough to read on. */
-  --lg-fill: rgba(255, 255, 255, 0.1);
-  --lg-fill-tint: rgba(255, 255, 255, 0.56);
-  --lg-rim: rgba(255, 255, 255, 0.95);
-  --lg-rim-soft: rgba(255, 255, 255, 0.4);
-  --lg-sheen: rgba(255, 255, 255, 0.6);
-  --lg-shade: rgba(16, 22, 16, 0.12);
-  --lg-shadow: 0 12px 32px -14px rgba(16, 22, 16, 0.28), 0 2px 6px -2px rgba(16, 22, 16, 0.08);
-
   /* Details open smoothly where the browser can animate to `auto`. */
   interpolate-size: allow-keywords;
 }
@@ -38,14 +29,6 @@
 [data-theme="dark"] {
   --mk-lime: color-mix(in srgb, var(--signature) 20%, transparent);
   --mk-lime-faint: color-mix(in srgb, var(--signature) 9%, transparent);
-
-  --lg-fill: rgba(255, 255, 255, 0.04);
-  --lg-fill-tint: rgba(30, 35, 30, 0.58);
-  --lg-rim: rgba(255, 255, 255, 0.34);
-  --lg-rim-soft: rgba(255, 255, 255, 0.08);
-  --lg-sheen: rgba(255, 255, 255, 0.14);
-  --lg-shade: rgba(0, 0, 0, 0.35);
-  --lg-shadow: 0 14px 36px -14px rgba(0, 0, 0, 0.75), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
 }
 
 /* The story's stamp count, animated as a whole number by the scroll. */
@@ -94,70 +77,6 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  /* ── liquid glass ── */
-  .mk-lg {
-    --lg-blur: 2px;
-    position: relative;
-    isolation: isolate;
-    background: var(--lg-fill);
-    color: var(--ink);
-    -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(1.8) brightness(1.04);
-    backdrop-filter: blur(var(--lg-blur)) saturate(1.8) brightness(1.04);
-    box-shadow:
-      inset 0 1px 0.5px var(--lg-rim),
-      inset 0 -1px 0.5px var(--lg-rim-soft),
-      inset 0 0 0 0.5px var(--lg-rim-soft),
-      inset 0 12px 20px -14px var(--lg-sheen),
-      inset 0 -14px 22px -16px var(--lg-shade),
-      var(--lg-shadow);
-  }
-  /* The sheen: a soft bright spot where the light falls, which follows the pointer across the glass. */
-  .mk-lg::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      radial-gradient(180px circle at var(--mx, 22%) var(--my, -10%), var(--lg-sheen), transparent 70%),
-      linear-gradient(170deg, var(--lg-sheen) 0%, transparent 34%);
-    opacity: 0.85;
-  }
-  /* The rim: bright where it faces the light, fading away from it. */
-  .mk-lg::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    pointer-events: none;
-    background: linear-gradient(140deg, var(--lg-rim) 0%, transparent 30%, transparent 64%, var(--lg-rim-soft) 100%);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-  }
-  .mk-lg--tint {
-    --lg-blur: 10px;
-    background: var(--lg-fill-tint);
-  }
-  [data-refract] .mk-lg--tint {
-    --lg-blur: 6px;
-  }
-  /* On an aura: light glass in both themes, with the fixed pastel ink. */
-  .mk-lg--light {
-    --lg-blur: 8px;
-    --lg-sheen: rgba(255, 255, 255, 0.7);
-    --lg-rim: rgba(255, 255, 255, 0.95);
-    background: var(--glass-light);
-    color: var(--on-pastel);
-  }
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .mk-lg--tint {
-      background: var(--glass-strong);
-    }
   }
 
   /* Gel: controls squash when pressed and spring back, like a drop of something soft. */
@@ -625,7 +544,7 @@
 
   /* A notification: liquid glass that drops in from the top of the screen, then slips away. */
   .mk-notif {
-    --lg-fill-tint: rgba(255, 255, 255, 0.72);
+    --liquid-tint: rgba(255, 255, 255, 0.72);
     position: absolute;
     z-index: 5;
     top: 46px;
@@ -642,7 +561,7 @@
     animation: mk-notif 1.6s var(--ease-spring) both;
   }
   :root.dark .mk-notif {
-    --lg-fill-tint: rgba(30, 35, 30, 0.74);
+    --liquid-tint: rgba(30, 35, 30, 0.74);
   }
   .mk-notif--hold {
     animation-duration: 4s;
@@ -736,7 +655,7 @@
   }
   /* A clear drop of glass, drifting down the phone's edge. */
   .mk-lens {
-    --lg-blur: 0px;
+    --liquid-blur: 0px;
     position: absolute;
     z-index: 3;
     top: 30px;
@@ -1078,7 +997,6 @@
     height: 56px;
     margin-bottom: var(--space-3);
     border-radius: 50%;
-    background: var(--lg-fill-tint);
   }
   .mk-step__bubble svg {
     width: 22px;
@@ -1133,22 +1051,12 @@
     color: var(--ink-3);
     vertical-align: 2px;
   }
-  /* The selection: a drop of lime-tinted glass over the chosen label, sliding on a spring. */
+  /* The selection: Softform's liquid drop (.sf-tabs__drop slides it), tinted lime and sized to this bar. */
   .mk-tabs__drop {
-    --lg-blur: 0px;
-    position: absolute;
     z-index: 2;
     top: 6px;
     bottom: 6px;
-    left: 0;
-    width: var(--w, 96px);
-    translate: var(--x, 6px) 0;
-    border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--signature) 34%, transparent);
-    pointer-events: none;
-    transition:
-      translate 620ms var(--ease-spring),
-      width 620ms var(--ease-spring);
   }
   .mk-rewards__panel {
     display: grid;
@@ -1418,7 +1326,7 @@
   .mk-compare__col--qrew {
     background:
       radial-gradient(110% 90% at 0% 0%, var(--mk-lime) 0%, transparent 60%),
-      var(--lg-fill-tint);
+      var(--liquid-tint);
   }
   .mk-compare__col--qrew .qrew-wordmark {
     font-size: 30px;
@@ -2127,7 +2035,6 @@
   }
   .mk-gel,
   .mk-gallery .mk-pass,
-  .mk-tabs__drop,
   .mk-faq__icon {
     transition-duration: 1ms;
   }
