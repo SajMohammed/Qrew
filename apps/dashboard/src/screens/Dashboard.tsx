@@ -1,11 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowRight, Gift, Hourglass, RefreshCw, Repeat, Sparkles, Stamp, Users } from "lucide-react";
-import type { Analytics, AnalyticsRange, ActivityItem } from "@/api";
+import type { Analytics, AnalyticsRange, ActivityItem, Program } from "@/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { displayName, formatCount, percentChange, relativeTime } from "@/lib/format";
 import { Greeting } from "@/components/Greeting";
 import { LiquidDrop } from "@/components/LiquidDrop";
+import { CardSwitcher } from "@/components/CardSwitcher";
 
 const RANGES: { id: AnalyticsRange; label: string }[] = [
   { id: "7d", label: "7 days" },
@@ -17,6 +18,11 @@ interface Props {
   data: Analytics | null;
   range: AnalyticsRange;
   onRangeChange: (range: AnalyticsRange) => void;
+  /** The shop's cards that are on. With two or more, the overview can be read for one of them. */
+  cards: Program[];
+  /** The card the numbers are for; null for the whole shop. */
+  card: string | null;
+  onCardChange: (card: string | null) => void;
   onRefresh: () => void;
   onViewCustomers: (filter: "at_risk" | "reward_ready") => void;
   loading: boolean;
@@ -30,6 +36,9 @@ export function Dashboard({
   data,
   range,
   onRangeChange,
+  cards,
+  card,
+  onCardChange,
   onRefresh,
   onViewCustomers,
   loading,
@@ -68,6 +77,10 @@ export function Dashboard({
           </button>
         </div>
       </header>
+
+      {cards.length >= 2 && (
+        <CardSwitcher cards={cards} value={card} onChange={onCardChange} all="All cards" className="-mt-4" />
+      )}
 
       {!data ? (
         <LoadingState />

@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
-import { ProgramController } from "./program.controller";
+import { ProgramController, ProgramsController } from "./program.controller";
 
 @Module({
-  controllers: [ProgramController],
+  controllers: [ProgramController, ProgramsController],
 })
 export class ProgramModule {}

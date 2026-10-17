@@ -13,7 +13,7 @@ export class AnalyticsController {
   @Roles("owner", "manager")
   @Get()
   overview(@Merchant() merchantId: string, @Query() query: unknown) {
-    const { range } = AnalyticsQuery.parse(query);
-    return getShopAnalytics(merchantId, range);
+    const { range, program } = AnalyticsQuery.parse(query);
+    return getShopAnalytics(merchantId, range, program);
   }
 }

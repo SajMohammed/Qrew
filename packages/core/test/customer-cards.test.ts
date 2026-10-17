@@ -15,6 +15,8 @@ import { enroll, signInWithProvider } from "../src/index";
 
 let merchantId: string;
 let programId: string;
+// The same shop's second card: a shop runs one card of each type.
+let pointsProgramId: string;
 const sfx = process.pid.toString(36);
 const accountIds = new Set<string>();
 
@@ -37,6 +39,11 @@ beforeAll(async () => {
     .values({ merchantId, name: "Card", stampsRequired: 5, bonusStamps: 0 })
     .returning();
   programId = p!.id;
+  const [pts] = await adminDb
+    .insert(loyaltyPrograms)
+    .values({ merchantId, name: "Points", type: "points", stampsRequired: 500, bonusStamps: 0 })
+    .returning();
+  pointsProgramId = pts!.id;
 });
 
 afterAll(async () => {
@@ -81,9 +88,9 @@ describe("customer cards — enroll linking + claim", () => {
     expect(await claimCardBySerial(accountId, anon.serial)).toBe("claimed"); // idempotent for the owner
   });
 
-  // An account can hold one card per shop. A second, anonymous one used to break the unique index
-  // and answer 500 on every sign-in; now it is declined and left exactly as it was.
-  it("declines a card from a shop where the account already has one, leaving it untouched", async () => {
+  // An account holds one card per programme. A second, anonymous one of the same programme used to
+  // break the unique index and answer 500 on every sign-in; now it is declined and left as it was.
+  it("declines a second card of a programme the account already holds, leaving it untouched", async () => {
     const accountId = await newAccount(5);
     await enroll({ merchantId, programId, customerAccountId: accountId });
     const anon = await enroll({ merchantId, programId, phone: `+9715${sfx}0005` });
@@ -96,6 +103,36 @@ describe("customer cards — enroll linking + claim", () => {
       .innerJoin(enrollments, eq(enrollments.customerId, customers.id))
       .where(eq(enrollments.cardSerial, anon.serial));
     expect(row?.accountId).toBeNull();
+  });
+
+  /*
+   * A shop runs a card per type, and a walk-in who took both and then signed in arrives with two
+   * anonymous cards from one shop, each on its own customer row. The second can't link its row (the
+   * account is already a customer there), so the card itself moves onto the account's row — and the
+   * walk-in row, now holding nothing, goes rather than counting as a second customer.
+   */
+  it("claims a second card from the same shop onto the account's own customer row", async () => {
+    const accountId = await newAccount(6);
+    const stamp = await enroll({ merchantId, programId });
+    const points = await enroll({ merchantId, programId: pointsProgramId });
+    const [walkInCard] = await adminDb
+      .select({ customerId: enrollments.customerId })
+      .from(enrollments)
+      .where(eq(enrollments.cardSerial, points.serial));
+
+    expect(await claimCardBySerial(accountId, stamp.serial)).toBe("claimed");
+    expect(await claimCardBySerial(accountId, points.serial)).toBe("claimed");
+    expect(await claimCardBySerial(accountId, points.serial)).toBe("claimed"); // a retry stays a no-op
+
+    const mine = await getMyCards(accountId);
+    expect(mine.map((c) => c.serial).sort()).toEqual([stamp.serial, points.serial].sort());
+    const holders = await adminDb
+      .selectDistinct({ customerId: enrollments.customerId })
+      .from(enrollments)
+      .where(inArray(enrollments.cardSerial, [stamp.serial, points.serial]));
+    expect(holders).toHaveLength(1);
+    const [walkIn] = await adminDb.select().from(customers).where(eq(customers.id, walkInCard!.customerId));
+    expect(walkIn).toBeUndefined();
   });
 
   // Security regression (S2): a signed-in caller must not reach another person's row via a phone

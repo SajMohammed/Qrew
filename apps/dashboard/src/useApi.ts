@@ -14,6 +14,7 @@ import type {
   CustomersParams,
   StaffMember,
   CardType,
+  CardTypeOption,
 } from "./api";
 
 /**
@@ -164,8 +165,9 @@ export function useApi() {
         return res.json();
       },
       // ── Owner console ──
-      async getAnalytics(range: AnalyticsRange): Promise<Analytics> {
-        const res = await call(`/analytics?range=${range}`);
+      /** The shop's numbers — for one card when given one, else the whole shop. */
+      async getAnalytics(range: AnalyticsRange, program?: string): Promise<Analytics> {
+        const res = await call(`/analytics?range=${range}${program ? `&program=${program}` : ""}`);
         if (res.status === 409) throw new NeedsOnboarding();
         if (res.status === 403) throw new Forbidden();
         if (!res.ok) throw new Error(`Analytics failed (${res.status})`);
@@ -174,6 +176,7 @@ export function useApi() {
       async getCustomers(params: CustomersParams = {}): Promise<CustomerList> {
         const qs = new URLSearchParams();
         if (params.filter && params.filter !== "all") qs.set("filter", params.filter);
+        if (params.program) qs.set("program", params.program);
         if (params.search) qs.set("search", params.search);
         if (params.limit !== undefined) qs.set("limit", String(params.limit));
         if (params.offset) qs.set("offset", String(params.offset));
@@ -184,24 +187,28 @@ export function useApi() {
         return res.json();
       },
       /** The card types this deployment can issue — the picker must not offer any others. */
-      async getCardTypes(): Promise<
-        {
-          type: CardType;
-          label: string;
-          blurb: string;
-          accrues: boolean;
-          defaultTarget: number;
-          drawsStampStrip: boolean;
-          issuable: boolean;
-        }[]
-      > {
+      async getCardTypes(): Promise<CardTypeOption[]> {
         const res = await call("/program/types");
         if (!res.ok) throw new Error(`Card types failed (${res.status})`);
         return res.json();
       },
-      async getProgram(): Promise<Program> {
-        const res = await call("/program");
+      /** Every card the shop has, on or frozen, oldest first. Pages show the ones that are on. */
+      async listPrograms(): Promise<Program[]> {
+        const res = await call("/programs");
+        if (res.status === 409) throw new NeedsOnboarding();
+        if (!res.ok) throw new Error(`Cards failed (${res.status})`);
+        return res.json();
+      },
+      async getProgram(id: string): Promise<Program> {
+        const res = await call(`/program/${id}`);
         if (!res.ok) throw new Error(`Program failed (${res.status})`);
+        return res.json();
+      },
+      /** Turn a card type on (creating or unfreezing its card) or off (freezing it). Owner only. */
+      async setCardType(type: CardType, enabled: boolean): Promise<Program[]> {
+        const res = await call(`/programs/${type}`, { method: "PATCH", body: JSON.stringify({ enabled }) });
+        if (res.status === 403) throw new Error("Only the shop's owner can change which cards it runs.");
+        if (!res.ok) throw new Error(await describe(res, "Could not change that card"));
         return res.json();
       },
       async updateProgram(id: string, patch: ProgramPatch): Promise<Program> {

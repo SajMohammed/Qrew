@@ -188,7 +188,7 @@ export function StampCard({
             data-liquid={card.rewardReady ? "" : undefined}
             data-bezel={card.rewardReady ? "12" : undefined}
           >
-            {card.rewardReady ? "Reward ready" : `${remaining} to your reward`}
+            {card.rewardReady ? "Reward ready" : card.frozen ? "No longer collecting" : `${remaining} to your reward`}
           </span>
           <span className="sf-tag">{card.rewardText}</span>
         </CardFoot>
@@ -222,7 +222,16 @@ export function StampCard({
             </div>
           )}
         </div>
-        {!expired && <p className="text-ink-2 m-0 text-sm">Show this to staff to earn a stamp</p>}
+        {!expired && (
+          <p className="text-ink-2 m-0 text-sm">
+            {/* The shop turned this card off: it earns nothing more, but a reward on it is still theirs. */}
+            {!card.frozen
+              ? "Show this to staff to earn a stamp"
+              : card.rewardReady
+                ? "This card is no longer collecting. Show this to staff to redeem your reward."
+                : "This card is no longer collecting stamps."}
+          </p>
+        )}
         {/* The code a cashier types when the QR won't read — a glare, a cracked screen. */}
         {card.shortCode && (
           <p className="text-ink-3 m-0 flex flex-wrap items-center justify-center gap-x-3 text-[12.5px]">

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   withTenant,
   merchants,
@@ -18,6 +18,8 @@ import {
  *  - STAMPS ISSUED is the sum of positive deltas, so a 2-stamp signup bonus counts as 2 — unlike
  *    the older `getDashboard` stat, which counted ledger rows.
  *  - every number is tenant-scoped by RLS via `withTenant`; no query filters on merchant_id by hand.
+ *  - given a card (a shop runs one per type), every number is about that card alone: its holders,
+ *    its stamps, its redemptions. Without one they cover the whole shop, as they always have.
  */
 
 export type AnalyticsRange = "7d" | "30d" | "90d";
@@ -97,12 +99,26 @@ interface CohortRow {
 export async function getShopAnalytics(
   merchantId: string,
   range: AnalyticsRange = "30d",
+  programId?: string,
 ): Promise<ShopAnalytics> {
   const days = RANGE_DAYS[range];
   const weekly = days > DAILY_MAX_DAYS;
 
   return withTenant(merchantId, async (db) => {
     const [merchant] = await db.select({ name: merchants.name }).from(merchants);
+
+    // Scoping to one card. Typed queries take a condition (undefined = the whole shop, which `and`
+    // drops); raw SQL takes a fragment that is empty for the whole shop.
+    const onCard = programId ? eq(enrollments.programId, programId) : undefined;
+    const cardIds = programId
+      ? db.select({ id: enrollments.id }).from(enrollments).where(eq(enrollments.programId, programId))
+      : undefined;
+    const eventsOnCard = cardIds ? inArray(loyaltyProgressEvents.enrollmentId, cardIds) : undefined;
+    const redemptionsOnCard = cardIds ? inArray(redemptions.enrollmentId, cardIds) : undefined;
+    const rawOnCard = programId ? sql`and e.program_id = ${programId}` : sql``;
+    const rawEventsOnCard = programId
+      ? sql`and ${loyaltyProgressEvents.enrollmentId} in (select id from ${enrollments} where program_id = ${programId})`
+      : sql``;
 
     // ── headline counters ─────────────────────────────────────────────────────────
     // Both windows come from one pass over the ledger, bounded to 2× the range so the
@@ -117,7 +133,7 @@ export async function getShopAnalytics(
             and ${loyaltyProgressEvents.createdAt} <  now() - make_interval(days => ${days})), 0)::int`,
       })
       .from(loyaltyProgressEvents)
-      .where(sql`${loyaltyProgressEvents.createdAt} >= now() - make_interval(days => ${days * 2})`);
+      .where(and(sql`${loyaltyProgressEvents.createdAt} >= now() - make_interval(days => ${days * 2})`, eventsOnCard));
 
     const [redeemed] = await db
       .select({
@@ -127,25 +143,39 @@ export async function getShopAnalytics(
           where ${redemptions.createdAt} <  now() - make_interval(days => ${days}))::int`,
       })
       .from(redemptions)
-      .where(sql`${redemptions.createdAt} >= now() - make_interval(days => ${days * 2})`);
+      .where(and(sql`${redemptions.createdAt} >= now() - make_interval(days => ${days * 2})`, redemptionsOnCard));
 
     // Customers is a lifetime total; the two windows describe how many joined, not how many exist.
-    const [cust] = await db
-      .select({
-        total: sql<number>`count(*)::int`,
-        value: sql<number>`count(*) filter (
-          where ${customers.createdAt} >= now() - make_interval(days => ${days}))::int`,
-        previous: sql<number>`count(*) filter (
-          where ${customers.createdAt} >= now() - make_interval(days => ${days * 2})
-            and ${customers.createdAt} <  now() - make_interval(days => ${days}))::int`,
-      })
-      .from(customers);
+    // For one card, its customers are its holders and joining is taking the card — one each, since a
+    // person holds at most one card per programme.
+    const [cust] = programId
+      ? await db
+          .select({
+            total: sql<number>`count(*)::int`,
+            value: sql<number>`count(*) filter (
+              where ${enrollments.createdAt} >= now() - make_interval(days => ${days}))::int`,
+            previous: sql<number>`count(*) filter (
+              where ${enrollments.createdAt} >= now() - make_interval(days => ${days * 2})
+                and ${enrollments.createdAt} <  now() - make_interval(days => ${days}))::int`,
+          })
+          .from(enrollments)
+          .where(onCard)
+      : await db
+          .select({
+            total: sql<number>`count(*)::int`,
+            value: sql<number>`count(*) filter (
+              where ${customers.createdAt} >= now() - make_interval(days => ${days}))::int`,
+            previous: sql<number>`count(*) filter (
+              where ${customers.createdAt} >= now() - make_interval(days => ${days * 2})
+                and ${customers.createdAt} <  now() - make_interval(days => ${days}))::int`,
+          })
+          .from(customers);
 
     const [ready] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(enrollments)
       .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
-      .where(sql`${enrollments.currentProgress} >= ${loyaltyPrograms.stampsRequired}`);
+      .where(and(sql`${enrollments.currentProgress} >= ${loyaltyPrograms.stampsRequired}`, onCard));
 
     // ── the cohort aggregate ──────────────────────────────────────────────────────
     // One pass over (enrollments ⨝ ledger) grouped per customer answers the retention ladder, both
@@ -162,12 +192,14 @@ export async function getShopAnalytics(
           max(se.created_at) filter (where se.source = 'staff_scan')           as last_visit
         from ${enrollments} e
         left join ${loyaltyProgressEvents} se on se.enrollment_id = e.id
+        where true ${rawOnCard}
         group by e.customer_id
       ),
       rewarded as (
         select distinct e.customer_id as cid
         from ${redemptions} rd
         join ${enrollments} e on e.id = rd.enrollment_id
+        where true ${rawOnCard}
       )
       select
         (select count(*) from v)::int                                             as joined,
@@ -198,6 +230,7 @@ export async function getShopAnalytics(
               from ${loyaltyProgressEvents}
               where ${loyaltyProgressEvents.delta} > 0
                 and ${loyaltyProgressEvents.createdAt} >= now() - make_interval(weeks => ${WEEKLY_BUCKETS})
+                ${rawEventsOnCard}
               group by 1
             ) s on s.bucket = d
             order by d`
@@ -213,6 +246,7 @@ export async function getShopAnalytics(
               from ${loyaltyProgressEvents}
               where ${loyaltyProgressEvents.delta} > 0
                 and ${loyaltyProgressEvents.createdAt} >= now() - make_interval(days => ${days})
+                ${rawEventsOnCard}
               group by 1
             ) s on s.bucket = d
             order by d`,
@@ -233,7 +267,7 @@ export async function getShopAnalytics(
       .innerJoin(enrollments, eq(enrollments.id, loyaltyProgressEvents.enrollmentId))
       .innerJoin(customers, eq(customers.id, enrollments.customerId))
       .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
-      .where(eq(loyaltyProgressEvents.source, "staff_scan"))
+      .where(and(eq(loyaltyProgressEvents.source, "staff_scan"), onCard))
       .orderBy(desc(loyaltyProgressEvents.createdAt))
       .limit(FEED_LIMIT);
 
@@ -248,6 +282,7 @@ export async function getShopAnalytics(
       .from(redemptions)
       .innerJoin(enrollments, eq(enrollments.id, redemptions.enrollmentId))
       .innerJoin(customers, eq(customers.id, enrollments.customerId))
+      .where(onCard)
       .orderBy(desc(redemptions.createdAt))
       .limit(FEED_LIMIT);
 
@@ -263,6 +298,7 @@ export async function getShopAnalytics(
       .from(enrollments)
       .innerJoin(customers, eq(customers.id, enrollments.customerId))
       .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
+      .where(onCard)
       .orderBy(desc(enrollments.createdAt))
       .limit(FEED_LIMIT);
 
@@ -314,6 +350,7 @@ export async function getShopAnalytics(
         loyaltyProgressEvents,
         and(eq(loyaltyProgressEvents.enrollmentId, enrollments.id), eq(loyaltyProgressEvents.source, "staff_scan")),
       )
+      .where(onCard)
       .groupBy(customers.id, customers.name, customers.email)
       .orderBy(desc(sql`count(${loyaltyProgressEvents.id})`))
       .limit(TOP_REGULARS);

@@ -142,6 +142,21 @@ describe("row-level tenant isolation", () => {
     ).rejects.toThrow();
   });
 
+  // Which cards a shop runs lives on its programme rows (migration 0015), so it sits behind the same
+  // policy: a shop can't freeze, or turn on, another shop's card.
+  it("a tenant cannot change another tenant's card status", async () => {
+    const changed = await withTenant(merchantA, (db) =>
+      db
+        .update(loyaltyPrograms)
+        .set({ status: "frozen", frozenAt: new Date() })
+        .where(eq(loyaltyPrograms.merchantId, merchantB))
+        .returning(),
+    );
+    expect(changed).toHaveLength(0);
+    const [b] = await adminDb.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.merchantId, merchantB));
+    expect(b?.status).toBe("active");
+  });
+
   it("with no tenant set, the app sees nothing", async () => {
     const rows = await appDb.select().from(loyaltyPrograms);
     expect(rows).toHaveLength(0);

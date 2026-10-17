@@ -24,7 +24,7 @@ afterAll(async () => {
 
 describe("program (card designer)", () => {
   it("returns the program with a default design", async () => {
-    const p = await getProgram(merchantId);
+    const p = await getProgram(merchantId, programId);
     expect(p?.id).toBe(programId);
     expect(p?.cardDesign.brandColor).toBe("#146A2E");
     expect(p?.cardDesign.stampIcon).toBe("☕");
@@ -72,14 +72,25 @@ describe("program (card designer)", () => {
  * real failures behind whichever test happened to run last.
  */
 describe("clearing part of a design", () => {
+  // Its own shop too: a shop runs one stamp card.
+  let ownMerchantId: string;
   let ownProgramId: string;
 
   beforeAll(async () => {
+    const [m] = await adminDb
+      .insert(merchants)
+      .values({ name: "Clearing Co", slug: `dsc-${process.pid.toString(36)}` })
+      .returning();
+    ownMerchantId = m!.id;
     const [p] = await adminDb
       .insert(loyaltyPrograms)
-      .values({ merchantId, name: "Clearing", stampsRequired: 5 })
+      .values({ merchantId: ownMerchantId, name: "Clearing", stampsRequired: 5 })
       .returning();
     ownProgramId = p!.id;
+  });
+
+  afterAll(async () => {
+    await adminDb.delete(merchants).where(eq(merchants.id, ownMerchantId));
   });
 
   /*
@@ -89,21 +100,21 @@ describe("clearing part of a design", () => {
    * the UI showed it gone.
    */
   it("clears an image when sent an empty string, and keeps it when the key is absent", async () => {
-    await updateProgram(merchantId, ownProgramId, {
+    await updateProgram(ownMerchantId, ownProgramId, {
       cardDesign: { customStripUrl: "https://shop.test/strip.png", logoUrl: "https://shop.test/logo.png" },
     });
 
-    const untouched = await updateProgram(merchantId, ownProgramId, { cardDesign: { brandColor: "#111111" } });
+    const untouched = await updateProgram(ownMerchantId, ownProgramId, { cardDesign: { brandColor: "#111111" } });
     expect(untouched?.cardDesign.customStripUrl).toBe("https://shop.test/strip.png");
 
-    const cleared = await updateProgram(merchantId, ownProgramId, { cardDesign: { customStripUrl: "" } });
+    const cleared = await updateProgram(ownMerchantId, ownProgramId, { cardDesign: { customStripUrl: "" } });
     expect(cleared?.cardDesign.customStripUrl).toBeUndefined();
     // Clearing one image must not take the others with it.
     expect(cleared?.cardDesign.logoUrl).toBe("https://shop.test/logo.png");
   });
 
   it("does not leave emptied fields behind in the stored design", async () => {
-    const saved = await updateProgram(merchantId, ownProgramId, {
+    const saved = await updateProgram(ownMerchantId, ownProgramId, {
       cardDesign: { stampImageUrl: "", emptyStampImageUrl: "" },
     });
     // Normalised on write, so the row stays canonical instead of accumulating empty strings.

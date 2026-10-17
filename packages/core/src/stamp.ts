@@ -23,7 +23,9 @@ export type StampReason =
   | "cooldown"
   | "reward_ready"
   /** This kind of card does not collect anything — a discount is valid the day it is issued. */
-  | "no_accrual";
+  | "no_accrual"
+  /** The shop turned this card's type off. It keeps what it has earned and collects nothing more. */
+  | "frozen";
 
 export interface StampResult {
   applied: boolean;
@@ -40,7 +42,8 @@ function cooldownMs(): number {
 /**
  * Record one stamp:
  *   0. a key already used replays as "duplicate" — before any rule below could answer otherwise.
- *   1. reject if the card is already at the reward threshold — redeem before earning more.
+ *   1. a frozen card (its type turned off) takes nothing; nor does one already at the reward
+ *      threshold — redeem before earning more.
  *   2. cooldown guard — a re-scan of the same card within the window is ignored. A backstop
  *      behind the counter's one key per presentation of a card; skipped for a deliberate stamp.
  *   2. append to the ledger (idempotent); the DB trigger updates current_progress.
@@ -101,6 +104,20 @@ export async function addStamp(input: AddStampInput): Promise<StampResult> {
       return {
         applied: false,
         reason: "no_accrual" as StampReason,
+        enrollment,
+        program,
+        currentStamps: enrollment.currentProgress,
+      };
+    }
+
+    /*
+     * A frozen card collects nothing more, but what it holds is still the customer's: a full one can
+     * be redeemed, which is why this is an answer and not an error.
+     */
+    if (program.status !== "active") {
+      return {
+        applied: false,
+        reason: "frozen" as StampReason,
         enrollment,
         program,
         currentStamps: enrollment.currentProgress,

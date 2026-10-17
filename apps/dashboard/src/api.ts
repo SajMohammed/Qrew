@@ -52,6 +52,24 @@ export interface CardDesign {
 
 export type CardType = "stamp" | "points" | "discount" | "membership";
 
+/** One of the card types this deployment can issue, from GET /program/types. */
+export interface CardTypeOption {
+  type: CardType;
+  label: string;
+  blurb: string;
+  accrues: boolean;
+  defaultTarget: number;
+  drawsStampStrip: boolean;
+  issuable: boolean;
+}
+
+/**
+ * A card is on ("active": takes new members and progress) or "frozen": its type was turned off in
+ * Settings, so it takes no one new and collects nothing more, but customers keep it and can redeem.
+ */
+export type ProgramStatus = "active" | "frozen";
+
+/** A shop runs one card per type it has turned on. Each is its own programme. */
 export interface Program {
   id: string;
   name: string;
@@ -62,7 +80,11 @@ export interface Program {
   rewardText: string;
   stampsRequired: number;
   bonusStamps: number;
-  active: boolean;
+  status: ProgramStatus;
+  /** When this card was last turned on. */
+  enabledAt: string;
+  /** When it was last turned off; null while it is on. */
+  frozenAt: string | null;
   cardDesign: CardDesign;
   /** Whether the last design change reached the passes already in customers' phones. */
   walletSync: WalletSync;
@@ -90,10 +112,14 @@ export interface ScanResult {
   enrollmentId?: string; // present when found — lets us redeem this exact card
   shortCode?: string; // the card's code, "K7M 4QX" — shown so staff can see which card it was
   applied?: boolean;
-  reason?: "applied" | "duplicate" | "cooldown" | "reward_ready" | "no_accrual";
+  reason?: "applied" | "duplicate" | "cooldown" | "reward_ready" | "no_accrual" | "frozen";
   currentStamps?: number;
   stampsRequired?: number;
   rewardReady?: boolean;
+  /** Which of the shop's cards was scanned — a shop can run one of each type. */
+  program?: { id: string; name: string; type: CardType; status: ProgramStatus };
+  /** How many cards the shop has on. With two or more, the result names the card. */
+  cardsRunning?: number;
 }
 
 /** The answer to a deliberate extra stamp — the stamp half of a scan result. */
@@ -205,6 +231,8 @@ export interface StaffMember {
 
 export interface CustomersParams {
   filter?: CustomerFilter;
+  /** One of the shop's cards: only its holders. */
+  program?: string;
   search?: string;
   limit?: number;
   offset?: number;

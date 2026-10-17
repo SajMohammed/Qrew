@@ -59,6 +59,10 @@ export type StaffPinUpdate = z.infer<typeof StaffPinUpdate>;
  */
 const imageUrl = z.url({ protocol: /^https?$/ }).max(500);
 
+/** The card types a shop can run, one card of each. Keep in step with CARD_TYPES in @qrew/core. */
+export const CardType = z.enum(["stamp", "points", "discount", "membership"]);
+export type CardType = z.infer<typeof CardType>;
+
 export const ProgramUpdate = z.object({
   name: z.string().min(1).max(60).optional(),
   /**
@@ -66,7 +70,7 @@ export const ProgramUpdate = z.object({
    * whose passes are already in customers' wallets, because a wallet object cannot move between
    * class types — see packages/core/src/card-types/types.ts.
    */
-  type: z.enum(["stamp", "points", "discount", "membership"]).optional(),
+  type: CardType.optional(),
   /** Settings only the chosen type has. Shape is validated per type in the domain. */
   mechanics: z.record(z.string(), z.unknown()).optional(),
   rewardText: z.string().min(1).max(60).optional(),
@@ -120,6 +124,10 @@ export const ProgramUpdate = z.object({
     .optional(),
 });
 export type ProgramUpdate = z.infer<typeof ProgramUpdate>;
+
+// Turning a card type on (creating or unfreezing its card) or off (freezing it) — owner-only.
+export const CardTypeToggle = z.object({ enabled: z.boolean() });
+export type CardTypeToggle = z.infer<typeof CardTypeToggle>;
 
 /**
  * Render a design that has not been saved, so the card designer can show the real strip a wallet
@@ -237,12 +245,16 @@ export type ClaimCardRequest = z.infer<typeof ClaimCardRequest>;
 // matching "previous period" the API knows how to compare against.
 export const AnalyticsQuery = z.object({
   range: z.enum(["7d", "30d", "90d"]).default("30d"),
+  // One of the shop's cards; absent means the whole shop.
+  program: z.string().uuid().optional(),
 });
 export type AnalyticsQuery = z.infer<typeof AnalyticsQuery>;
 
 // The Customers tab: one actionable segment at a time, searchable and paged.
 export const CustomersQuery = z.object({
   filter: z.enum(["all", "at_risk", "reward_ready", "regulars"]).default("all"),
+  // One of the shop's cards: only its holders. Absent means everyone.
+  program: z.string().uuid().optional(),
   search: z.string().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).default(0),

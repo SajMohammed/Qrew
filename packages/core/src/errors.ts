@@ -29,7 +29,11 @@ export class InvalidInputError extends DomainError {
  * stamp or reward that never happened to that card.
  */
 export class ConflictError extends DomainError {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** A machine-readable reason, for a client that answers this conflict in its own words. */
+    readonly code?: string,
+  ) {
     super(message);
     this.name = "ConflictError";
   }

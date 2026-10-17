@@ -4,7 +4,6 @@ import {
   uuid,
   text,
   integer,
-  boolean,
   jsonb,
   timestamp,
   index,
@@ -84,7 +83,12 @@ export const loyaltyPrograms = pgTable(
     // Settings only this type has — a points earn rate, a discount's terms, a membership's tiers.
     // Validated in the domain by a zod schema per type (packages/core/src/card-types).
     mechanics: jsonb("mechanics").notNull().default(sql`'{}'::jsonb`),
-    active: boolean("active").notNull().default(true),
+    // A shop runs one card per type (migration 0015). 'active' takes new members and progress;
+    // 'frozen' is a type the shop turned off — customers keep the card and can redeem what it holds.
+    status: text("status").notNull().default("active"),
+    // When this card was last turned on, and last turned off (null while on). Pricing reads these.
+    enabledAt: timestamp("enabled_at", { withTimezone: true }).notNull().defaultNow(),
+    frozenAt: timestamp("frozen_at", { withTimezone: true }),
     createdAt: createdAt(),
     // Whether design changes reached the passes in customers' phones (migration 0013). Tracked by
     // generation, not timestamps: a save bumps the requested one, the worker records the one it pushed.
@@ -99,9 +103,12 @@ export const loyaltyPrograms = pgTable(
   },
   (t) => [
     index("programs_merchant_idx").on(t.merchantId),
-    index("loyalty_programs_merchant_type_idx").on(t.merchantId, t.type),
+    // one card of each type per shop
+    uniqueIndex("loyalty_programs_merchant_type_uq").on(t.merchantId, t.type),
     check("loyalty_programs_type_known", sql`${t.type} in ('stamp', 'points', 'discount', 'membership')`),
     check("loyalty_programs_wallet_failed_nonneg", sql`${t.walletSyncFailedPasses} >= 0`),
+    check("loyalty_programs_status_known", sql`${t.status} in ('active', 'frozen')`),
+    check("loyalty_programs_frozen_at_set", sql`(${t.status} = 'frozen') = (${t.frozenAt} is not null)`),
   ],
 );
 

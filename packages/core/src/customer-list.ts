@@ -7,8 +7,9 @@ import { AT_RISK_DAYS, REGULAR_VISITS } from "./analytics";
  * owner actually acts on: how often they come, when they were last in, and whether they're owed a
  * reward or drifting away.
  *
- * A customer can hold a card in more than one programme. Card progress shown here is their MOST
- * RECENT card; visits and redemptions are summed across all of them.
+ * A customer can hold a card in more than one programme (a shop runs one per type). Card progress
+ * shown here is their MOST RECENT card; visits and redemptions are summed across all of them. Asked
+ * about one card, the list is that card's holders, and every number on a row is about that card.
  */
 
 export type CustomerFilter = "all" | "at_risk" | "reward_ready" | "regulars";
@@ -31,6 +32,8 @@ export interface CustomerRow {
 
 export interface CustomerListQuery {
   filter?: CustomerFilter;
+  /** One of the shop's cards: only its holders, with that card's progress and visits. */
+  programId?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -91,6 +94,13 @@ export async function listCustomers(
     const where = conditions.length
       ? sql`where ${sql.join(conditions, sql` and `)}`
       : sql``;
+    // Every lateral join below reads one customer's cards; given a card, only that one.
+    const onCard = query.programId ? sql`and e.program_id = ${query.programId}` : sql``;
+    const holders = query.programId
+      ? sql`where exists (select 1 from ${enrollments} e where e.customer_id = c.id ${onCard})`
+      : sql``;
+    // Joining one card is taking it; joining the shop is taking any.
+    const joined = query.programId ? sql`card.taken_at` : sql`c.created_at`;
 
     // Lateral joins keep this one row per customer: the newest card for display, and full-history
     // rollups for behaviour. count(*) over () rides along so paging doesn't need a second query.
@@ -98,20 +108,20 @@ export async function listCustomers(
       with base as (
         select
           c.id, c.name, c.email, c.phone,
-          c.created_at as joined_at,
+          ${joined} as joined_at,
           card.current_progress,
           card.stamps_required,
           coalesce(card.current_progress >= card.stamps_required, false) as reward_ready,
           coalesce(v.visits, 0)::int      as visits,
           v.last_visit,
           coalesce(r.redemptions, 0)::int as redemptions,
-          coalesce(v.last_visit, c.created_at) < now() - make_interval(days => ${AT_RISK_DAYS}) as at_risk
+          coalesce(v.last_visit, ${joined}) < now() - make_interval(days => ${AT_RISK_DAYS}) as at_risk
         from ${customers} c
         left join lateral (
-          select e.current_progress, lp.stamps_required
+          select e.current_progress, lp.stamps_required, e.created_at as taken_at
           from ${enrollments} e
           join ${loyaltyPrograms} lp on lp.id = e.program_id
-          where e.customer_id = c.id
+          where e.customer_id = c.id ${onCard}
           order by e.created_at desc
           limit 1
         ) card on true
@@ -119,14 +129,15 @@ export async function listCustomers(
           select count(se.id) as visits, max(se.created_at) as last_visit
           from ${enrollments} e
           join ${loyaltyProgressEvents} se on se.enrollment_id = e.id and se.source = 'staff_scan'
-          where e.customer_id = c.id
+          where e.customer_id = c.id ${onCard}
         ) v on true
         left join lateral (
           select count(rd.id) as redemptions
           from ${enrollments} e
           join ${redemptions} rd on rd.enrollment_id = e.id
-          where e.customer_id = c.id
+          where e.customer_id = c.id ${onCard}
         ) r on true
+        ${holders}
       )
       select *, count(*) over ()::int as total_count
       from base

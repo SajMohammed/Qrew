@@ -99,6 +99,8 @@ export interface CardView {
   stampsRequired: number;
   bonusStamps: number;
   rewardReady: boolean;
+  /** The shop turned this card off: it collects nothing more, but what it holds can still be used. */
+  frozen?: boolean;
   brandColor: string;
   stampIcon: string;
   /** The shop's artwork, when set. Drawn instead of the emoji. */
@@ -141,6 +143,7 @@ export interface MyCard {
   stampsRequired: number;
   cardDesign: { brandColor?: string; stampIcon?: string } | null;
   status: string;
+  frozen?: boolean;
 }
 
 export interface AuthTokens {
@@ -154,6 +157,10 @@ export interface CardTile {
   serial: string;
   programId: string;
   merchantName: string;
+  /** Which of the shop's cards — a shop can run more than one, and each is its own card. */
+  programName: string;
+  /** No longer collecting: the shop turned this card off. What it holds can still be used. */
+  frozen: boolean;
   currentStamps: number;
   stampsRequired: number;
   brandColor: string;
@@ -169,6 +176,8 @@ export function tileFromMyCard(c: MyCard): CardTile {
     serial: c.serial,
     programId: c.programId,
     merchantName: c.merchantName,
+    programName: c.programName,
+    frozen: c.frozen ?? false,
     currentStamps: c.currentStamps,
     stampsRequired: c.stampsRequired,
     brandColor: c.cardDesign?.brandColor ?? DEFAULT_BRAND,
@@ -182,6 +191,8 @@ export function tileFromCardView(c: CardView): CardTile {
     serial: c.serial,
     programId: c.programId,
     merchantName: c.merchantName,
+    programName: c.programName,
+    frozen: c.frozen ?? false,
     currentStamps: c.currentStamps,
     stampsRequired: c.stampsRequired,
     brandColor: c.brandColor,
@@ -194,7 +205,8 @@ export function tileFromCardView(c: CardView): CardTile {
  * The card this device already holds for a programme, if any. Every card the app knows is active —
  * /me/cards returns only active ones, and nothing yet makes a card anything else. If that changes
  * (a lapsed membership, say), a non-active card must not count here, or its shop could never be
- * joined again.
+ * joined again. A FROZEN card does count: it is still the customer's, and its programme takes no
+ * one new, so scanning its old poster should open it.
  */
 export function heldCardFor(tiles: CardTile[], programId: string): CardTile | undefined {
   return tiles.find((t) => t.programId === programId);
@@ -214,6 +226,11 @@ export async function enroll(
   // Rate-limited per connection: on a busy café's Wi-Fi this is the shop's network, not this person.
   if (res.status === 429) {
     throw new ApiError("server", 429, "enroll rate-limited", "Lots of sign-ups from this connection just now — please try again in a minute.");
+  }
+  if (res.status === 409) {
+    // The shop turned this card off between the preview and the tap: like a code that isn't active.
+    const body = (await res.json().catch(() => null)) as { code?: string } | null;
+    if (body?.code === "card_frozen") throw new ApiError("not_found", 409, "card frozen");
   }
   if (!res.ok) throw new ApiError(kindOf(res.status), res.status, `Enroll failed (${res.status})`);
   return res.json();

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Search, Users, X } from "lucide-react";
-import type { CustomerFilter, CustomerList, CustomerRow, CustomerStatus } from "@/api";
+import type { CustomerFilter, CustomerList, CustomerRow, CustomerStatus, Program } from "@/api";
 import { useApi } from "@/useApi";
+import { CardSwitcher } from "@/components/CardSwitcher";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -23,9 +24,19 @@ const FILTERS: { id: CustomerFilter; label: string }[] = [
 
 const PAGE_SIZE = 25;
 
-export function Customers({ initialFilter = "all" }: { initialFilter?: CustomerFilter }) {
+export function Customers({
+  initialFilter = "all",
+  cards,
+  initialCard = null,
+}: {
+  initialFilter?: CustomerFilter;
+  /** The shop's cards that are on. With two or more, the list can be narrowed to one card's holders. */
+  cards: Program[];
+  initialCard?: string | null;
+}) {
   const api = useApi();
   const [filter, setFilter] = useState<CustomerFilter>(initialFilter);
+  const [card, setCard] = useState<string | null>(initialCard);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
@@ -49,7 +60,7 @@ export function Customers({ initialFilter = "all" }: { initialFilter?: CustomerF
     setLoading(true);
     setErr(null);
     try {
-      const result = await api.getCustomers({ filter, search, limit: PAGE_SIZE, offset });
+      const result = await api.getCustomers({ filter, program: card ?? undefined, search, limit: PAGE_SIZE, offset });
       if (id !== requestId.current) return;
       // Landing past the end (the segment shrank, or a filter narrowed it) returns no rows and no
       // total, which would strand the reader on a blank page. Fall back to the first one.
@@ -63,7 +74,7 @@ export function Customers({ initialFilter = "all" }: { initialFilter?: CustomerF
     } finally {
       if (id === requestId.current) setLoading(false);
     }
-  }, [api, filter, search, offset]);
+  }, [api, filter, card, search, offset]);
 
   useEffect(() => {
     void load();
@@ -86,6 +97,17 @@ export function Customers({ initialFilter = "all" }: { initialFilter?: CustomerF
       </header>
 
       <div className="flex flex-col gap-3">
+        {cards.length >= 2 && (
+          <CardSwitcher
+            cards={cards}
+            value={card}
+            onChange={(next) => {
+              setCard(next);
+              setOffset(0);
+            }}
+            all="All cards"
+          />
+        )}
         <label className="sf-search">
           <Search aria-hidden />
           <input

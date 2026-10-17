@@ -29,7 +29,7 @@ export class MeController {
         statusCode: 409,
         error: "Conflict",
         code: "has_own_card",
-        message: "this account already has a card at this shop",
+        message: "this account already holds this shop's card",
       });
     }
     if (outcome === "refused") throw new ConflictException("card not found or already linked to another account");

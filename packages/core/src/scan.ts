@@ -1,5 +1,7 @@
-import { and, eq, type SQL } from "drizzle-orm";
-import { withTenant, enrollments } from "@qrew/db";
+import { and, count, eq, type SQL } from "drizzle-orm";
+import { withTenant, enrollments, loyaltyPrograms } from "@qrew/db";
+import { isCardType, type CardType } from "./card-types";
+import type { ProgramStatus } from "./program";
 import { addStamp, type StampResult } from "./stamp";
 import { formatShortCode, normalizeShortCode } from "./short-code";
 import { verifyCardToken } from "./token";
@@ -11,6 +13,10 @@ export type ScanResult =
       enrollmentId: string;
       /** The card's code, formatted — so the counter can show which card it is acting on. */
       shortCode: string;
+      /** Which of the shop's cards this is: a shop can run one of each type. */
+      program: { id: string; name: string; type: CardType; status: ProgramStatus };
+      /** How many cards the shop has on. With two or more, the counter names the card it scanned. */
+      cardsRunning: number;
     } & StampResult);
 
 export interface ScanInput {
@@ -43,10 +49,25 @@ function cardMatch(merchantId: string, value: string): SQL {
 export async function scanStamp(input: ScanInput): Promise<ScanResult> {
   const card = await withTenant(input.merchantId, async (db) => {
     const [row] = await db
-      .select({ id: enrollments.id, shortCode: enrollments.shortCode })
+      .select({
+        id: enrollments.id,
+        shortCode: enrollments.shortCode,
+        program: {
+          id: loyaltyPrograms.id,
+          name: loyaltyPrograms.name,
+          type: loyaltyPrograms.type,
+          status: loyaltyPrograms.status,
+        },
+      })
       .from(enrollments)
+      .innerJoin(loyaltyPrograms, eq(loyaltyPrograms.id, enrollments.programId))
       .where(cardMatch(input.merchantId, input.serial));
-    return row ?? null;
+    if (!row) return null;
+    const [running] = await db
+      .select({ n: count() })
+      .from(loyaltyPrograms)
+      .where(eq(loyaltyPrograms.status, "active"));
+    return { ...row, cardsRunning: running?.n ?? 0 };
   });
 
   if (!card) return { found: false };
@@ -57,5 +78,16 @@ export async function scanStamp(input: ScanInput): Promise<ScanResult> {
     idempotencyKey: input.idempotencyKey,
     staffId: input.staffId,
   });
-  return { found: true, enrollmentId: card.id, shortCode: formatShortCode(card.shortCode), ...result };
+  return {
+    found: true,
+    enrollmentId: card.id,
+    shortCode: formatShortCode(card.shortCode),
+    program: {
+      ...card.program,
+      type: isCardType(card.program.type) ? card.program.type : "stamp",
+      status: card.program.status === "frozen" ? "frozen" : "active",
+    },
+    cardsRunning: card.cardsRunning,
+    ...result,
+  };
 }

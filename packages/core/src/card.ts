@@ -39,6 +39,8 @@ export interface CardView {
   stampsRequired: number;
   bonusStamps: number;
   rewardReady: boolean;
+  /** The shop turned this card's type off: it collects nothing more, but what it holds can be used. */
+  frozen: boolean;
   brandColor: string; // per-merchant theming (from the card designer)
   stampIcon: string;
   /** The shop's artwork, when they have supplied it. Takes precedence over the emoji. */
@@ -73,6 +75,7 @@ async function readCard(serial: string) {
       cardDesign: loyaltyPrograms.cardDesign,
       type: loyaltyPrograms.type,
       mechanics: loyaltyPrograms.mechanics,
+      programStatus: loyaltyPrograms.status,
     })
     .from(enrollments)
     .innerJoin(merchants, eq(merchants.id, enrollments.merchantId))
@@ -135,6 +138,7 @@ export async function getCard(serial: string): Promise<CardView | null> {
     stampsRequired: row.stampsRequired,
     bonusStamps: row.bonusStamps,
     rewardReady: row.currentStamps >= row.stampsRequired,
+    frozen: row.programStatus === "frozen",
     brandColor: design.brandColor,
     stampIcon: design.stampIcon,
     ...(design.stampImageUrl ? { stampImageUrl: design.stampImageUrl } : {}),

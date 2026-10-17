@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
  * The wallet. One card leads — a reward that's ready, else the first — as the screen's one vivid
  * surface, in its shop's colour; the rest follow as rows, each with its shop's colour as a dot.
  * `lead={false}` lists them all as rows, for a screen whose vivid surface is something else.
+ *
+ * A shop can run more than one card, and each is its own card here. Where the wallet holds two from
+ * one shop, each also says which of the shop's cards it is.
  */
 export function CardsGrid({
   cards,
@@ -26,6 +29,9 @@ export function CardsGrid({
   };
   const first = lead ? (cards.find((c) => c.rewardReady) ?? cards[0]) : undefined;
   const rest = cards.filter((c) => c !== first);
+  // The programme's name, only when another card here is from the same shop.
+  const which = (c: CardTile) =>
+    cards.some((o) => o !== c && o.merchantName === c.merchantName) ? c.programName : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,7 +42,9 @@ export function CardsGrid({
           </span>
           <div className="sf-banner__main">
             <p className="sf-banner__title">Reward ready</p>
-            <p className="sf-banner__meta truncate">{first.merchantName}</p>
+            <p className="sf-banner__meta truncate">
+              {[first.merchantName, which(first)].filter(Boolean).join(" · ")}
+            </p>
           </div>
           <button type="button" onClick={() => open(first.serial)} className="sf-btn sf-btn--ink">
             Show
@@ -55,7 +63,12 @@ export function CardsGrid({
           style={merchantStyle(first.brandColor)}
           className={cn("sf-aura sf-aura--tint qrew-card w-full text-left", first.rewardReady && "qrew-card--ready")}
         >
-          <CardTop name={first.merchantName} count={first.currentStamps} total={first.stampsRequired} />
+          <CardTop
+            name={first.merchantName}
+            program={which(first)}
+            count={first.currentStamps}
+            total={first.stampsRequired}
+          />
           <ol className="sf-steps [--dot:14px] sm:[--dot:18px]" aria-hidden>
             {Array.from({ length: first.stampsRequired }, (_, i) => (
               <li key={i} className={cn("sf-steps__dot", i < first.currentStamps && "sf-steps__dot--done")} />
@@ -65,7 +78,9 @@ export function CardsGrid({
             <span className="sf-tag">
               {first.rewardReady
                 ? "Reward ready"
-                : `${Math.max(0, first.stampsRequired - first.currentStamps)} to your reward`}
+                : first.frozen
+                  ? "No longer collecting"
+                  : `${Math.max(0, first.stampsRequired - first.currentStamps)} to your reward`}
             </span>
           </CardFoot>
         </m.button>
@@ -97,7 +112,16 @@ export function CardsGrid({
                   <span className="sf-row__main">
                     <span className="sf-row__title">{c.merchantName}</span>
                     <span className="sf-row__meta">
-                      {c.rewardReady ? "Reward ready" : `${c.currentStamps} of ${c.stampsRequired} stamps`}
+                      {[
+                        which(c),
+                        c.rewardReady
+                          ? "Reward ready"
+                          : c.frozen
+                            ? "No longer collecting"
+                            : `${c.currentStamps} of ${c.stampsRequired} stamps`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   </span>
                   <span className="sf-row__trail">

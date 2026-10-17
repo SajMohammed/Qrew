@@ -13,7 +13,7 @@ export class CustomersController {
   @Roles("owner", "manager")
   @Get()
   list(@Merchant() merchantId: string, @Query() query: unknown) {
-    const { filter, search, limit, offset } = CustomersQuery.parse(query);
-    return listCustomers(merchantId, { filter, search, limit, offset });
+    const { filter, program, search, limit, offset } = CustomersQuery.parse(query);
+    return listCustomers(merchantId, { filter, programId: program, search, limit, offset });
   }
 }
