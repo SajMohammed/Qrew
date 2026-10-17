@@ -166,3 +166,24 @@ describe("the card already held for a shop", () => {
     expect(tileFromMyCard({ serial: "a", programId: "p1", cardDesign: null } as MyCard).programId).toBe("p1");
   });
 });
+
+// A shop runs a card per type, each its own card; one it turned off is frozen but still held.
+describe("a shop's second card, and a frozen one", () => {
+  it("tiles say which of the shop's cards they are, and whether it still collects", () => {
+    const view = { serial: "a", programId: "p1", programName: "Saba points", frozen: true } as CardView;
+    expect(tileFromCardView(view)).toMatchObject({ programName: "Saba points", frozen: true });
+    // An API from before frozen cards sends no flag: the card is collecting.
+    const mine = { serial: "b", programId: "p2", programName: "Coffee club", cardDesign: null } as MyCard;
+    expect(tileFromMyCard(mine)).toMatchObject({ programName: "Coffee club", frozen: false });
+  });
+
+  it("joining a card the shop has just turned off reads like a code that isn't active", async () => {
+    stubFetch(() => Response.json({ code: "card_frozen", message: "this card isn't taking new members" }, { status: 409 }));
+    expect((await failure(enroll({ merchantId: "m", programId: "p" }))).kind).toBe("not_found");
+  });
+
+  it("any other refusal to join stays a server failure", async () => {
+    stubFetch(() => Response.json({ message: "conflict" }, { status: 409 }));
+    expect((await failure(enroll({ merchantId: "m", programId: "p" }))).kind).toBe("server");
+  });
+});

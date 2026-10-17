@@ -436,7 +436,11 @@ export function Scanner() {
       </form>
 
       {result && <ResultBanner result={result} />}
-      {result?.found && result.enrollmentId && !result.rewardReady && result.reason !== "no_accrual" && (
+      {result?.found &&
+        result.enrollmentId &&
+        !result.rewardReady &&
+        result.reason !== "no_accrual" &&
+        result.reason !== "frozen" && (
         <div className="flex flex-col items-center gap-1.5">
           <button
             type="button"
@@ -476,13 +480,14 @@ export function Scanner() {
 /** What a scan sounds like: a stamp (or a valid card), a repeat that added nothing, or a miss. */
 function feedbackFor(r: ScanResult): Feedback {
   if (!r.found) return "error";
-  if (r.reason === "cooldown" || r.reason === "reward_ready") return "repeat";
+  if (r.reason === "cooldown" || r.reason === "reward_ready" || r.reason === "frozen") return "repeat";
   return "success";
 }
 
 function Banner({
   tone,
   card,
+  name,
   stamps,
   landed,
   children,
@@ -490,6 +495,8 @@ function Banner({
   tone: "ok" | "warn" | "bad" | "ready";
   /** The card this result is about, so staff can see which card the buttons below will act on. */
   card?: string;
+  /** Which of the shop's cards it is — said when the shop runs more than one, or the card is frozen. */
+  name?: string;
   /** The card's stamps, drawn as dots — the same dots the customer sees on their card. */
   stamps?: { current: number; total: number };
   /** Whether a stamp just landed, so the newest dot springs in. */
@@ -508,7 +515,11 @@ function Banner({
       )}
     >
       <div>{children}</div>
-      {card && <div className="text-[12.5px] font-normal opacity-80">Card {card}</div>}
+      {card && (
+        <div className="text-[12.5px] font-normal opacity-80">
+          {name && `${name} · `}Card {card}
+        </div>
+      )}
       {stamps && stamps.total > 0 && (
         <ol
           key={stamps.current}
@@ -561,28 +572,41 @@ function momentOf(result: ScanResult | null, redeemed: RedeemResult | null): Mom
 function ResultBanner({ result }: { result: ScanResult }) {
   if (!result.found) return <Banner tone="bad">✗ Card not found for this store</Banner>;
   const card = result.shortCode;
+  const frozen = result.reason === "frozen" || result.program?.status === "frozen";
+  const name = (result.cardsRunning ?? 1) >= 2 || frozen ? result.program?.name : undefined;
+  // The shop turned this card off: it adds nothing, but a reward it already holds is still theirs.
+  if (result.reason === "frozen")
+    return result.rewardReady ? (
+      <Banner tone="ready" card={card} name={name} stamps={stampsOf(result)}>
+        Card no longer collecting — redeem the reward below · {result.currentStamps}/{result.stampsRequired}
+      </Banner>
+    ) : (
+      <Banner tone="warn" card={card} name={name} stamps={stampsOf(result)}>
+        Card no longer collecting — nothing added · {result.currentStamps}/{result.stampsRequired}
+      </Banner>
+    );
   if (result.reason === "cooldown")
     return (
-      <Banner tone="warn" card={card} stamps={stampsOf(result)}>
+      <Banner tone="warn" card={card} name={name} stamps={stampsOf(result)}>
         ⏳ Already stamped just now · {result.currentStamps}/{result.stampsRequired}
       </Banner>
     );
   // Nothing to collect on this kind of card — scanning it is how staff check it is genuine.
   if (result.reason === "no_accrual")
     return (
-      <Banner tone="ok" card={card}>
+      <Banner tone="ok" card={card} name={name}>
         ✓ Valid card — apply the offer
       </Banner>
     );
   if (result.reason === "reward_ready")
     return (
-      <Banner tone="ready" card={card} stamps={stampsOf(result)}>
+      <Banner tone="ready" card={card} name={name} stamps={stampsOf(result)}>
         🎉 Reward ready — redeem it below · {result.currentStamps}/{result.stampsRequired}
       </Banner>
     );
   // "applied", or "duplicate": a retry of a request whose stamp had already landed — added either way.
   return (
-    <Banner tone={result.rewardReady ? "ready" : "ok"} card={card} stamps={stampsOf(result)} landed>
+    <Banner tone={result.rewardReady ? "ready" : "ok"} card={card} name={name} stamps={stampsOf(result)} landed>
       {result.rewardReady ? "🎉 Reward ready!" : "✓ Stamp added"} · {result.currentStamps}/
       {result.stampsRequired}
     </Banner>

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Palette, Signature, LayoutGrid, ListPlus, MapPin, Plus, Trash2, Check } from "lucide-react";
 import { useApi } from "@/useApi";
-import type { CardDesign, CardType, Program, WalletSync } from "@/api";
+import type { CardDesign, CardType, CardTypeOption, Program, WalletSync } from "@/api";
 import { Card as Panel } from "@/components/ui/card";
+import { CardSwitcher } from "@/components/CardSwitcher";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { SurfacePreview, textOn } from "./card/SurfacePreview";
@@ -15,6 +16,9 @@ import { PROGRESS_EDITORS } from "./card/progress";
  * One page rather than a wizard. A wizard suits first-time setup, but a shop comes back here to
  * change one colour, and Back/Next between them to reach it would be worse every time after the
  * first. The preview stays on screen instead, because the card is the product.
+ *
+ * A shop that runs two or more cards picks which one to edit. Each card keeps its own editor while
+ * the screen is open, so switching to look at the other card never throws away unsaved changes.
  */
 
 const PRESET_COLORS = [
@@ -22,17 +26,86 @@ const PRESET_COLORS = [
   "#8A4B2F", "#3B2E5A", "#B0413E", "#2E7D57",
 ];
 
-interface CardTypeOption {
-  type: CardType;
-  label: string;
-  blurb: string;
-  accrues: boolean;
-  defaultTarget: number;
-  drawsStampStrip: boolean;
-  issuable: boolean;
+export function CardScreen({
+  merchantName,
+  cards,
+  failed,
+  onRetry,
+  onSaved,
+}: {
+  merchantName?: string;
+  /** The cards that are on; null while they load. */
+  cards: Program[] | null;
+  failed: boolean;
+  onRetry: () => void;
+  onSaved: (program: Program) => void;
+}) {
+  const [chosen, setChosen] = useState<string | null>(null);
+
+  if (!cards) {
+    return failed ? (
+      <div className="flex flex-col items-start gap-3">
+        <p className="text-danger-ink m-0 text-sm">Couldn't load your cards.</p>
+        <button type="button" onClick={onRetry} className="sf-btn">
+          Retry
+        </button>
+      </div>
+    ) : (
+      <EditorSkeleton />
+    );
+  }
+  const current = cards.find((c) => c.id === chosen) ?? cards[0];
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="sf-display sf-twotone">
+          <strong>Cards</strong>
+        </h1>
+        <p className="text-ink-3 mt-2 mb-0 text-[15px] sm:text-[17px]">
+          One design, everywhere your customers meet it.
+        </p>
+      </header>
+
+      {!current && <p className="text-ink-2 m-0 text-sm">Turn a card on in Settings to design it.</p>}
+      {cards.length >= 2 && current && <CardSwitcher cards={cards} value={current.id} onChange={setChosen} />}
+
+      {cards.map((c) => (
+        <div key={c.id} hidden={c.id !== current?.id}>
+          <CardEditor
+            programId={c.id}
+            merchantName={merchantName}
+            // With one card the shop may still change what kind it is. With two or more, each card IS
+            // its type, and types are turned on and off in Settings.
+            typePicker={cards.length < 2}
+            onSaved={onSaved}
+          />
+        </div>
+      ))}
+    </div>
+  );
 }
 
-export function CardScreen({ merchantName }: { merchantName?: string }) {
+function EditorSkeleton() {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+      <Skeleton className="h-96 rounded-lg lg:order-1" />
+      <Skeleton className="h-80 rounded-xl lg:order-2" />
+    </div>
+  );
+}
+
+function CardEditor({
+  programId,
+  merchantName,
+  typePicker,
+  onSaved,
+}: {
+  programId: string;
+  merchantName?: string;
+  typePicker: boolean;
+  onSaved: (program: Program) => void;
+}) {
   const api = useApi();
   const [program, setProgram] = useState<Program | null>(null);
   const [types, setTypes] = useState<CardTypeOption[]>([]);
@@ -50,7 +123,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
   const saves = useRef(0);
 
   useEffect(() => {
-    Promise.all([api.getProgram(), api.getCardTypes()])
+    Promise.all([api.getProgram(programId), api.getCardTypes()])
       .then(([p, t]) => {
         setProgram(p);
         setName(p.name);
@@ -96,7 +169,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
       if (++polls > 24) return window.clearInterval(timer);
       const started = saves.current;
       api
-        .getProgram()
+        .getProgram(programId)
         .then((fresh) => {
           if (saves.current === started) setProgram((p) => p && { ...p, walletSync: fresh.walletSync });
         })
@@ -123,6 +196,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
       // Again on landing: a check that went out while this save was in flight read the state before it.
       saves.current++;
       setProgram(updated);
+      onSaved(updated);
       setRound((n) => n + 1);
       setType(updated.type);
       setMechanics((updated.mechanics ?? {}) as Record<string, unknown>);
@@ -135,14 +209,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
   }
 
   if (!program) {
-    return err ? (
-      <p className="text-danger-ink text-sm">{err}</p>
-    ) : (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
-        <Skeleton className="h-96 rounded-lg lg:order-1" />
-        <Skeleton className="h-80 rounded-xl lg:order-2" />
-      </div>
-    );
+    return err ? <p className="text-danger-ink text-sm">{err}</p> : <EditorSkeleton />;
   }
 
   const shopName = merchantName || program.name;
@@ -152,16 +219,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
   const upload = async (kind: "stamp" | "logo", file: File) => (await api.uploadAsset(kind, file)).url;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="sf-display sf-twotone">
-          <strong>Cards</strong>
-        </h1>
-        <p className="text-ink-3 mt-2 mb-0 text-[15px] sm:text-[17px]">
-          One design, everywhere your customers meet it.
-        </p>
-      </header>
-
+    <>
       {/*
         Preview first in the DOM, so a phone shows the card before the controls that change it —
         then ordered to the right column on a wide screen, where it sticks as the editor scrolls.
@@ -185,31 +243,33 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
         </div>
 
         <div className="flex flex-col gap-4 lg:order-1">
-          <Section icon={LayoutGrid} title="What kind of card" hint={typeHint(program)}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {types.map((t) => {
-                const active = t.type === type;
-                return (
-                  <button
-                    key={t.type}
-                    type="button"
-                    onClick={() => selectType(t)}
-                    aria-pressed={active}
-                    className={cn(
-                      "sf-press cursor-pointer rounded-[var(--radius-md)] p-3 text-left transition-colors",
-                      // Chosen goes ink, like a pressed chip; lime stays for Save.
-                      active ? "bg-surface-inverse text-on-inverse" : "bg-surface-sunken hover:text-ink",
-                    )}
-                  >
-                    <span className="block text-sm font-medium">{t.label}</span>
-                    <span className={cn("mt-0.5 block text-[12px] leading-snug", active ? "opacity-75" : "text-ink-2")}>
-                      {t.blurb}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </Section>
+          {typePicker && (
+            <Section icon={LayoutGrid} title="What kind of card" hint={typeHint(program)}>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {types.map((t) => {
+                  const active = t.type === type;
+                  return (
+                    <button
+                      key={t.type}
+                      type="button"
+                      onClick={() => selectType(t)}
+                      aria-pressed={active}
+                      className={cn(
+                        "sf-press cursor-pointer rounded-[var(--radius-md)] p-3 text-left transition-colors",
+                        // Chosen goes ink, like a pressed chip; lime stays for Save.
+                        active ? "bg-surface-inverse text-on-inverse" : "bg-surface-sunken hover:text-ink",
+                      )}
+                    >
+                      <span className="block text-sm font-medium">{t.label}</span>
+                      <span className={cn("mt-0.5 block text-[12px] leading-snug", active ? "opacity-75" : "text-ink-2")}>
+                        {t.blurb}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Section>
+          )}
 
           <Section icon={Signature} title="Identity">
             <Labelled label="Card title" hint="The pass title on both wallets.">
@@ -396,7 +456,7 @@ export function CardScreen({ merchantName }: { merchantName?: string }) {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

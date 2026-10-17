@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SignIn, useAuth } from "@clerk/react";
-import type { Analytics, AnalyticsRange, CustomerFilter } from "./api";
+import type { Analytics, AnalyticsRange, CustomerFilter, Program } from "./api";
 import { useApi, NeedsOnboarding, Forbidden } from "./useApi";
 import { AppShell, Wordmark, type ManageView } from "@/components/AppShell";
 import { Dashboard } from "@/screens/Dashboard";
@@ -12,6 +12,7 @@ import { CardScreen } from "@/screens/Card";
 import { CreateShop } from "@/screens/CreateShop";
 import { Settings } from "@/screens/Settings";
 import { Card } from "@/components/ui/card";
+import { runningCards } from "@/components/CardSwitcher";
 import { isCounterMode, setCounterModeFlag } from "@/lib/counter-mode";
 // Softform's liquid glass script, copied verbatim beside its CSS: re-copy to update, never edit.
 import { liquidGlass } from "./styles/liquid-glass.js";
@@ -53,6 +54,13 @@ function ShopApp() {
   const [counterMode, setCounterMode] = useState(isCounterMode);
   const [range, setRange] = useState<AnalyticsRange>("30d");
   const [customerFilter, setCustomerFilter] = useState<CustomerFilter>("all");
+  // Which card the overview and the customer list are about; null is the whole shop. Only offered
+  // when the shop runs two or more cards.
+  const [overviewCard, setOverviewCard] = useState<string | null>(null);
+  const [customerCard, setCustomerCard] = useState<string | null>(null);
+  // Every card the shop has, on or frozen. Screens show the ones that are on.
+  const [programs, setPrograms] = useState<Program[] | null>(null);
+  const [programsFailed, setProgramsFailed] = useState(false);
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -65,6 +73,11 @@ function ShopApp() {
   // A rename made while a poll was out: that poll's answer still carries the old name.
   const renamed = useRef<{ name: string; at: number } | null>(null);
 
+  const cards = runningCards(programs);
+  // A card filter only means something while there is a choice, and while that card is still on.
+  const card = (id: string | null) => (cards.length >= 2 && cards.some((c) => c.id === id) ? id : null);
+  const overviewProgram = card(overviewCard);
+
   const load = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -72,7 +85,7 @@ function ShopApp() {
     setLoading(true);
     try {
       const askedAt = Date.now();
-      const fresh = await api.getAnalytics(range);
+      const fresh = await api.getAnalytics(range, overviewProgram ?? undefined);
       const r = renamed.current;
       setData(r && r.at >= askedAt ? { ...fresh, merchantName: r.name } : fresh);
     } catch (e) {
@@ -88,7 +101,21 @@ function ShopApp() {
       setLoading(false);
       inFlight.current = false;
     }
-  }, [api, range]);
+  }, [api, range, overviewProgram]);
+
+  const loadPrograms = useCallback(async () => {
+    setProgramsFailed(false);
+    try {
+      setPrograms(await api.listPrograms());
+    } catch (e) {
+      // No shop yet is the analytics load's to handle; anything else, the card screens offer a retry.
+      if (!(e instanceof NeedsOnboarding)) setProgramsFailed(true);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    if (!needsShop) void loadPrograms();
+  }, [loadPrograms, needsShop]);
 
   useEffect(() => {
     // Nothing is worth polling until the shop exists — and a poll landing while the owner is naming
@@ -117,9 +144,19 @@ function ShopApp() {
     setCounterMode(false);
   }, []);
 
-  const openCustomers = useCallback((filter: CustomerFilter) => {
-    setCustomerFilter(filter);
-    setView("customers");
+  // From the overview's "See who": the same segment, and the same card the overview is showing.
+  const openCustomers = useCallback(
+    (filter: CustomerFilter) => {
+      setCustomerFilter(filter);
+      setCustomerCard(overviewProgram);
+      setView("customers");
+    },
+    [overviewProgram],
+  );
+
+  // A saved card replaces its entry, so a renamed card is renamed in every switcher.
+  const cardSaved = useCallback((saved: Program) => {
+    setPrograms((list) => list && list.map((p) => (p.id === saved.id ? saved : p)));
   }, []);
 
   // Before counter mode: a device left in counter mode with no shop behind it would land in a scanner
@@ -171,16 +208,36 @@ function ShopApp() {
             data={data}
             range={range}
             onRangeChange={setRange}
+            cards={cards}
+            card={overviewProgram}
+            onCardChange={setOverviewCard}
             onRefresh={() => void load()}
             onViewCustomers={openCustomers}
             loading={loading}
           />
         )}
-        {view === "customers" && <Customers key={customerFilter} initialFilter={customerFilter} />}
+        {view === "customers" && (
+          <Customers
+            key={`${customerFilter}:${customerCard}`}
+            initialFilter={customerFilter}
+            cards={cards}
+            initialCard={card(customerCard)}
+          />
+        )}
         {view === "team" && <Team />}
-        {view === "card" && <CardScreen merchantName={data?.merchantName} />}
+        {view === "card" && (
+          <CardScreen
+            merchantName={data?.merchantName}
+            cards={programs && cards}
+            failed={programsFailed}
+            onRetry={() => void loadPrograms()}
+            onSaved={cardSaved}
+          />
+        )}
         {view === "settings" && (
           <Settings
+            programs={programs}
+            onCardsChanged={setPrograms}
             merchantName={data?.merchantName}
             // Update everything that shows the name now, rather than at the next poll.
             onRenamed={(name) => {
@@ -191,7 +248,13 @@ function ShopApp() {
         )}
         {view === "counterqr" &&
           (data ? (
-            <CounterQR merchantId={data.merchantId} merchantName={data.merchantName} />
+            <CounterQR
+              merchantId={data.merchantId}
+              merchantName={data.merchantName}
+              cards={programs && cards}
+              failed={programsFailed}
+              onRetry={() => void loadPrograms()}
+            />
           ) : (
             <p className="text-ink-3 text-sm">Loading…</p>
           ))}
