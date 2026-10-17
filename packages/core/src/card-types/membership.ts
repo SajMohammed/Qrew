@@ -71,6 +71,8 @@ export const membershipCard: CardTypeModule<MembershipMechanics> = {
 
   defaultTarget: 50,
 
+  defaultBonus: 0,
+
   drawsStampStrip: false,
 
   accrues: true,

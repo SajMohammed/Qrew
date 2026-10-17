@@ -25,6 +25,7 @@ export class DomainExceptionFilter implements ExceptionFilter {
         : error instanceof ConflictError
           ? [HttpStatus.CONFLICT, "Conflict"]
           : [HttpStatus.BAD_REQUEST, "Bad Request"];
-    res.status(status).json({ statusCode: status, error: label, message: error.message });
+    const code = error instanceof ConflictError ? error.code : undefined;
+    res.status(status).json({ statusCode: status, error: label, ...(code ? { code } : {}), message: error.message });
   }
 }

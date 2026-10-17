@@ -10,7 +10,7 @@ import {
   loyaltyProgressEvents,
 } from "@qrew/db";
 import { enqueueWalletSync } from "@qrew/queue";
-import { NotFoundError } from "./errors";
+import { ConflictError, NotFoundError } from "./errors";
 import { isWalletIssuable } from "./wallet-pass";
 
 export interface EnrollInput {
@@ -37,6 +37,7 @@ export interface EnrollResult {
  *
  * - Idempotent per (customer, program): re-scanning returns the existing card and does
  *   NOT re-seed bonus stamps (prevents bonus farming).
+ * - A frozen card (its type turned off by the shop) refuses anyone who doesn't already hold it.
  * - Endowed-progress: seeds the program's bonus stamps as a ledger event on signup.
  * - No wallet call: the pass is created by the wallet worker from a queued job, and the card page
  *   hands out a save link built from the card's state either way. A vendor outage used to fail
@@ -52,10 +53,7 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
     const [merchant] = await db.select({ name: merchants.name }).from(merchants);
     if (!merchant) throw new NotFoundError("merchant not found");
 
-    const [program] = await db
-      .select()
-      .from(loyaltyPrograms)
-      .where(and(eq(loyaltyPrograms.id, input.programId), eq(loyaltyPrograms.active, true)));
+    const [program] = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.id, input.programId));
     if (!program) throw new NotFoundError("program not found");
 
     // find-or-create the customer, within the tenant.
@@ -147,6 +145,14 @@ export async function enroll(input: EnrollInput): Promise<EnrollResult> {
       );
     if (existing) {
       return { alreadyEnrolled: true as const, enrollment: existing, program, merchantName: merchant.name };
+    }
+
+    /*
+     * A frozen card takes no new members. Asked only now, so someone who already holds it still gets
+     * their own card back above. Throwing rolls back the customer row this transaction may have made.
+     */
+    if (program.status !== "active") {
+      throw new ConflictError("this card isn't taking new members", "card_frozen");
     }
 
     /*

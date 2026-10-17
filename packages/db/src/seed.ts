@@ -12,13 +12,17 @@ async function main(): Promise<void> {
   const merchant = inserted[0] ?? (await adminDb.select().from(merchants).limit(1))[0];
   if (!merchant) throw new Error("seed failed: no merchant");
 
-  await adminDb.insert(loyaltyPrograms).values({
-    merchantId: merchant.id,
-    name: "Coffee Card",
-    stampsRequired: 10,
-    bonusStamps: 2,
-    rewardText: "1 free coffee",
-  });
+  // A shop has one card per type, so a re-run leaves the existing stamp card alone.
+  await adminDb
+    .insert(loyaltyPrograms)
+    .values({
+      merchantId: merchant.id,
+      name: "Coffee Card",
+      stampsRequired: 10,
+      bonusStamps: 2,
+      rewardText: "1 free coffee",
+    })
+    .onConflictDoNothing();
 
   console.log(`✓ seeded merchant ${merchant.slug} (${merchant.id})`);
   await closeDb();

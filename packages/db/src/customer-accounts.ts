@@ -119,7 +119,7 @@ export async function revokeRefreshSession(refreshTokenHash: string): Promise<vo
  * What claiming a card came to:
  * - claimed — it is this account's card now (or already was);
  * - refused — no such card, or it belongs to a different account;
- * - has_own — the account already has its own card at this shop, so this one can't join it.
+ * - has_own — the account already holds its own card of this programme, so this one can't join it.
  */
 export type ClaimOutcome = "claimed" | "refused" | "has_own";
 
@@ -132,7 +132,7 @@ export type ClaimOutcome = "claimed" | "refused" | "has_own";
 export async function claimCardBySerial(accountId: string, serial: string): Promise<ClaimOutcome> {
   return adminDb.transaction(async (tx) => {
     const [e] = await tx
-      .select({ customerId: enrollments.customerId })
+      .select({ id: enrollments.id, customerId: enrollments.customerId, programId: enrollments.programId })
       .from(enrollments)
       .where(eq(enrollments.cardSerial, serial))
       .limit(1);
@@ -148,19 +148,39 @@ export async function claimCardBySerial(accountId: string, serial: string): Prom
     if (c.accountId) return c.accountId === accountId ? "claimed" : "refused";
 
     /*
-     * A person is one customer per shop, so an account that already has a card here can't take this
-     * one as well — linking it would break that rule (and used to fail as a 500 on every sign-in).
-     * Merging two cards' stamps is a policy not yet settled, so this card stays as it is: unclaimed,
-     * and still on the device that holds it.
+     * A person is one customer per shop, so an account that is already a customer here can't link
+     * this card's customer row as well — that would break the rule (and used to fail as a 500 on
+     * every sign-in). A shop runs one card of each type, though, so the account may hold this shop's
+     * stamp card while this is its points card: then the card moves onto the account's own row, and
+     * the walk-in row it came with goes once it holds nothing. Only a second card of the SAME
+     * programme stays put — merging two cards' stamps is a policy not yet settled — unclaimed, and
+     * still on the device that holds it.
      */
     const [own] = await tx
       .select({ id: customers.id })
       .from(customers)
       .where(and(eq(customers.merchantId, c.merchantId), eq(customers.customerAccountId, accountId)))
-      .limit(1);
-    if (own) return "has_own";
+      .limit(1)
+      .for("update"); // two of this person's cards claimed at once must not both move in
+    if (!own) {
+      await tx.update(customers).set({ customerAccountId: accountId }).where(eq(customers.id, c.id));
+      return "claimed";
+    }
 
-    await tx.update(customers).set({ customerAccountId: accountId }).where(eq(customers.id, c.id));
+    const [same] = await tx
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(and(eq(enrollments.customerId, own.id), eq(enrollments.programId, e.programId)))
+      .limit(1);
+    if (same) return "has_own";
+
+    await tx.update(enrollments).set({ customerId: own.id }).where(eq(enrollments.id, e.id));
+    const [left] = await tx
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(eq(enrollments.customerId, c.id))
+      .limit(1);
+    if (!left) await tx.delete(customers).where(eq(customers.id, c.id));
     return "claimed";
   });
 }
@@ -186,15 +206,18 @@ export interface MyCard {
   stampsRequired: number;
   cardDesign: unknown;
   status: string;
+  /** The shop turned this card's type off: it collects nothing more, but what it holds can be used. */
+  frozen: boolean;
 }
 
 /**
- * The deliberate CROSS-MERCHANT read: every active card belonging to this person, across all shops.
+ * The deliberate CROSS-MERCHANT read: every active card belonging to this person, across all shops —
+ * frozen ones included, since what they hold is still the customer's to use.
  * adminDb bypasses RLS on purpose — authorization is the customer's own session (checked upstream),
  * so only the signed-in person sees their aggregate; merchant dashboards stay RLS-isolated.
  */
 export async function getMyCards(accountId: string): Promise<MyCard[]> {
-  return adminDb
+  const rows = await adminDb
     .select({
       serial: enrollments.cardSerial,
       programId: enrollments.programId,
@@ -205,6 +228,7 @@ export async function getMyCards(accountId: string): Promise<MyCard[]> {
       stampsRequired: loyaltyPrograms.stampsRequired,
       cardDesign: loyaltyPrograms.cardDesign,
       status: enrollments.status,
+      programStatus: loyaltyPrograms.status,
     })
     .from(customers)
     .innerJoin(enrollments, eq(enrollments.customerId, customers.id))
@@ -212,4 +236,5 @@ export async function getMyCards(accountId: string): Promise<MyCard[]> {
     .innerJoin(merchants, eq(merchants.id, enrollments.merchantId))
     .where(and(eq(customers.customerAccountId, accountId), eq(enrollments.status, "active")))
     .orderBy(desc(enrollments.createdAt));
+  return rows.map(({ programStatus, ...card }) => ({ ...card, frozen: programStatus === "frozen" }));
 }

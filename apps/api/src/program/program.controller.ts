@@ -1,6 +1,6 @@
 import { Controller, Get, Patch, Param, Body, NotFoundException, ParseUUIDPipe } from "@nestjs/common";
-import { ProgramUpdate } from "@qrew/contracts";
-import { getProgram, updateProgram, availableCardTypes } from "@qrew/core";
+import { CardType, CardTypeToggle, ProgramUpdate } from "@qrew/contracts";
+import { getProgram, listPrograms, setCardTypeEnabled, updateProgram, availableCardTypes } from "@qrew/core";
 import { Merchant, Roles } from "../auth/auth.decorators";
 
 @Controller("program")
@@ -30,10 +30,10 @@ export class ProgramController {
     }));
   }
 
-  @Get()
-  async current(@Merchant() merchantId: string) {
-    const program = await getProgram(merchantId);
-    if (!program) throw new NotFoundException("no program");
+  @Get(":id")
+  async one(@Merchant() merchantId: string, @Param("id", ParseUUIDPipe) id: string) {
+    const program = await getProgram(merchantId, id);
+    if (!program) throw new NotFoundException("program not found");
     return program;
   }
 
@@ -45,5 +45,29 @@ export class ProgramController {
     const program = await updateProgram(merchantId, id, patch);
     if (!program) throw new NotFoundException("program not found");
     return program;
+  }
+}
+
+/**
+ * The shop's cards, one per card type it runs. There is no single "current" card: every screen
+ * lists them and names the one it means.
+ */
+@Controller("programs")
+export class ProgramsController {
+  /** Every card, on or frozen, oldest first. Card designs are not sensitive, so any staff role reads them. */
+  @Get()
+  list(@Merchant() merchantId: string) {
+    return listPrograms(merchantId);
+  }
+
+  /**
+   * Turn a card type on or off. Owner-only, like the shop's name: which cards a shop runs is what
+   * its price will be based on. Answers with every card, so the console redraws from the truth.
+   */
+  @Roles("owner")
+  @Patch(":type")
+  setEnabled(@Merchant() merchantId: string, @Param("type") type: string, @Body() body: unknown) {
+    const { enabled } = CardTypeToggle.parse(body);
+    return setCardTypeEnabled(merchantId, CardType.parse(type), enabled);
   }
 }

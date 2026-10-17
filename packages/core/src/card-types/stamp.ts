@@ -31,6 +31,8 @@ export const stampCard: CardTypeModule<StampMechanics> = {
 
   defaultTarget: 10,
 
+  defaultBonus: 2,
+
   drawsStampStrip: true,
 
   accrues: true,

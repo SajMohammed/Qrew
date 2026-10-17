@@ -48,6 +48,8 @@ export const discountCard: CardTypeModule<DiscountMechanics> = {
 
   defaultTarget: 1,
 
+  defaultBonus: 0,
+
   drawsStampStrip: false,
 
   accrues: false,

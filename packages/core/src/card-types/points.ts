@@ -47,6 +47,8 @@ export const pointsCard: CardTypeModule<PointsMechanics> = {
 
   defaultTarget: 500,
 
+  defaultBonus: 0,
+
   drawsStampStrip: false,
 
   accrues: true,

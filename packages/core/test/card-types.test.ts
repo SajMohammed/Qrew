@@ -6,6 +6,8 @@ import { getProgram, updateProgram } from "../src/index";
 import { InvalidInputError } from "../src/errors";
 
 let merchantId: string;
+// A shop runs one card per type, so the held stamp card belongs to a second shop.
+let heldMerchantId: string;
 let emptyProgramId: string;
 let heldProgramId: string;
 
@@ -13,6 +15,8 @@ beforeAll(async () => {
   const s = process.pid.toString(36);
   const [m] = await adminDb.insert(merchants).values({ name: "Types Co", slug: `typ-${s}` }).returning();
   merchantId = m!.id;
+  const [h] = await adminDb.insert(merchants).values({ name: "Held Co", slug: `typh-${s}` }).returning();
+  heldMerchantId = h!.id;
 
   const [empty] = await adminDb
     .insert(loyaltyPrograms)
@@ -22,13 +26,13 @@ beforeAll(async () => {
 
   const [held] = await adminDb
     .insert(loyaltyPrograms)
-    .values({ merchantId, name: "Customers hold this", stampsRequired: 10 })
+    .values({ merchantId: heldMerchantId, name: "Customers hold this", stampsRequired: 10 })
     .returning();
   heldProgramId = held!.id;
 
-  const [c] = await adminDb.insert(customers).values({ merchantId, name: "Holder" }).returning();
+  const [c] = await adminDb.insert(customers).values({ merchantId: heldMerchantId, name: "Holder" }).returning();
   await adminDb.insert(enrollments).values({
-    merchantId,
+    merchantId: heldMerchantId,
     programId: heldProgramId,
     customerId: c!.id,
     cardSerial: `types-${s}`,
@@ -37,6 +41,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await adminDb.delete(merchants).where(eq(merchants.id, merchantId));
+  await adminDb.delete(merchants).where(eq(merchants.id, heldMerchantId));
   await closeDb();
 });
 
@@ -83,16 +88,16 @@ describe("changing a programme's card type", () => {
   });
 
   it("is refused once even one customer holds a pass", async () => {
-    await expect(updateProgram(merchantId, heldProgramId, { type: "points" })).rejects.toThrow(
+    await expect(updateProgram(heldMerchantId, heldProgramId, { type: "points" })).rejects.toThrow(
       InvalidInputError,
     );
-    await expect(updateProgram(merchantId, heldProgramId, { type: "points" })).rejects.toThrow(
+    await expect(updateProgram(heldMerchantId, heldProgramId, { type: "points" })).rejects.toThrow(
       /already has 1 card/,
     );
   });
 
   it("still allows every other edit on a programme customers hold", async () => {
-    const updated = await updateProgram(merchantId, heldProgramId, {
+    const updated = await updateProgram(heldMerchantId, heldProgramId, {
       rewardText: "Free pastry",
       cardDesign: { brandColor: "#6C2A4B" },
     });
@@ -102,7 +107,7 @@ describe("changing a programme's card type", () => {
 
   it("does not trip the guard when the type is re-sent unchanged", async () => {
     // Saving the designer form resends every field, including the type it already has.
-    const updated = await updateProgram(merchantId, heldProgramId, { type: "stamp", name: "Same type" });
+    const updated = await updateProgram(heldMerchantId, heldProgramId, { type: "stamp", name: "Same type" });
     expect(updated?.name).toBe("Same type");
   });
 });

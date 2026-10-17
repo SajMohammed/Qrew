@@ -81,6 +81,13 @@ export interface CardTypeModule<M = unknown> {
   defaultTarget: number;
 
   /**
+   * The head start a new card of this type gives on signup, when a shop first turns the type on.
+   * Zero for a type with nothing to collect: a bonus there would be a ledger row counting progress
+   * on a card that has none.
+   */
+  defaultBonus: number;
+
+  /**
    * Whether the pass shows progress as a picture of stamps.
    *
    * Only a stamp card does. Google renders a points balance natively and a discount has no
