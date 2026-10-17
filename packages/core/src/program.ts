@@ -47,8 +47,9 @@ export interface ShopPreview {
 
 /**
  * Public pre-enrollment preview of a shop's card — merchant + programme branding, by the routing ids
- * from the counter QR. A frozen card has no preview: it takes no new members. Read via withTenant(merchantId) exactly like enroll; everything returned is
- * public shop branding (name, reward, design), no customer data.
+ * from the counter QR. A frozen card has no preview: it takes no new members. Read via
+ * withTenant(merchantId) exactly like enroll; everything returned is public shop branding (name,
+ * reward, design), no customer data.
  */
 export async function getShopPreview(merchantId: string, programId: string): Promise<ShopPreview | null> {
   return withTenant(merchantId, async (db) => {

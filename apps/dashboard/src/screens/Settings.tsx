@@ -65,7 +65,8 @@ const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 
 function CardTypes({ programs, onChanged }: { programs: Program[] | null; onChanged: (p: Program[]) => void }) {
   const api = useApi();
   const [types, setTypes] = useState<CardTypeOption[] | null>(null);
-  const [busy, setBusy] = useState<CardType | null>(null);
+  // The switch being changed, shown in its new position while the server answers; back if it refuses.
+  const [busy, setBusy] = useState<{ type: CardType; enabled: boolean } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,7 +77,7 @@ function CardTypes({ programs, onChanged }: { programs: Program[] | null; onChan
   }, [api]);
 
   async function toggle(type: CardType, enabled: boolean) {
-    setBusy(type);
+    setBusy({ type, enabled });
     setErr(null);
     try {
       onChanged(await api.setCardType(type, enabled));
@@ -131,7 +132,7 @@ function CardTypes({ programs, onChanged }: { programs: Program[] | null; onChan
                     className="sf-switch disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label={t.label}
                     aria-describedby={`card-type-${t.type}`}
-                    checked={enabled}
+                    checked={busy?.type === t.type ? busy.enabled : enabled}
                     disabled={busy !== null || last}
                     onChange={(e) => void toggle(t.type, e.target.checked)}
                   />

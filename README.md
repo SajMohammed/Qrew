@@ -78,7 +78,7 @@ Scanner    http://localhost:5174/?m=<merchant-uuid>
 API        curl localhost:4000/health
 
 # the card needs the program id too — grab it from the API:
-curl localhost:4000/program -H "x-merchant-id: <merchant-uuid>"   # → { id, ... }
+curl localhost:4000/programs -H "x-merchant-id: <merchant-uuid>"  # → [{ id, type, status, ... }], one per card type
 Card       http://localhost:5173/?m=<merchant-uuid>&p=<program-uuid>
 ```
 
